@@ -1,15 +1,15 @@
-# Lecture 18 — VLN 理论
+# Lecture 19 — VLN 实操
 
-> 对应文稿：见 `docs/` 中第 18 讲
+> 对应文稿：见 `docs/` 中第 19 讲
 
 ## 本讲 Demo
 
-Habitat VLN episode 走读与指标说明
+VLN 批量评测与 navigate_to skill
 
 ## 目录结构
 
 ```
-lecture18/
+lecture19/
 ├── README.md           # 本文件
 ├── requirements.txt    # Python 依赖（按需）
 ├── hardware/           # 真机脚本（SO101 / xLeRobot / G1）
@@ -19,10 +19,10 @@ lecture18/
 ## 快速开始（仿真）
 
 ```bash
-cd code/lecture18
+cd code/lecture19
 python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python simulation/habitat_vln_walkthrough.py
+python simulation/run_vln_eval.py
 ```
 
 ## 真机路径
@@ -38,4 +38,4 @@ python simulation/habitat_vln_walkthrough.py
 
 ## 贡献
 
-修改本讲代码请开 PR，标题格式：`[Lecture 18] ...`
+修改本讲代码请开 PR，标题格式：`[Lecture 19] ...`

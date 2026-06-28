@@ -9,10 +9,10 @@
   ╚═╝  ╚═╝╚═════╝  ╚═════╝    ╚═╝   ╚═╝ ╚═════╝╚══════╝
   </pre>
 
-  # Xbotics 具身智能十八讲
+  # Xbotics 具身智能教程（21 讲）
 
   <p align="center">
-    <em>从机器人基础到世界模型 · 真机优先、仿真兜底 · 面向高校学生与企业开发者的工程实践课程</em>
+    <em>从机器人基础到具身前沿 · Agent / VLN / 世界模型 · 真机优先、仿真兜底</em>
   </p>
 
   <p align="center">
@@ -22,15 +22,18 @@
   <p align="center">
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-0052cc?style=for-the-badge&labelColor=1a1a2e" alt="License"></a>
     <a href="https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide"><img src="https://img.shields.io/badge/社区-Xbotics%20Embodied-4ecdc4?style=for-the-badge&labelColor=1a1a2e" alt="Community"></a>
+    <img src="https://img.shields.io/badge/讲次-21_讲-ff6b6b?style=for-the-badge&labelColor=1a1a2e" alt="21 Lectures">
   </p>
 
 </div>
 
 ---
 
-《Xbotics 具身智能十八讲》是 [Xbotics 具身智能社区](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide) 出品的**系统实践教程**：不是论文综述，也不是纯科普，而是一套围绕真实机器人任务、可跑通 Demo、可复盘失败的工程实践课程。
+《Xbotics 具身智能教程（21 讲）》是 [Xbotics 具身智能社区](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide) 出品的**系统实践教程**：不是论文综述，也不是纯科普，而是一套围绕真实机器人任务、可跑通 Demo、可复盘失败的工程实践课程。
 
-本仓库包含 **书稿正文 · 每讲代码 · 配图资料 · 协作规范**，与社区 [Xbotics-Embodied-Guide](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide)（学习路线与资源导航）互补——Guide 帮你看全局，**十八讲**带你动手跑完整闭环。
+本仓库包含 **21 讲**书稿正文 · 每讲代码 · 配图资料 · 协作规范（**六大部分**），与社区 [Xbotics-Embodied-Guide](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide) 互补——Guide 帮你看全局，**本教程**带你动手跑完整闭环。
+
+> 仓库名 [Xbotics-Embodied-AI-Handbook](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-AI-Handbook)；课程已从原「十八讲」扩展为 **二十一讲**（新增 VLN×2，世界模型与前沿进展分讲）。
 
 ![具身智能学习路线示意](https://github.com/user-attachments/assets/054c89b9-d114-4477-b751-a01f2e7a6376)
 
@@ -43,8 +46,8 @@
 **三步上手本仓库：**
 
 ```bash
-git clone <本仓库 URL>
-cd Xbotics-Embodied-AI-18Lectures
+git clone git@github.com:Xbotics-Embodied-AI-club/Xbotics-Embodied-AI-Handbook.git
+cd Xbotics-Embodied-AI-Handbook
 ```
 
 1. **读目录**：打开 [`docs/SUMMARY.md`](docs/SUMMARY.md)，从 [总定位](docs/00-preface/01-positioning.md) 建立系统地图。
@@ -62,8 +65,8 @@ python simulation/minimal_reach.py
 
 | 目录 | 说明 |
 |------|------|
-| [`docs/`](docs/) | 书稿正文（五大部分 · 18 讲） |
-| [`code/`](code/) | 每讲 Demo（`lecture01` … `lecture18`） |
+| [`docs/`](docs/) | 书稿正文（**六大部分** · 21 讲） |
+| [`code/`](code/) | 每讲 Demo（`lecture01` … `lecture21`，共 21 讲） |
 | [`assets/`](assets/) | 配图与演示视频 |
 | [`references/`](references/) | 开源链接集中维护 |
 | [`meta/`](meta/) | 大纲、进度、贡献者 |
@@ -81,7 +84,7 @@ python simulation/minimal_reach.py
 
 | 模块 | 说明 | 阅读 |
 |------|------|------|
-| 总定位与学习路径 | 课程要解决什么、18 讲主线 | [📖 阅读](docs/00-preface/01-positioning.md) |
+| 总定位与学习路径 | 课程要解决什么、21 讲主线 | [📖 阅读](docs/00-preface/01-positioning.md) |
 | 双路径设计 | 有硬件版 / 无硬件仿真版 | [📖 阅读](docs/00-preface/02-dual-path.md) |
 | AI 时代学习方法 | 问题驱动、云平台、协作写作 | [📖 阅读](docs/00-preface/03-ai-era-learning.md) |
 
@@ -133,15 +136,28 @@ python simulation/minimal_reach.py
 | 第 15 讲 | RL 运动控制（Unitree G1） | [📖](docs/part4-reinforcement-learning/15-rl-locomotion.md) | [💻](code/lecture15/) |
 | 第 16 讲 | 抓取 RL 后训练与 Recovery Policy | [📖](docs/part4-reinforcement-learning/16-rl-post-training.md) | [💻](code/lecture16/) |
 
-### 第五部分 · Robot Agent 与世界模型（第 17–18 讲）
+### 第五部分 · 视觉语言导航 VLN（第 18–19 讲）
 
-**阶段项目**：语言指令驱动的具身智能综合任务 · **负责人**：[@雨浩](#team) · 富平（Agent）· 煜恒（世界模型）
+**阶段项目**：语言驱动导航评测 · **负责人**：**新梦** · 雨浩协同 · 昊旺 / 志凯（xLeRobot 支持）
 
 | 讲次 | 标题 | 文稿 | 代码 |
 |------|------|------|------|
-| 导言 | 部分定位 | [📖](docs/part5-agent-world-model/00-part-overview.md) | — |
-| 第 17 讲 | Robot Agent 与技能调用 | [📖](docs/part5-agent-world-model/17-robot-agent.md) | [💻](code/lecture17/) |
-| 第 18 讲 | 世界模型与数据飞轮 | [📖](docs/part5-agent-world-model/18-world-model.md) | [💻](code/lecture18/) |
+| 导言 | 部分定位 | [📖](docs/part5-vln/00-part-overview.md) | — |
+| 第 18 讲 | VLN 理论基础 | [📖](docs/part5-vln/18-vln-theory.md) | [💻](code/lecture18/) |
+| 第 19 讲 | VLN 实操与评测 | [📖](docs/part5-vln/19-vln-practice.md) | [💻](code/lecture19/) |
+
+### 第六部分 · Agent、世界模型与前沿进展（第 17、20–21 讲）
+
+**阶段项目**：移动 + 操作综合答辩 · **负责人**：[@雨浩](#team) · 富平（L17 Agent）· 煜恒（L20 世界模型）
+
+| 讲次 | 标题 | 文稿 | 代码 |
+|------|------|------|------|
+| 导言 | 部分定位 | [📖](docs/part6-agent-world-model/00-part-overview.md) | — |
+| 第 17 讲 | Robot Agent 与技能调用 | [📖](docs/part6-agent-world-model/17-robot-agent.md) | [💻](code/lecture17/) |
+| 第 20 讲 | 世界模型与数据飞轮 | [📖](docs/part6-agent-world-model/20-world-model.md) | [💻](code/lecture20/) |
+| 第 21 讲 | 前沿进展与综合答辩 | [📖](docs/part6-agent-world-model/21-frontier-progress.md) | [💻](code/lecture21/) |
+
+> **学习顺序**：L17 Agent → L18–L19 VLN（Part 5）→ L20 世界模型 → L21 综合答辩
 
 ### 附录
 
@@ -158,8 +174,19 @@ python simulation/minimal_reach.py
 具身智能导论 → 系统架构 → 本体与动作空间 → 传感器与坐标系
 → 仿真导论 → 感知与位姿估计 → 操作技能 → 端到端导论
 → 数据采集 → 模仿学习 → Diffusion Policy → VLA 理论 → VLA 实操
-→ RL 基础 → RL 运控(G1) → RL 后训练 → Robot Agent → 世界模型
+→ RL 基础 → RL 运控(G1) → RL 后训练 → Robot Agent
+→ VLN 理论 → VLN 实操 → 世界模型 → 前沿进展与综合答辩
 ```
+
+## 五个阶段项目
+
+| 阶段 | 讲次 | 项目名称 |
+|------|------|----------|
+| 一 | 第 1–4 讲 | 机器人基础控制闭环 |
+| 二 | 第 5–7 讲 | 视觉目标定位与模块化抓取 |
+| 三 | 第 8–13 讲 | 端到端操作策略学习 |
+| 四 | 第 18–19 讲 | 语言驱动导航评测（VLN） |
+| 五 | 第 17、20–21 讲 | 移动 + 操作综合答辩 |
 
 ---
 
@@ -172,7 +199,8 @@ python simulation/minimal_reach.py
 | **第一部分负责人** | **丛林** | 第 1–4 讲及阶段项目一；协同：翼茗、锦丰 |
 | **第二部分负责人** | **育帆** | 第 5–7 讲及阶段项目二；协同：昊旺、志凯、彤彤、宝华 |
 | **第三 & 第四部分负责人** | **harry** | 第 8–16 讲及阶段项目三；协同：陈老师、诸老师、罗辑 |
-| **第五部分负责人** | **雨浩** | 第 17–18 讲及阶段项目四；协同：富平（Agent）、煜恒（世界模型） |
+| **第五部分负责人** | **新梦** | 第 18–19 讲（VLN）及阶段项目四；雨浩协同 |
+| **第六部分负责人** | **雨浩** | 第 17、20–21 讲及阶段项目五；富平（L17）、煜恒（L20） |
 | **大纲总控** | **丛林、木木** | 6 月 30 日整体大纲检查与编写规划 |
 | **项目代码管理** | **志凯** | `code/` 结构、复现入口、跨讲依赖与 CI |
 | **文稿校验** | **乙然** | 结构/术语/模板合规检查；进度提醒 |
@@ -189,7 +217,7 @@ python simulation/minimal_reach.py
 | 节点 | 日期 | 负责人 | 交付物 |
 |------|------|--------|--------|
 | 整体大纲检查 & 编写规划 | **6 月 30 日** | 丛林、木木 | 大纲定稿、分工确认、里程碑 |
-| 各部分大纲完成 | **7 月 5 日前** | 丛林、育帆、harry、雨浩 | 各 Part 细纲（每讲目标、Demo、作业） |
+| 各部分大纲完成 | **7 月 5 日前** | 丛林、育帆（Part 2）、**新梦（Part 5）**、harry、雨浩（Part 6） | 各 Part 细纲 |
 | 第一版初稿 | **7 月 26 日前** | 全体 | 文稿 + Demo 骨架 + 配图清单 |
 | 第一版修改版 | **8 月 2 日前** | 全体 | 根据校验与互审意见修订 |
 | 例行进度同步 | **每周三 21:00** | 乙然提醒，各 Part 负责人汇报 | 进度更新 `meta/status.md` |
@@ -258,7 +286,7 @@ python simulation/minimal_reach.py
 
 ## 项目理念
 
-- **系统地图清晰**：类似《视觉 SLAM 十四讲》，先全局再模块，最后拼成闭环  
+- **系统地图清晰**：21 讲、六大部分，先全局再模块，最后拼成闭环  
 - **真机优先、仿真兜底**：没有硬件也能完成每讲核心实验  
 - **数据和失败同等重要**：成功 Demo 之外，必须有失败样本与回流路径  
 - **与社区联动**：路线查 [Embodied-Guide](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide)，求职查 [Embodied-AI-Job](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-AI-Job)

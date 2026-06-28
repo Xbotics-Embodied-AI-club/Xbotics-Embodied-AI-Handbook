@@ -97,20 +97,13 @@ PART_OVERVIEWS = {
 - 第 15 讲：强化学习运动控制（Unitree G1 Locomotion）
 - 第 16 讲：机械臂抓取 RL 后训练与 Recovery Policy
 """,
-    "part5-agent-world-model/00-part-overview.md": """# 第五部分：Robot Agent 与世界模型
+    "part5-vln/00-part-overview.md": """# 第五部分：视觉语言导航 VLN
 
-## 部分定位
+见 `docs/part5-vln/00-part-overview.md`（已独立维护）。
+""",
+    "part6-agent-world-model/00-part-overview.md": """# 第六部分：Agent、世界模型与前沿进展
 
-从端到端策略进入 **Robot Agent** 和 **世界模型**，形成语言指令驱动与数据飞轮闭环。
-
-## 覆盖讲次
-
-- 第 17 讲：Robot Agent、任务规划与技能调用
-- 第 18 讲：世界模型、数据飞轮与具身智能未来方向
-
-## 阶段项目（综合）
-
-语言指令驱动的具身智能综合任务：Agent 规划 + 感知/操作 skill + episode 记录 + 失败回流。
+见 `docs/part6-agent-world-model/00-part-overview.md`（已独立维护）。
 """,
 }
 

@@ -135,12 +135,37 @@ OpenVLA-OFT、LIBERO — https://github.com/moojink/openvla-oft ，https://githu
 | LangChain | https://github.com/langchain-ai/langchain |
 | agents-from-scratch | https://github.com/langchain-ai/agents-from-scratch |
 
-## Lecture 18 — 世界模型 {#lecture-18}
+## Lecture 18 — VLN 理论 {#lecture-18}
+
+| 项目 | URL |
+|------|-----|
+| Habitat-Lab | https://github.com/facebookresearch/habitat-lab |
+| Habitat-Sim | https://github.com/facebookresearch/habitat-sim |
+| VLN-CE | https://github.com/jacobkrantz/VLN-CE |
+| Matterport3D | https://niessner.github.io/Matterport/ |
+
+## Lecture 19 — VLN 实操 {#lecture-19}
+
+| 项目 | URL |
+|------|-----|
+| AllenAct | https://github.com/allenai/allenact |
+| Habitat-Lab VLN baselines | https://github.com/facebookresearch/habitat-lab/tree/main/habitat-baselines |
+
+## Lecture 20 — 世界模型 {#lecture-20}
 
 | 项目 | URL |
 |------|-----|
 | DreamerV3 | https://github.com/danijar/dreamerv3 |
 | DreamerV3 PyTorch | https://github.com/burchim/DreamerV3-PyTorch |
+| LeRobot | https://github.com/huggingface/lerobot |
+
+## Lecture 21 — 前沿进展 {#lecture-21}
+
+| 项目 | URL |
+|------|-----|
+| OpenPI | https://github.com/Physical-Intelligence/openpi |
+| OpenVLA | https://github.com/openvla/openvla |
+| Xbotics-Embodied-Guide 前沿 | https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide/tree/main/docs/5-sota |
 
 ---
 

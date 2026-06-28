@@ -17,7 +17,7 @@
 
 ## figures/
 
-每讲配图目录：`figures/lecture01/` … `figures/lecture18/`
+每讲配图目录：`figures/lecture01/` … `figures/lecture21/`（共 **21 讲**）
 
 命名：`fig-NN-M-简短英文名.png`
 

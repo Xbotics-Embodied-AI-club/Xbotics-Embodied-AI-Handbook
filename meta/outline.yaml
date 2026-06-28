@@ -1,7 +1,9 @@
-title: "Xbotics 具身智能十八讲"
-subtitle: "从机器人基础到世界模型"
-version: "0.1.0-draft"
+title: "Xbotics 具身智能教程（21 讲）"
+subtitle: "二十一讲：从机器人基础到具身前沿"
+version: "0.2.1-draft"
 language: zh-CN
+lecture_count: 21
+part_count: 6
 
 parts:
   - id: part1
@@ -20,114 +22,54 @@ parts:
     title: 强化学习
     lectures: [14, 15, 16]
   - id: part5
-    title: Robot Agent 与世界模型
-    lectures: [17, 18]
-    stage_project: 语言指令驱动的具身智能综合任务
+    title: 视觉语言导航 VLN
+    lectures: [18, 19]
+    stage_project: 语言驱动导航评测
+    lead: 新梦
+  - id: part6
+    title: Agent、世界模型与前沿进展
+    lectures: [17, 20, 21]
+    stage_project: 移动与操作综合答辩
+    lead: 雨浩
 
 lectures:
-  - id: 1
-    slug: introduction
-    title: 具身智能导论
-    path: docs/part1-system-basics/01-introduction.md
-    code: code/lecture01
-  - id: 2
-    slug: ros2-architecture
-    title: 机器人系统架构
-    path: docs/part1-system-basics/02-ros2-architecture.md
-    code: code/lecture02
-  - id: 3
-    slug: robot-body-control
-    title: 机器人本体与控制基础
-    path: docs/part1-system-basics/03-robot-body-control.md
-    code: code/lecture03
-  - id: 4
-    slug: sensors-coordinates
-    title: 传感器与感知基础
-    path: docs/part1-system-basics/04-sensors-coordinates.md
-    code: code/lecture04
-  - id: 5
-    slug: simulation
-    title: 仿真环境与操作任务搭建
-    path: docs/part2-vision-manipulation/05-simulation.md
-    code: code/lecture05
-  - id: 6
-    slug: pose-estimation
-    title: 机器人感知与位姿估计
-    path: docs/part2-vision-manipulation/06-pose-estimation.md
-    code: code/lecture06
-  - id: 7
-    slug: manipulation-skills
-    title: 机器人操作技能
-    path: docs/part2-vision-manipulation/07-manipulation-skills.md
-    code: code/lecture07
-  - id: 8
-    slug: policy-intro
-    title: 端到端策略学习导论
-    path: docs/part3-end-to-end/08-policy-intro.md
-    code: code/lecture08
-  - id: 9
-    slug: data-collection
-    title: 操作数据采集、任务设计与评测
-    path: docs/part3-end-to-end/09-data-collection.md
-    code: code/lecture09
-  - id: 10
-    slug: imitation-learning
-    title: 模仿学习训练
-    path: docs/part3-end-to-end/10-imitation-learning.md
-    code: code/lecture10
-  - id: 11
-    slug: diffusion-policy
-    title: 生成式动作策略 Diffusion Policy
-    path: docs/part3-end-to-end/11-diffusion-policy.md
-    code: code/lecture11
-  - id: 12
-    slug: vla-theory
-    title: VLA 理论基础
-    path: docs/part3-end-to-end/12-vla-theory.md
-    code: code/lecture12
-  - id: 13
-    slug: vla-practice
-    title: VLA 实操
-    path: docs/part3-end-to-end/13-vla-practice.md
-    code: code/lecture13
-  - id: 14
-    slug: rl-basics
-    title: 强化学习基础
-    path: docs/part4-reinforcement-learning/14-rl-basics.md
-    code: code/lecture14
-  - id: 15
-    slug: rl-locomotion
-    title: 强化学习运动控制
-    path: docs/part4-reinforcement-learning/15-rl-locomotion.md
-    code: code/lecture15
-  - id: 16
-    slug: rl-post-training
-    title: 机械臂抓取 RL 后训练与 Recovery Policy
-    path: docs/part4-reinforcement-learning/16-rl-post-training.md
-    code: code/lecture16
-  - id: 17
-    slug: robot-agent
-    title: Robot Agent、任务规划与技能调用
-    path: docs/part5-agent-world-model/17-robot-agent.md
-    code: code/lecture17
-  - id: 18
-    slug: world-model
-    title: 世界模型、数据飞轮与未来方向
-    path: docs/part5-agent-world-model/18-world-model.md
-    code: code/lecture18
+  - { id: 1, slug: introduction, title: 具身智能导论, path: docs/part1-system-basics/01-introduction.md, code: code/lecture01, part: 1 }
+  - { id: 2, slug: ros2-architecture, title: 机器人系统架构, path: docs/part1-system-basics/02-ros2-architecture.md, code: code/lecture02, part: 1 }
+  - { id: 3, slug: robot-body-control, title: 机器人本体与控制基础, path: docs/part1-system-basics/03-robot-body-control.md, code: code/lecture03, part: 1 }
+  - { id: 4, slug: sensors-coordinates, title: 传感器与感知基础, path: docs/part1-system-basics/04-sensors-coordinates.md, code: code/lecture04, part: 1 }
+  - { id: 5, slug: simulation, title: 仿真环境与操作任务搭建, path: docs/part2-vision-manipulation/05-simulation.md, code: code/lecture05, part: 2 }
+  - { id: 6, slug: pose-estimation, title: 机器人感知与位姿估计, path: docs/part2-vision-manipulation/06-pose-estimation.md, code: code/lecture06, part: 2 }
+  - { id: 7, slug: manipulation-skills, title: 机器人操作技能, path: docs/part2-vision-manipulation/07-manipulation-skills.md, code: code/lecture07, part: 2 }
+  - { id: 8, slug: policy-intro, title: 端到端策略学习导论, path: docs/part3-end-to-end/08-policy-intro.md, code: code/lecture08, part: 3 }
+  - { id: 9, slug: data-collection, title: 操作数据采集与评测, path: docs/part3-end-to-end/09-data-collection.md, code: code/lecture09, part: 3 }
+  - { id: 10, slug: imitation-learning, title: 模仿学习训练, path: docs/part3-end-to-end/10-imitation-learning.md, code: code/lecture10, part: 3 }
+  - { id: 11, slug: diffusion-policy, title: Diffusion Policy, path: docs/part3-end-to-end/11-diffusion-policy.md, code: code/lecture11, part: 3 }
+  - { id: 12, slug: vla-theory, title: VLA 理论基础, path: docs/part3-end-to-end/12-vla-theory.md, code: code/lecture12, part: 3 }
+  - { id: 13, slug: vla-practice, title: VLA 实操, path: docs/part3-end-to-end/13-vla-practice.md, code: code/lecture13, part: 3 }
+  - { id: 14, slug: rl-basics, title: 强化学习基础, path: docs/part4-reinforcement-learning/14-rl-basics.md, code: code/lecture14, part: 4 }
+  - { id: 15, slug: rl-locomotion, title: 强化学习运动控制, path: docs/part4-reinforcement-learning/15-rl-locomotion.md, code: code/lecture15, part: 4 }
+  - { id: 16, slug: rl-post-training, title: RL 后训练与 Recovery, path: docs/part4-reinforcement-learning/16-rl-post-training.md, code: code/lecture16, part: 4 }
+  - { id: 17, slug: robot-agent, title: Robot Agent 与技能调用, path: docs/part6-agent-world-model/17-robot-agent.md, code: code/lecture17, part: 6 }
+  - { id: 18, slug: vln-theory, title: VLN 理论基础, path: docs/part5-vln/18-vln-theory.md, code: code/lecture18, part: 5 }
+  - { id: 19, slug: vln-practice, title: VLN 实操与评测, path: docs/part5-vln/19-vln-practice.md, code: code/lecture19, part: 5 }
+  - { id: 20, slug: world-model, title: 世界模型与数据飞轮, path: docs/part6-agent-world-model/20-world-model.md, code: code/lecture20, part: 6 }
+  - { id: 21, slug: frontier-progress, title: 前沿进展与综合答辩, path: docs/part6-agent-world-model/21-frontier-progress.md, code: code/lecture21, part: 6 }
+
+learning_order: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
 
 hardware:
   - name: SO101
     role: 基础控制、数据采集、模仿学习、小模型部署
   - name: xLeRobot
-    role: 移动操作、目标接近、移动抓取、Agent 综合任务
+    role: 移动操作、VLN 导航、移动抓取、Agent 综合任务
   - name: Imeta-Y1
     role: 高阶机械臂操作、科研演示
   - name: Unitree G1
-    role: 人形本体、仿真 RL、站立行走、世界模型案例
+    role: 人形本体、仿真 RL、VLN 行走、世界模型案例
 
 simulation_fallback:
   SO101: [MuJoCo, ManiSkill, robosuite, MoveIt2]
-  xLeRobot: [TurtleBot3, ROS2 mock, Isaac Lab]
+  xLeRobot: [TurtleBot3, ROS2 mock, Isaac Lab, Habitat]
   Imeta-Y1: [6DoF arm, MoveIt2, MuJoCo, Isaac Lab]
   G1: [unitree_rl_gym, unitree_rl_lab, unitree_sim_isaaclab]
+  VLN: [Habitat-Sim, Habitat-Lab, VLN-CE]

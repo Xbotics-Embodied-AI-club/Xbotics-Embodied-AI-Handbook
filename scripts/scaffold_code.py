@@ -23,7 +23,10 @@ LECTURES = {
     15: ("RL 运控 G1", "G1 locomotion 仿真入口说明", "simulation/g1_locomotion_notes.md"),
     16: ("RL 后训练", "recovery policy 仿真", "simulation/recovery_rl.py"),
     17: ("Robot Agent", "LangGraph skill 调用 mock", "simulation/agent_skills.py"),
-    18: ("世界模型", "综合任务 + episode + 失败库", "simulation/full_pipeline_demo.py"),
+    18: ("VLN 理论", "Habitat VLN episode 走读与指标说明", "simulation/habitat_vln_walkthrough.py"),
+    19: ("VLN 实操", "VLN 批量评测与 navigate_to skill", "simulation/run_vln_eval.py"),
+    20: ("世界模型", "一步 state 预测对比 Demo", "simulation/world_model_predict.py"),
+    21: ("前沿综合", "Agent + VLN + 操作全链路 mock", "simulation/full_pipeline_demo.py"),
 }
 
 TEMPLATE = """# Lecture {n:02d} — {title}

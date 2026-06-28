@@ -1,6 +1,7 @@
-# 全书目录
+# 全书目录（21 讲 · 六大部分）
 
-> 团队分工 · 时间安排 · 写作风格：见仓库根目录 [README](../README.md)  
+> **课程规模**：共 **21 讲**（非原十八讲）。Part 5 为 VLN（L18–L19），Part 6 为 Agent / 世界模型 / 前沿（L17、L20–L21）。  
+> 团队分工 · 时间安排 · 写作风格：见 [README](../README.md)  
 > 进度跟踪：[`meta/status.md`](../meta/status.md)（每周三 21:00 更新）
 
 ## 前言
@@ -51,11 +52,22 @@
 
 ---
 
-## 第五部分：Robot Agent 与世界模型（第 17–18 讲）
+## 第五部分：视觉语言导航 VLN（第 18–19 讲）
 
-- [部分导言](part5-agent-world-model/00-part-overview.md)
-- [第 17 讲：Robot Agent、任务规划与技能调用](part5-agent-world-model/17-robot-agent.md)
-- [第 18 讲：世界模型、数据飞轮与未来方向](part5-agent-world-model/18-world-model.md)
+- [部分导言](part5-vln/00-part-overview.md)
+- [第 18 讲：VLN 理论基础](part5-vln/18-vln-theory.md)
+- [第 19 讲：VLN 实操与评测](part5-vln/19-vln-practice.md)
+
+---
+
+## 第六部分：Agent、世界模型与前沿进展（第 17、20–21 讲）
+
+> 讲次顺序：建议 L17 → L18–L19（Part 5）→ L20 → L21
+
+- [部分导言](part6-agent-world-model/00-part-overview.md)
+- [第 17 讲：Robot Agent、任务规划与技能调用](part6-agent-world-model/17-robot-agent.md)
+- [第 20 讲：世界模型 —— 预测、规划与数据飞轮](part6-agent-world-model/20-world-model.md)
+- [第 21 讲：具身智能前沿进展 —— 综合闭环与答辩](part6-agent-world-model/21-frontier-progress.md)
 
 ---
 
