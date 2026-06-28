@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.egg-info/
+dist/
+build/
+
+# ROS2
+install/
+log/
+build/
+
+# ML / data
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+checkpoints/
+datasets/
+episode_data/
+code/**/outputs/
+*.hdf5
+*.bag
+*.mcap
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large media (use Git LFS or external storage)
+assets/videos/**/*.mp4
+assets/videos/**/*.mkv
+
+# Isaac / MuJoCo caches
+_isaac_sim/
+.mujoco/
