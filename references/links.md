@@ -134,6 +134,25 @@ OpenVLA-OFT、LIBERO — https://github.com/moojink/openvla-oft ，https://githu
 | LangGraph | https://github.com/langchain-ai/langgraph |
 | LangChain | https://github.com/langchain-ai/langchain |
 | agents-from-scratch | https://github.com/langchain-ai/agents-from-scratch |
+| LLM Powered Autonomous Agents | https://lilianweng.github.io/posts/2023-06-23-agent/ |
+| ReAct | https://arxiv.org/abs/2210.03629 |
+| Generative Agents | https://arxiv.org/abs/2304.03442 |
+| Mem0 | https://arxiv.org/abs/2504.19413 |
+| nanobot | https://github.com/HKUDS/nanobot |
+| Building Effective Agents | https://www.anthropic.com/engineering/building-effective-agents |
+| Effective Harnesses for Long-Running Agents | https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents |
+| Agent Skills | https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills |
+| MCP Specification | https://modelcontextprotocol.io/ |
+| π0.7 | https://arxiv.org/abs/2604.15483 |
+| MEM | https://arxiv.org/abs/2603.03596 |
+| Agentic-VLA | https://arxiv.org/abs/2605.22896 |
+| Hi Robot | https://arxiv.org/abs/2502.19417 |
+| ABot-Claw | https://arxiv.org/abs/2604.10096 |
+| Dimos | https://github.com/dimensionalOS/dimos |
+| RoboCrew | https://github.com/Grigorij-Dudnik/RoboCrew |
+| HomeBot | https://github.com/choco-robot/HomeBot |
+| Vector OS Nano | https://github.com/VectorRobotics/vector-os-nano |
+| Hey Robot | https://github.com/Xbotics-Embodied-AI-club/Xbotics-Hey-Robot |
 
 ## Lecture 18 — VLN 理论 {#lecture-18}
 
