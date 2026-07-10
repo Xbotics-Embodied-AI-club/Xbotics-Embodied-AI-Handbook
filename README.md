@@ -118,12 +118,12 @@ python simulation/minimal_reach.py
 | 讲次 | 标题 | 文稿 | 代码 |
 |------|------|------|------|
 | 导言 | 部分定位与阶段项目 | [📖](docs/part3-end-to-end/00-part-overview.md) | — |
-| 第 8 讲 | 端到端策略学习导论 | [📖](docs/part3-end-to-end/08-policy-intro.md) | [💻](code/lecture08/) |
-| 第 9 讲 | 数据采集、任务设计与评测 | [📖](docs/part3-end-to-end/09-data-collection.md) | [💻](code/lecture09/) |
-| 第 10 讲 | 模仿学习（BC / ACT） | [📖](docs/part3-end-to-end/10-imitation-learning.md) | [💻](code/lecture10/) |
-| 第 11 讲 | Diffusion Policy | [📖](docs/part3-end-to-end/11-diffusion-policy.md) | [💻](code/lecture11/) |
-| 第 12 讲 | VLA 理论基础 | [📖](docs/part3-end-to-end/12-vla-theory.md) | [💻](code/lecture12/) |
-| 第 13 讲 | VLA 实操与真机部署 | [📖](docs/part3-end-to-end/13-vla-practice.md) | [💻](code/lecture13/) |
+| 第 8 讲 | 端到端策略导论：从 Pipeline 到 Policy | [📖](docs/part3-end-to-end/08-端到端策略导论.md) [📄](docs/part3-end-to-end/pdf/第8讲_端到端策略导论.pdf) | [💻](code/vla/1_policy_rollout/) |
+| 第 9 讲 | 操作数据闭环：采一份能训练的数据集 | [📖](docs/part3-end-to-end/09-操作数据闭环.md) [📄](docs/part3-end-to-end/pdf/第9讲_操作数据闭环.pdf) | [💻](code/vla/2_data_collection/) |
+| 第 10 讲 | 模仿学习实战：ACT、Diffusion 与 Flow Matching | [📖](docs/part3-end-to-end/10-模仿学习实战.md) [📄](docs/part3-end-to-end/pdf/第10讲_模仿学习实战.pdf) | [💻](code/vla/3_imitation_learning/) |
+| 第 11 讲 | VLA 模型导览：从 OpenVLA 到 π0 家族 | [📖](docs/part3-end-to-end/11-VLA模型导览.md) [📄](docs/part3-end-to-end/pdf/第11讲_VLA模型导览.pdf) | [💻](code/vla/4_vla_inference/) |
+| 第 12 讲 | VLA 微调实战：从全量 SFT 到 LoRA 上真机 | [📖](docs/part3-end-to-end/12-VLA微调实战.md) [📄](docs/part3-end-to-end/pdf/第12讲_VLA微调实战.pdf) | [💻](code/vla/5_vla_finetune/) |
+| 第 13 讲 | VLA 前沿：跑得更快、记得更久、用上全身 | [📖](docs/part3-end-to-end/13-VLA前沿.md) [📄](docs/part3-end-to-end/pdf/第13讲_VLA前沿.pdf) | — |
 
 ### 第四部分 · 强化学习（第 14–16 讲）
 
@@ -132,9 +132,9 @@ python simulation/minimal_reach.py
 | 讲次 | 标题 | 文稿 | 代码 |
 |------|------|------|------|
 | 导言 | 部分定位 | [📖](docs/part4-reinforcement-learning/00-part-overview.md) | — |
-| 第 14 讲 | 强化学习基础（MDP → 策略） | [📖](docs/part4-reinforcement-learning/14-rl-basics.md) | [💻](code/lecture14/) |
-| 第 15 讲 | RL 运动控制（Unitree G1） | [📖](docs/part4-reinforcement-learning/15-rl-locomotion.md) | [💻](code/lecture15/) |
-| 第 16 讲 | 抓取 RL 后训练与 Recovery Policy | [📖](docs/part4-reinforcement-learning/16-rl-post-training.md) | [💻](code/lecture16/) |
+| 第 14 讲 | 强化学习入门：从策略梯度到 PPO | [📖](docs/part4-reinforcement-learning/14-强化学习入门.md) [📄](docs/part4-reinforcement-learning/pdf/第14讲_强化学习入门.pdf) | [💻](code/rl/1_rl_basics/) |
+| 第 15 讲 | GRPO 后训练：让 VLM 学会数数、让 VLA 自我提升 | [📖](docs/part4-reinforcement-learning/15-GRPO后训练.md) [📄](docs/part4-reinforcement-learning/pdf/第15讲_GRPO后训练.pdf) | [💻](code/rl/2_grpo_posttraining/) |
+| 第 16 讲 | Off-policy 强化学习：从仿真提速到真机落地 | [📖](docs/part4-reinforcement-learning/16-真机强化学习.md) [📄](docs/part4-reinforcement-learning/pdf/第16讲_真机强化学习.pdf) | [💻](code/rl/3_offpolicy/) |
 
 ### 第五部分 · 视觉语言导航 VLN（第 18–19 讲）
 
