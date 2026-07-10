@@ -1,0 +1,6 @@
+# 讲 8–16 讲义的 PDF 编译配置（Quarto 项目根）：自动启用表格自动排版过滤器。
+# 过滤器权威源在教学仓 skills/lesson-authoring/tbl-autowidth.lua，此处为部署副本。
+project:
+  type: default
+filters:
+  - _filters/tbl-autowidth.lua
