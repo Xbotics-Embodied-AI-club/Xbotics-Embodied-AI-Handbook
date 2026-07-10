@@ -1026,7 +1026,7 @@ VLA（Vision-Language-Action）模型的微调场景天然适合 LoRA，原因�
 
 | 你的情况 | 推荐方法 | 理由 |
 |----------|----------|------|
-| GPU 显存充足（≥24 GB for 7B） | LoRA | 训练更快，精度更高 |
+| GPU 显存充足（$\geq$ 24 GB for 7B） | LoRA | 训练更快，精度更高 |
 | GPU 显存有限（<24 GB for 7B） | QLoRA | 显存省 ~40%，精度损失很小 |
 | 想微调 33B+ 模型，单卡 | QLoRA | 通常是最现实的方案 |
 | 想进一步提高效果 | LoRA + DoRA | 多个实验设置中优于标准 LoRA，但要按任务验证 |
@@ -2865,7 +2865,7 @@ Scalable Real2Sim 展示了刚体资产如何通过机器人主动交互自动�
 
 [5] NVIDIA, BJORCK J, CASTAÑEDA F, et al. GR00T N1: an open foundation model for generalist humanoid robots[EB/OL]. (2025)[2026-06-26]. https://arxiv.org/abs/2503.14734.
 
-[6] HOULSBY N, GIURGIU A, JASTRZȨBSKI S, et al. Parameter-efficient transfer learning for NLP[EB/OL]. (2019)[2026-06-26]. https://arxiv.org/abs/1902.00751.
+[6] HOULSBY N, GIURGIU A, JASTRZEBSKI S, et al. Parameter-efficient transfer learning for NLP[EB/OL]. (2019)[2026-06-26]. https://arxiv.org/abs/1902.00751.
 
 [7] AGHAJANYAN A, ZETTLEMOYER L, GUPTA S. Intrinsic dimensionality explains the effectiveness of language model fine-tuning[EB/OL]. (2020)[2026-06-26]. https://arxiv.org/abs/2012.13255.
 
@@ -2909,7 +2909,7 @@ Scalable Real2Sim 展示了刚体资产如何通过机器人主动交互自动�
 
 [27] KIM M J, PERTSCH K, KARAMCHETI S, et al. OpenVLA: an open-source vision-language-action model[EB/OL]. (2024)[2026-06-26]. https://arxiv.org/abs/2406.09246.
 
-[28] BLACK K, BROWN N, DRIESS D, et al. π0: a vision-language-action flow model for general robot control[EB/OL]. (2024)[2026-06-26]. https://arxiv.org/abs/2410.24164.
+[28] BLACK K, BROWN N, DRIESS D, et al. $\pi_0$: a vision-language-action flow model for general robot control[EB/OL]. (2024)[2026-06-26]. https://arxiv.org/abs/2410.24164.
 
 [29] KUMAR A, FU Z, PATHAK D, et al. RMA: rapid motor adaptation for legged robots[EB/OL]. (2021)[2026-06-26]. https://arxiv.org/abs/2107.04034.
 

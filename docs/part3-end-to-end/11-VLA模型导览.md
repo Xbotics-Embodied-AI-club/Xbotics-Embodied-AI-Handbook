@@ -382,7 +382,7 @@ OpenVLA 的局限性也可以直接概括为四点：
 
 # 3 $\pi_0$：基于 Flow Matching 的视觉-语言-动作流模型
 
-![π0 总览：基于预训练 VLM 骨干和大规模跨机器人数据集训练的通用机器人策略。模型通过独立的 Action Expert 以 flow matching 方式生成连续动作，支持精细流畅的操作技能。模型可以直接通过 prompt 执行任务，也可以在高质量数据上微调以完成复杂多阶段任务（如叠衣服、组装纸箱等）](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/teaser_fig.png)
+![$\pi_0$ 总览：基于预训练 VLM 骨干和大规模跨机器人数据集训练的通用机器人策略。模型通过独立的 Action Expert 以 flow matching 方式生成连续动作，支持精细流畅的操作技能。模型可以直接通过 prompt 执行任务，也可以在高质量数据上微调以完成复杂多阶段任务（如叠衣服、组装纸箱等）](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/teaser_fig.png)
 
 ## 3.1 背景与动机
 
@@ -412,13 +412,13 @@ $$
 \underbrace{\text{OpenVLA}}_{\text{自回归离散动作}} \quad\longrightarrow\quad \underbrace{\pi_0}_{\text{Flow Matching 连续动作 + Action Expert}}
 $$
 
-![π0 控制移动机器人叠衣服的完整流程：从烘干机取出衣物、装入篮子、推到折叠台、逐件折叠。模型在 7 种机器人构型、68 个任务上预训练，可直接 prompt 或微调到复杂下游任务](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/fig2_final.jpeg)
+![$\pi_0$ 控制移动机器人叠衣服的完整流程：从烘干机取出衣物、装入篮子、推到折叠台、逐件折叠。模型在 7 种机器人构型、68 个任务上预训练，可直接 prompt 或微调到复杂下游任务](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/fig2_final.jpeg)
 
 ## 3.2 模型架构
 
 ### 3.2.1 总体结构：VLM 骨干 + Action Expert
 
-![π0 框架总览：左侧为预训练混合数据（自有精细操作数据集 + 开源 OXE 数据），中间为 flow matching VLA 模型（较大的 VLM 骨干处理图像和语言，较小的 Action Expert 处理机器人状态和动作），VLM 骨干权重从 PaliGemma 初始化以继承互联网规模预训练的表示。右侧为训练后的 π0 模型可控制多种不同动作空间的机器人完成各类任务](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/overview.png)
+![$\pi_0$ 框架总览：左侧为预训练混合数据（自有精细操作数据集 + 开源 OXE 数据），中间为 flow matching VLA 模型（较大的 VLM 骨干处理图像和语言，较小的 Action Expert 处理机器人状态和动作），VLM 骨干权重从 PaliGemma 初始化以继承互联网规模预训练的表示。右侧为训练后的 $\pi_0$ 模型可控制多种不同动作空间的机器人完成各类任务](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/overview.png)
 
 $\pi_0$ 的架构可以理解为一个带有两组权重的 Transformer：
 
@@ -641,7 +641,7 @@ $\pi_0$ 的训练方案直接借鉴了 LLM 的 pre-training / post-training 范�
 
 ### 3.4.2 预训练数据
 
-![预训练数据组成：左图为各数据集按时间步数量的相对大小，右图为各数据集在预训练混合中的权重占比。预训练混合包含 OXE 开源数据子集和 π 自有数据集](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/combined-robot-allocation-chart.png)
+![预训练数据组成：左图为各数据集按时间步数量的相对大小，右图为各数据集在预训练混合中的权重占比。预训练混合包含 OXE 开源数据子集和 $\pi$ 自有数据集](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/combined-robot-allocation-chart.png)
 
 预训练数据总量约 10,000 小时，包含两大来源：
 
@@ -685,7 +685,7 @@ $\pi_0$ 的训练方案直接借鉴了 LLM 的 pre-training / post-training 范�
 
 ## 3.5 支持的机器人平台
 
-![π0 实验中使用的机器人平台：包括单臂和双臂操作器（6-DoF 和 7-DoF 臂），以及全向和非全向移动操作器。π0 在所有这些平台上联合训练](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/robots_compressed.png)
+![$\pi_0$ 实验中使用的机器人平台：包括单臂和双臂操作器（6-DoF 和 7-DoF 臂），以及全向和非全向移动操作器。$\pi_0$ 在所有这些平台上联合训练](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/robots_compressed.png)
 
 $\pi_0$ 在 7 种不同的机器人构型上联合训练：
 
@@ -978,13 +978,13 @@ $\pi_{0.5}$（读作 "pi oh five"）基于 $\pi_0$ 构建，是一个面向开�
 3. **从异构数据中迁移知识**：不仅使用移动操作数据，还利用其他机器人数据、网络数据、语言指令等
 4. **具备高层任务规划能力**：自主将"打扫厨房"分解为"拿起盘子"→"放入水槽"等子任务
 
-![π0.5 从异构数据源迁移知识：包括其他机器人、高层子任务预测、语言指令和网络数据，实现在全新家庭环境中的广泛泛化](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2504.16054v1/figures/pibnb-teaser-bedroom.png)
+![$\pi_{0.5}$ 从异构数据源迁移知识：包括其他机器人、高层子任务预测、语言指令和网络数据，实现在全新家庭环境中的广泛泛化](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2504.16054v1/figures/pibnb-teaser-bedroom.png)
 
 ## 5.2 模型架构
 
 ### 5.2.1 总体结构
 
-![π0.5 模型总览：预训练阶段使用离散 token（FAST）训练标准自回归 Transformer；后训练阶段加入 Action Expert 使用 flow matching 生成连续动作。推理时先推断高层子任务，再生成低层动作](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2504.16054v1/figures/Figure_3.png)
+![$\pi_{0.5}$ 模型总览：预训练阶段使用离散 token（FAST）训练标准自回归 Transformer；后训练阶段加入 Action Expert 使用 flow matching 生成连续动作。推理时先推断高层子任务，再生成低层动作](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2504.16054v1/figures/Figure_3.png)
 
 $\pi_{0.5}$ 的架构继承自 $\pi_0$，但做了关键扩展——模型可以同时输出**文本**（用于高层子任务预测和 VLM 任务）和**连续动作**（用于机器人控制）。从推理流程看，可以把它理解为：
 
@@ -1024,7 +1024,7 @@ $\pi_0$ 中，flow matching 时间步 $\tau$ 与带噪动作通过 MLP 融合后
 
 ### 5.2.4 注意力掩码
 
-![π0.5 的注意力掩码模式：图像和 prompt token 使用全前缀掩码；FAST action token 自回归地 attend 到前缀和之前的 action token；Action Expert 的 token attend 到前缀和彼此，但不 attend 到 FAST token](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2504.16054v1/figures/attention_mask.png){width=50%}
+![$\pi_{0.5}$ 的注意力掩码模式：图像和 prompt token 使用全前缀掩码；FAST action token 自回归地 attend 到前缀和之前的 action token；Action Expert 的 token attend 到前缀和彼此，但不 attend 到 FAST token](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2504.16054v1/figures/attention_mask.png){width=50%}
 
 $\pi_{0.5}$ 的注意力掩码比 $\pi_0$ 更复杂，因为需要同时处理 FAST 离散 token 和 flow matching 连续 token：
 
@@ -1304,7 +1304,7 @@ uv run python vla/4_vla_inference/4_3_vla0_infer/vla0_demo.py
 ```
 
 这一行空格分隔的 56 个整数就是模型的**全部输出**——8 步 × 7 维，每个整数是
-6.2.1 节说的 bin 编号（512 bin 下 255≈中位，对应"这一维基本不动"；末尾的 0 是
+6.2.1 节说的 bin 编号（512 bin 下 255$\approx$中位，对应"这一维基本不动"；末尾的 0 是
 夹爪张开）。解码只有几行：按空格切开、查 bin 中心表映射回 $[-1,1]$，没有动作头、
 没有扩词表，6.2.3 节"零改装"的主张在代码里就是这么直白。demo 里另外两处对应
 本节机制：`xgr.contrib.hf.LogitsProcessor` 挂在 `generate()` 上做 6.2.2 节的
