@@ -1,0 +1,13 @@
+{
+  "action_abs_mean": 0.38593642905354497,
+  "checkpoint": "DATASETS_ROOT/models/trained/xbotics_rl_g1_walk/g1-walk-ppo/model_3000.pt",
+  "checkpoint_iteration": 3000,
+  "done_count": 0,
+  "done_fraction": 0.0,
+  "mean_reward": 0.09744350159540772,
+  "num_envs": 16,
+  "run_name": "g1-walk-ppo",
+  "steps": 400,
+  "video_frames": 400,
+  "video_output": "rl/1_rl_basics/result/1_1_g1_walk_rl/g1-walk-ppo.mp4"
+}

@@ -1,0 +1,76 @@
+diff --git a/src/lerobot/envs/configs.py b/src/lerobot/envs/configs.py
+index 9c1c083..f2b7c7f 100644
+--- a/src/lerobot/envs/configs.py
++++ b/src/lerobot/envs/configs.py
+@@ -388,6 +388,71 @@ class MetaworldEnv(EnvConfig):
+         }
+ 
+ 
++@EnvConfig.register_subclass("so101_sim")
++@dataclass
++class So101SimEnv(EnvConfig):
++    """SO101 仿真（squint / ManiSkill3）评测环境。
++
++    走 make_env 的通用分支：import package_name（=so101_sim）触发注册，再
++    gym.make(gym_id=SO101Sim-v1, **gym_kwargs)。8 个任务由 task 字段选择：
++    SO101{Reach,Lift,Place,Stack}{Cube,Can}-v1。
++    """
++
++    task: str = "SO101ReachCube-v1"
++    fps: int = 20
++    episode_length: int = 50
++    obs_type: str = "pixels_agent_pos"
++    obs_mode: str = "rgb"
++    render_mode: str = "rgb_array"
++    observation_width: int = 128
++    observation_height: int = 128
++    features: dict[str, PolicyFeature] = field(
++        default_factory=lambda: {
++            "action": PolicyFeature(type=FeatureType.ACTION, shape=(6,)),
++        }
++    )
++    features_map: dict[str, str] = field(
++        default_factory=lambda: {
++            "action": ACTION,
++            "agent_pos": OBS_STATE,
++            "pixels/base_camera": f"{OBS_IMAGES}.base_camera",
++        }
++    )
++
++    def __post_init__(self):
++        if self.obs_type == "pixels":
++            self.features["pixels/base_camera"] = PolicyFeature(
++                type=FeatureType.VISUAL, shape=(self.observation_height, self.observation_width, 3)
++            )
++        elif self.obs_type == "pixels_agent_pos":
++            self.features["agent_pos"] = PolicyFeature(type=FeatureType.STATE, shape=(6,))
++            self.features["pixels/base_camera"] = PolicyFeature(
++                type=FeatureType.VISUAL, shape=(self.observation_height, self.observation_width, 3)
++            )
++        else:
++            raise ValueError(f"Unsupported obs_type: {self.obs_type}")
++
++    @property
++    def package_name(self) -> str:
++        return "so101_sim"
++
++    @property
++    def gym_id(self) -> str:
++        return "SO101Sim-v1"
++
++    @property
++    def gym_kwargs(self) -> dict:
++        return {
++            "task": self.task,
++            "obs_type": self.obs_type,
++            "obs_mode": self.obs_mode,
++            "render_mode": self.render_mode,
++            "observation_width": self.observation_width,
++            "observation_height": self.observation_height,
++            "episode_length": self.episode_length,
++        }
++
++
+ @EnvConfig.register_subclass("isaaclab_arena")
+ @dataclass
+ class IsaaclabArenaEnv(HubEnvConfig):

@@ -1,0 +1,19 @@
+{
+  "dataset_id": "MMInstruction/SuperClevr_Val",
+  "split": "train",
+  "sample_count": 200,
+  "base": {
+    "count": 200,
+    "accuracy": 0.095,
+    "format": 0.22
+  },
+  "adapter": {
+    "count": 200,
+    "accuracy": 0.44,
+    "format": 0.79
+  },
+  "delta": {
+    "accuracy": 0.345,
+    "format": 0.57
+  }
+}

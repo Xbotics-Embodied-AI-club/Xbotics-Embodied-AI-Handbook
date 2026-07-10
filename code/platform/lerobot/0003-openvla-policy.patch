@@ -1,0 +1,832 @@
+diff --git a/src/lerobot/policies/__init__.py b/src/lerobot/policies/__init__.py
+index 55ce09c..b1a6eab 100644
+--- a/src/lerobot/policies/__init__.py
++++ b/src/lerobot/policies/__init__.py
+@@ -16,6 +16,7 @@ from .act.configuration_act import ACTConfig as ACTConfig
+ from .diffusion.configuration_diffusion import DiffusionConfig as DiffusionConfig
+ from .groot.configuration_groot import GrootConfig as GrootConfig
+ from .multi_task_dit.configuration_multi_task_dit import MultiTaskDiTConfig as MultiTaskDiTConfig
++from .openvla.configuration_openvla import OpenVLAConfig as OpenVLAConfig
+ from .pi0.configuration_pi0 import PI0Config as PI0Config
+ from .pi0_fast.configuration_pi0_fast import PI0FastConfig as PI0FastConfig
+ from .pi05.configuration_pi05 import PI05Config as PI05Config
+@@ -30,6 +31,7 @@ __all__ = [
+     "ACTConfig",
+     "DiffusionConfig",
+     "MultiTaskDiTConfig",
++    "OpenVLAConfig",
+     "PI0Config",
+     "PI05Config",
+     "PI0FastConfig",
+diff --git a/src/lerobot/policies/factory.py b/src/lerobot/policies/factory.py
+index 5927511..a40a1e8 100644
+--- a/src/lerobot/policies/factory.py
++++ b/src/lerobot/policies/factory.py
+@@ -32,6 +32,7 @@ from lerobot.policies.act.configuration_act import ACTConfig
+ from lerobot.policies.diffusion.configuration_diffusion import DiffusionConfig
+ from lerobot.policies.groot.configuration_groot import GrootConfig
+ from lerobot.policies.multi_task_dit.configuration_multi_task_dit import MultiTaskDiTConfig
++from lerobot.policies.openvla.configuration_openvla import OpenVLAConfig
+ from lerobot.policies.pi0.configuration_pi0 import PI0Config
+ from lerobot.policies.pi05.configuration_pi05 import PI05Config
+ from lerobot.policies.pretrained import PreTrainedPolicy
+@@ -143,6 +144,10 @@ def get_policy_class(name: str) -> type[PreTrainedPolicy]:
+         from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
+ 
+         return SmolVLAPolicy
++    elif name == "openvla":
++        from lerobot.policies.openvla.modeling_openvla import OpenVLAPolicy
++
++        return OpenVLAPolicy
+     elif name == "vla0_smol":
+         from lerobot.policies.vla0_smol.modeling_vla0_smol import VLA0SmolPolicy
+ 
+@@ -207,6 +212,8 @@ def make_policy_config(policy_type: str, **kwargs) -> PreTrainedConfig:
+         return SACConfig(**kwargs)
+     elif policy_type == "smolvla":
+         return SmolVLAConfig(**kwargs)
++    elif policy_type == "openvla":
++        return OpenVLAConfig(**kwargs)
+     elif policy_type == "vla0_smol":
+         return VLA0SmolConfig(**kwargs)
+     elif policy_type == "reward_classifier":
+@@ -277,6 +284,14 @@ def make_pre_post_processors(
+         NotImplementedError: If a processor factory is not implemented for the given
+             policy configuration type.
+     """
++    if isinstance(policy_cfg, OpenVLAConfig):
++        from lerobot.policies.openvla.processor_openvla import make_openvla_pre_post_processors
++
++        return make_openvla_pre_post_processors(
++            config=policy_cfg,
++            dataset_stats=kwargs.get("dataset_stats"),
++        )
++
+     if pretrained_path:
+         # TODO(Steven): Temporary patch, implement correctly the processors for Gr00t
+         if isinstance(policy_cfg, GrootConfig):
+diff --git a/src/lerobot/policies/openvla/__init__.py b/src/lerobot/policies/openvla/__init__.py
+new file mode 100644
+index 0000000..689488b
+--- /dev/null
++++ b/src/lerobot/policies/openvla/__init__.py
+@@ -0,0 +1,3 @@
++from .configuration_openvla import OpenVLAConfig as OpenVLAConfig
++from .modeling_openvla import OpenVLAPolicy as OpenVLAPolicy
++
+diff --git a/src/lerobot/policies/openvla/configuration_openvla.py b/src/lerobot/policies/openvla/configuration_openvla.py
+new file mode 100644
+index 0000000..171da5b
+--- /dev/null
++++ b/src/lerobot/policies/openvla/configuration_openvla.py
+@@ -0,0 +1,109 @@
++from __future__ import annotations
++
++from dataclasses import dataclass, field
++from pathlib import Path
++
++from lerobot.configs.policies import PreTrainedConfig
++from lerobot.configs.types import FeatureType, NormalizationMode
++from lerobot.optim.optimizers import AdamWConfig
++from lerobot.optim.schedulers import CosineDecayWithWarmupSchedulerConfig, LRSchedulerConfig
++from lerobot.utils.constants import ACTION, OBS_IMAGES
++
++
++@PreTrainedConfig.register_subclass("openvla")
++@dataclass
++class OpenVLAConfig(PreTrainedConfig):
++    """Configuration for the OpenVLA LeRobot policy wrapper."""
++
++    n_obs_steps: int = 1
++    normalization_mapping: dict[str, NormalizationMode] = field(
++        default_factory=lambda: {
++            "VISUAL": NormalizationMode.IDENTITY,
++            "ACTION": NormalizationMode.IDENTITY,
++        }
++    )
++
++    pretrained_path: Path | str | None = "openvla/openvla-7b"
++    vlm_model_name: str | None = None
++    image_feature_key: str = f"{OBS_IMAGES}.image"
++    task_key: str = "task"
++    default_task: str = ""
++    prompt_template: str = "In: What action should the robot take to {task}?\nOut:"
++    unnorm_key: str = "libero_10"
++    center_crop: bool = True
++    # LIBERO eval already rotates camera frames in LiberoProcessorStep.
++    rotate_image_180: bool = False
++    # LIBERO maps the gripper action to {-1,+1} (binarized) for env.step. True for LIBERO eval;
++    # real-robot deploys with a continuous gripper set False.
++    apply_libero_gripper: bool = True
++    action_dim: int = 7
++    action_slice: str | None = None
++    # Relative actions: tokenize (action - state) deltas instead of absolute joint targets, so the
++    # 256 action-token bins resolve the small per-step motion (fixes the absolute no-op). Mirrors pi0.
++    use_relative_actions: bool = False
++    # Joints kept absolute (not converted to relative). The gripper is a position, not a delta.
++    relative_exclude_joints: list[str] = field(default_factory=lambda: ["gripper"])
++    # Action dim names (e.g. joint1.pos..gripper.pos); used to build the relative mask.
++    action_feature_names: list[str] | None = None
++    torch_dtype: str = "bfloat16"
++    low_cpu_mem_usage: bool = True
++    action_stats_key: str = "exp014_multiobject_balanced_abs"
++    action_stats: dict[str, list[float]] | None = None
++    action_token_ignore_index: int = -100
++    tokenizer_max_length: int | None = None
++
++    optimizer_lr: float = 2e-5
++    optimizer_betas: tuple[float, float] = (0.9, 0.95)
++    optimizer_eps: float = 1e-8
++    optimizer_weight_decay: float = 0.01
++    optimizer_grad_clip_norm: float = 1.0
++    scheduler_warmup_steps: int = 1000
++    scheduler_decay_steps: int = 30000
++    scheduler_decay_lr: float = 0.0
++
++    def __post_init__(self) -> None:
++        super().__post_init__()
++        if self.action_dim != 7:
++            raise ValueError("OpenVLA Piper action-token training is configured for 7D actions.")
++        if not self.pretrained_path and not self.vlm_model_name:
++            raise ValueError("OpenVLAConfig requires `pretrained_path` or `vlm_model_name`.")
++        if not self.output_features:
++            from lerobot.configs.types import PolicyFeature
++
++            self.output_features = {ACTION: PolicyFeature(type=FeatureType.ACTION, shape=(self.action_dim,))}
++
++    def validate_features(self) -> None:
++        if self.image_features and self.image_feature_key not in self.input_features:
++            available = ", ".join(sorted(self.image_features))
++            raise ValueError(
++                f"OpenVLA expects image feature '{self.image_feature_key}', available visual keys: {available}"
++            )
++
++    def get_optimizer_preset(self) -> AdamWConfig:
++        return AdamWConfig(
++            lr=self.optimizer_lr,
++            betas=self.optimizer_betas,
++            eps=self.optimizer_eps,
++            weight_decay=self.optimizer_weight_decay,
++            grad_clip_norm=self.optimizer_grad_clip_norm,
++        )
++
++    def get_scheduler_preset(self) -> LRSchedulerConfig | None:
++        return CosineDecayWithWarmupSchedulerConfig(
++            peak_lr=self.optimizer_lr,
++            decay_lr=self.scheduler_decay_lr,
++            num_warmup_steps=self.scheduler_warmup_steps,
++            num_decay_steps=self.scheduler_decay_steps,
++        )
++
++    @property
++    def observation_delta_indices(self) -> list[int] | None:
++        return None
++
++    @property
++    def action_delta_indices(self) -> list[int]:
++        return [0]
++
++    @property
++    def reward_delta_indices(self) -> list[int] | None:
++        return None
+diff --git a/src/lerobot/policies/openvla/modeling_openvla.py b/src/lerobot/policies/openvla/modeling_openvla.py
+new file mode 100644
+index 0000000..34d6d39
+--- /dev/null
++++ b/src/lerobot/policies/openvla/modeling_openvla.py
+@@ -0,0 +1,581 @@
++from __future__ import annotations
++
++import builtins
++import json
++import os
++from pathlib import Path
++from typing import Any
++
++import numpy as np
++import torch
++from huggingface_hub.constants import SAFETENSORS_SINGLE_FILE
++from PIL import Image
++from torch import Tensor
++
++from lerobot.configs.policies import PreTrainedConfig
++from lerobot.policies import pretrained as pretrained_policy
++from lerobot.policies.pretrained import PreTrainedPolicy, T
++from lerobot.utils.constants import ACTION
++
++from .configuration_openvla import OpenVLAConfig
++
++
++_DTYPES: dict[str, torch.dtype] = {
++    "float32": torch.float32,
++    "float16": torch.float16,
++    "bfloat16": torch.bfloat16,
++}
++
++
++def _patch_transformers_tokenization_utils_for_openvla() -> None:
++    """Keep official OpenVLA remote processor code importable on transformers >=5."""
++    try:
++        import transformers.tokenization_utils as tokenization_utils
++        import transformers.tokenization_utils_base as tokenization_utils_base
++    except ImportError:
++        return
++
++    for name in ("PaddingStrategy", "PreTokenizedInput", "TextInput", "TruncationStrategy"):
++        if not hasattr(tokenization_utils, name) and hasattr(tokenization_utils_base, name):
++            setattr(tokenization_utils, name, getattr(tokenization_utils_base, name))
++
++
++def _resolve_transformers_openvla_auto_classes() -> tuple[Any, Any]:
++    try:
++        import transformers
++    except ImportError as exc:
++        raise ImportError(
++            "OpenVLA requires the shared train+openvla uv environment with transformers, "
++            "timm<1, sentencepiece, accelerate, and hf-libero."
++        ) from exc
++
++    auto_processor = getattr(transformers, "AutoProcessor", None)
++    auto_model = getattr(transformers, "AutoModelForVision2Seq", None) or getattr(
++        transformers, "AutoModelForImageTextToText", None
++    )
++    if auto_processor is None or auto_model is None:
++        raise ImportError(
++            "OpenVLA requires transformers with AutoProcessor and either AutoModelForVision2Seq "
++            "or AutoModelForImageTextToText in the shared train+openvla uv environment."
++        )
++    return auto_processor, auto_model
++
++
++def _load_openvla_remote_model_class(model_id: str, load_kwargs: dict[str, Any]) -> Any:
++    from transformers import AutoConfig
++    from transformers.dynamic_module_utils import get_class_from_dynamic_module
++
++    config = AutoConfig.from_pretrained(model_id, **load_kwargs)
++    auto_map = getattr(config, "auto_map", {}) or {}
++    class_reference = auto_map.get("AutoModelForVision2Seq") or auto_map.get("AutoModelForImageTextToText")
++    if class_reference is None:
++        raise ValueError(f"OpenVLA checkpoint at {model_id} does not define an AutoModel remote-code mapping.")
++    # Keep any `repo--module.Class` cross-repo prefix: official finetuned-libero checkpoints
++    # reference modeling_prismatic.py in base openvla/openvla-7b. get_class_from_dynamic_module
++    # resolves the prefixed repo natively; stripping it breaks the load on transformers>=5 (where
++    # AutoModelForVision2Seq is gone, so this fallback path is always taken).
++    return get_class_from_dynamic_module(
++        class_reference,
++        model_id,
++        local_files_only=load_kwargs.get("local_files_only", False),
++    )
++
++
++def _resolve_hf_snapshot_dir(model_id: str, load_kwargs: dict[str, Any]) -> Path:
++    model_path = Path(model_id)
++    if model_path.is_dir():
++        return model_path
++    from huggingface_hub import snapshot_download
++
++    return Path(
++        snapshot_download(
++            model_id,
++            local_files_only=load_kwargs.get("local_files_only", False),
++        )
++    )
++
++
++def _patch_remote_tie_weights_for_transformers5(model: torch.nn.Module | type[torch.nn.Module]) -> None:
++    """Allow legacy remote `tie_weights(self)` methods to accept new HF kwargs."""
++    tie_weights = getattr(model, "tie_weights", None)
++    if tie_weights is None:
++        return
++
++    def _compatible_tie_weights(*args: Any, **kwargs: Any) -> Any:
++        del kwargs
++        if isinstance(model, type):
++            return tie_weights(*args)
++        del args
++        return tie_weights()
++
++    setattr(model, "tie_weights", _compatible_tie_weights)
++
++
++def _is_transformers5_meta_init_error(exc: BaseException) -> bool:
++    message = str(exc)
++    return "meta tensor" in message or "meta tensors" in message
++
++
++def _load_openvla_remote_model_without_meta_init(
++    model_id: str,
++    remote_model_cls: Any,
++    load_kwargs: dict[str, Any],
++    torch_dtype: torch.dtype,
++) -> torch.nn.Module:
++    """Load official OpenVLA remote code while avoiding transformers>=5 meta-device init.
++
++    Transformers 5 wraps `from_pretrained` initialization in `torch.device("meta")`.
++    Official OpenVLA remote code builds a timm DINOv2 backbone in `__init__`, and
++    timm calls `.item()` during construction, which is incompatible with meta tensors.
++    """
++    from safetensors.torch import load_file
++    from transformers import AutoConfig
++
++    config = AutoConfig.from_pretrained(model_id, **load_kwargs)
++    if hasattr(config, "_attn_implementation"):
++        config._attn_implementation = "eager"
++
++    previous_dtype = torch.get_default_dtype()
++    torch.set_default_dtype(torch_dtype)
++    try:
++        _patch_remote_tie_weights_for_transformers5(remote_model_cls)
++        model = remote_model_cls(config)
++    finally:
++        torch.set_default_dtype(previous_dtype)
++    _patch_remote_tie_weights_for_transformers5(model)
++
++    snapshot_dir = _resolve_hf_snapshot_dir(model_id, load_kwargs)
++    index_path = snapshot_dir / "model.safetensors.index.json"
++    if index_path.exists():
++        with index_path.open("r", encoding="utf-8") as f:
++            index = json.load(f)
++        shard_names = sorted(set(index["weight_map"].values()))
++    elif (snapshot_dir / "model.safetensors").exists():
++        shard_names = ["model.safetensors"]
++    else:
++        raise FileNotFoundError(f"Could not find OpenVLA safetensors weights in {snapshot_dir}.")
++
++    unexpected_keys: list[str] = []
++    for shard_name in shard_names:
++        state_dict = load_file(snapshot_dir / shard_name, device="cpu")
++        incompatible = model.load_state_dict(state_dict, strict=False)
++        unexpected_keys.extend(str(key) for key in incompatible.unexpected_keys)
++        del state_dict
++    if unexpected_keys:
++        raise RuntimeError(f"Unexpected OpenVLA checkpoint keys while loading {model_id}: {unexpected_keys[:10]}")
++    if hasattr(model, "tie_weights"):
++        model.tie_weights()
++    return model.to(dtype=torch_dtype)
++
++
++def _resolve_model_id(config: OpenVLAConfig, pretrained_name_or_path: str | Path | None = None) -> str:
++    def _resolve_from_local_checkpoint(checkpoint_dir: Path) -> str | None:
++        config_path = checkpoint_dir / "config.json"
++        if not config_path.is_file():
++            return None
++        try:
++            with config_path.open("r", encoding="utf-8") as f:
++                saved_cfg = json.load(f)
++        except Exception:
++            return None
++        for key in ("vlm_model_name", "base_model_name_or_path", "pretrained_path"):
++            value = saved_cfg.get(key)
++            if isinstance(value, str) and value:
++                value_path = Path(value)
++                if value_path.is_dir() and value_path.resolve() == checkpoint_dir.resolve():
++                    continue
++                return value
++        return None
++
++    if pretrained_name_or_path is not None:
++        candidate = Path(pretrained_name_or_path)
++        if candidate.is_dir():
++            resolved = _resolve_from_local_checkpoint(candidate)
++            if resolved:
++                return resolved
++        return str(pretrained_name_or_path)
++    if config.vlm_model_name:
++        return str(config.vlm_model_name)
++    if config.pretrained_path is not None:
++        candidate = Path(config.pretrained_path)
++        if candidate.is_dir():
++            resolved = _resolve_from_local_checkpoint(candidate)
++            if resolved:
++                return resolved
++        return str(config.pretrained_path)
++    raise ValueError("OpenVLA requires a Hugging Face model id or local checkpoint path.")
++
++
++class OpenVLAPolicy(PreTrainedPolicy):
++    """LeRobot policy wrapper for official Hugging Face OpenVLA checkpoints."""
++
++    config_class = OpenVLAConfig
++    name = "openvla"
++
++    def __init__(
++        self,
++        config: OpenVLAConfig,
++        *,
++        processor: Any | None = None,
++        model: torch.nn.Module | None = None,
++        model_id: str | None = None,
++        dataset_stats: dict[str, dict[str, Any]] | None = None,
++        **_: Any,
++    ) -> None:
++        super().__init__(config)
++        self.config: OpenVLAConfig
++        self.model_id = model_id or _resolve_model_id(config)
++        self.processor = processor
++        self.model = model
++        self._action_stats = self._resolve_action_stats(dataset_stats)
++        if self.processor is None or self.model is None:
++            self.processor, self.model = self._load_hf_openvla(self.model_id)
++        self.model.to(config.device)
++        self.model.eval()
++        self._refresh_vocab_metadata()
++        self._maybe_inject_action_stats()
++
++    @classmethod
++    def from_pretrained(
++        cls: builtins.type[T],
++        pretrained_name_or_path: str | Path,
++        *,
++        config: PreTrainedConfig | None = None,
++        local_files_only: bool = False,
++        **kwargs: Any,
++    ) -> T:
++        model_id = str(pretrained_name_or_path)
++        if Path(model_id).is_dir() and (Path(model_id) / SAFETENSORS_SINGLE_FILE).exists():
++            return pretrained_policy.PreTrainedPolicy.from_pretrained.__func__(
++                cls,
++                pretrained_name_or_path,
++                config=config,
++                local_files_only=local_files_only,
++                **kwargs,
++            )
++        if config is None:
++            if Path(model_id).is_dir() and (Path(model_id) / "config.json").exists():
++                config = PreTrainedConfig.from_pretrained(
++                    pretrained_name_or_path=model_id,
++                    local_files_only=local_files_only,
++                    **kwargs,
++                )
++            else:
++                config = OpenVLAConfig(pretrained_path=model_id)
++        if not isinstance(config, OpenVLAConfig):
++            raise TypeError(f"Expected OpenVLAConfig, got {type(config).__name__}.")
++        policy = cls(config, model_id=_resolve_model_id(config, pretrained_name_or_path), **kwargs)
++        policy.to(config.device)
++        policy.eval()
++        return policy
++
++    def _load_hf_openvla(self, model_id: str) -> tuple[Any, torch.nn.Module]:
++        AutoProcessor, AutoModelForOpenVLA = _resolve_transformers_openvla_auto_classes()
++        _patch_transformers_tokenization_utils_for_openvla()
++        torch_dtype = _DTYPES.get(self.config.torch_dtype)
++        if torch_dtype is None:
++            raise ValueError(f"Unsupported OpenVLA torch_dtype '{self.config.torch_dtype}'.")
++        load_kwargs: dict[str, Any] = {
++            "trust_remote_code": True,
++            "local_files_only": bool(os.environ.get("HF_HUB_OFFLINE")) or bool(os.environ.get("TRANSFORMERS_OFFLINE")),
++        }
++        processor = AutoProcessor.from_pretrained(model_id, **load_kwargs)
++        model_kwargs = {
++            "torch_dtype": torch_dtype,
++            "low_cpu_mem_usage": self.config.low_cpu_mem_usage,
++            "attn_implementation": "eager",
++            **load_kwargs,
++        }
++        try:
++            model = AutoModelForOpenVLA.from_pretrained(model_id, **model_kwargs)
++        except RuntimeError as exc:
++            if not _is_transformers5_meta_init_error(exc):
++                raise
++            native_retry_kwargs = {
++                **model_kwargs,
++                "low_cpu_mem_usage": False,
++            }
++            model = AutoModelForOpenVLA.from_pretrained(model_id, **native_retry_kwargs)
++        except ValueError as exc:
++            if "Unrecognized configuration class" not in str(exc):
++                raise
++            remote_model_cls = _load_openvla_remote_model_class(model_id, load_kwargs)
++            model = _load_openvla_remote_model_without_meta_init(model_id, remote_model_cls, load_kwargs, torch_dtype)
++        return processor, model
++
++    def reset(self) -> None:
++        return None
++
++    def get_optim_params(self):
++        return (param for param in self.parameters() if param.requires_grad)
++
++    def forward(self, batch: dict[str, Tensor]) -> tuple[Tensor, dict | None]:
++        if ACTION not in batch:
++            raise KeyError(f"OpenVLA training requires '{ACTION}' in the batch.")
++        if self.config.action_slice and batch[ACTION].shape[-1] != self.config.action_dim:
++            batch = dict(batch)
++            batch[ACTION] = batch[ACTION][..., self._parse_action_slice(batch[ACTION].shape[-1])]
++
++        prompts = [self.config.prompt_template.format(task=task.lower()) for task in self._extract_tasks(batch)]
++        images = self._extract_images(batch)
++        inputs = self.processor(
++            prompts,
++            images,
++            padding=True,
++            truncation=self.config.tokenizer_max_length is not None,
++            max_length=self.config.tokenizer_max_length,
++            return_tensors="pt",
++        )
++        if hasattr(inputs, "to"):
++            inputs = inputs.to(self.config.device, dtype=_DTYPES.get(self.config.torch_dtype, torch.bfloat16))
++        input_ids = inputs["input_ids"]
++        action_token_ids = self._actions_to_token_ids(batch[ACTION]).to(device=input_ids.device)
++        inputs["input_ids"] = torch.cat([input_ids, action_token_ids], dim=1)
++        if "attention_mask" in inputs:
++            action_attention = torch.ones_like(action_token_ids, dtype=inputs["attention_mask"].dtype)
++            inputs["attention_mask"] = torch.cat([inputs["attention_mask"], action_attention], dim=1)
++
++        labels = torch.full_like(inputs["input_ids"], fill_value=self.config.action_token_ignore_index)
++        labels[:, -self.config.action_dim :] = action_token_ids
++        outputs = self.model.forward(**inputs, labels=labels)
++        loss = outputs.loss
++        with torch.no_grad():
++            logits = getattr(outputs, "logits", None)
++            if logits is not None and logits.ndim == 3 and logits.shape[1] >= self.config.action_dim:
++                pred = logits[:, -self.config.action_dim :, :].argmax(dim=-1)
++                token_acc = (pred == action_token_ids).float().mean().item()
++            else:
++                token_acc = 0.0
++        return loss, {"loss": loss.item(), "action_token_accuracy": token_acc}
++
++    def predict_action_chunk(self, batch: dict[str, Tensor], **kwargs: Any) -> Tensor:
++        return self.select_action(batch, **kwargs).unsqueeze(1)
++
++    @torch.no_grad()
++    def select_action(self, batch: dict[str, Any], **_: Any) -> Tensor:
++        image = self._extract_image(batch)
++        task = self._extract_task(batch)
++        prompt = self.config.prompt_template.format(task=task.lower())
++        inputs = self.processor(prompt, image)
++        if hasattr(inputs, "to"):
++            inputs = inputs.to(self.config.device, dtype=_DTYPES.get(self.config.torch_dtype, torch.bfloat16))
++        input_ids = inputs["input_ids"]
++        pixel_values = inputs["pixel_values"]
++        attn = inputs.get("attention_mask")
++        # Insert the empty '' token (29871) after the colon to match training inputs.
++        if not torch.all(input_ids[:, -1] == 29871):
++            pad = torch.tensor([[29871]], device=input_ids.device, dtype=input_ids.dtype)
++            input_ids = torch.cat([input_ids, pad], dim=1)
++            if attn is not None:
++                attn = torch.cat([attn, torch.ones((1, 1), device=attn.device, dtype=attn.dtype)], dim=1)
++        m = self.model
++        adim = m.get_action_dim(self.config.unnorm_key)
++        gen, cur_attn = input_ids, attn
++        # Forward-based greedy decode: transformers>=5 generate() drops pixel_values on the first
++        # step (image-blind), whereas forward consumes them. Decode the action tokens manually,
++        # passing pixel_values every step. Replicates the official predict_action math.
++        for _ in range(adim):
++            out = m(input_ids=gen, pixel_values=pixel_values, attention_mask=cur_attn)
++            nxt = out.logits[:, -1].argmax(dim=-1, keepdim=True)
++            gen = torch.cat([gen, nxt], dim=1)
++            if cur_attn is not None:
++                cur_attn = torch.cat([cur_attn, torch.ones((1, 1), device=cur_attn.device, dtype=cur_attn.dtype)], dim=1)
++        tok = gen[0, -adim:].cpu().numpy()
++        bin_centers = np.asarray(m.bin_centers)
++        disc = np.clip(m.vocab_size - tok - 1, 0, bin_centers.shape[0] - 1)
++        normalized = bin_centers[disc]
++        stats = m.get_action_stats(self.config.unnorm_key)
++        q01, q99 = np.asarray(stats["q01"]), np.asarray(stats["q99"])
++        action = (0.5 * (normalized + 1.0) * (q99 - q01) + q01).astype(np.float32)
++        action_t = torch.as_tensor(action, dtype=torch.float32)
++        if self.config.apply_libero_gripper:
++            action_t = self._postprocess_libero_action(action_t)
++        return action_t.to(device=self.config.device, dtype=torch.float32).unsqueeze(0)
++
++    def _extract_task(self, batch: dict[str, Any]) -> str:
++        task = batch.get(self.config.task_key, self.config.default_task)
++        if isinstance(task, (list, tuple)):
++            task = task[0] if task else self.config.default_task
++        if isinstance(task, np.ndarray):
++            task = task.reshape(-1)[0].item() if task.size else self.config.default_task
++        if task is None:
++            task = self.config.default_task
++        return str(task)
++
++    def _extract_tasks(self, batch: dict[str, Any]) -> list[str]:
++        task = batch.get(self.config.task_key, self.config.default_task)
++        if isinstance(task, Tensor):
++            task = task.detach().cpu().tolist()
++        if isinstance(task, np.ndarray):
++            task = task.tolist()
++        if isinstance(task, (list, tuple)):
++            return [str(value if value is not None else self.config.default_task) for value in task]
++        batch_size = self._infer_batch_size(batch)
++        return [str(task if task is not None else self.config.default_task)] * batch_size
++
++    def _infer_batch_size(self, batch: dict[str, Any]) -> int:
++        if ACTION in batch and isinstance(batch[ACTION], Tensor):
++            return int(batch[ACTION].shape[0])
++        if self.config.image_feature_key in batch and isinstance(batch[self.config.image_feature_key], Tensor):
++            image = batch[self.config.image_feature_key]
++            return int(image.shape[0]) if image.ndim == 4 else 1
++        return 1
++
++    def _extract_image(self, batch: dict[str, Any]) -> Image.Image:
++        if self.config.image_feature_key not in batch:
++            available = ", ".join(sorted(str(k) for k in batch if str(k).startswith("observation.images.")))
++            raise KeyError(f"Missing OpenVLA image key '{self.config.image_feature_key}'. Available: {available}")
++        image = batch[self.config.image_feature_key]
++        if isinstance(image, Tensor):
++            image = image.detach().cpu()
++            if image.ndim == 4:
++                image = image[0]
++            if image.ndim != 3:
++                raise ValueError(f"Expected image tensor with CHW or BCHW shape, got {tuple(image.shape)}.")
++            if image.shape[0] in (1, 3):
++                image = image.permute(1, 2, 0)
++            image_np = image.numpy()
++        else:
++            image_np = np.asarray(image)
++            if image_np.ndim == 4:
++                image_np = image_np[0]
++        if image_np.dtype != np.uint8:
++            if image_np.max(initial=0) <= 1.0:
++                image_np = image_np * 255.0
++            image_np = np.clip(image_np, 0, 255).astype(np.uint8)
++        if image_np.ndim == 3 and image_np.shape[-1] == 1:
++            image_np = np.repeat(image_np, 3, axis=-1)
++        if image_np.ndim != 3 or image_np.shape[-1] != 3:
++            raise ValueError(f"Expected RGB image, got shape {image_np.shape}.")
++        if self.config.rotate_image_180:
++            image_np = image_np[::-1, ::-1].copy()
++        return Image.fromarray(image_np)
++
++    def _extract_images(self, batch: dict[str, Any]) -> list[Image.Image]:
++        if self.config.image_feature_key not in batch:
++            return [self._extract_image(batch)]
++        image = batch[self.config.image_feature_key]
++        if isinstance(image, Tensor) and image.ndim == 4:
++            return [self._tensor_or_array_to_image(frame) for frame in image]
++        image_np = np.asarray(image)
++        if image_np.ndim == 4:
++            return [self._tensor_or_array_to_image(frame) for frame in image_np]
++        return [self._extract_image(batch)]
++
++    def _tensor_or_array_to_image(self, image: Tensor | np.ndarray) -> Image.Image:
++        if isinstance(image, Tensor):
++            image_np = image.detach().cpu()
++            if image_np.ndim != 3:
++                raise ValueError(f"Expected image tensor with CHW or HWC shape, got {tuple(image_np.shape)}.")
++            if image_np.shape[0] in (1, 3):
++                image_np = image_np.permute(1, 2, 0)
++            image_np = image_np.numpy()
++        else:
++            image_np = np.asarray(image)
++        if image_np.dtype != np.uint8:
++            if image_np.max(initial=0) <= 1.0:
++                image_np = image_np * 255.0
++            image_np = np.clip(image_np, 0, 255).astype(np.uint8)
++        if image_np.ndim == 3 and image_np.shape[-1] == 1:
++            image_np = np.repeat(image_np, 3, axis=-1)
++        if image_np.ndim != 3 or image_np.shape[-1] != 3:
++            raise ValueError(f"Expected RGB image, got shape {image_np.shape}.")
++        if self.config.rotate_image_180:
++            image_np = image_np[::-1, ::-1].copy()
++        return Image.fromarray(image_np)
++
++    def _postprocess_libero_action(self, action: Any) -> Tensor:
++        action_tensor = torch.as_tensor(action, dtype=torch.float32).flatten()
++        if action_tensor.numel() != self.config.action_dim:
++            raise ValueError(f"Expected {self.config.action_dim}D OpenVLA action, got {action_tensor.numel()}D.")
++        # Official LIBERO OpenVLA eval maps gripper [0, 1] -> {-1, +1}, then inverts for env.step.
++        gripper = torch.where(action_tensor[-1] > 0.5, torch.tensor(1.0), torch.tensor(-1.0))
++        action_tensor[-1] = -gripper
++        return action_tensor
++
++    def _refresh_vocab_metadata(self) -> None:
++        hf_config = getattr(self.model, "config", None)
++        text_config = getattr(hf_config, "text_config", None)
++        text_vocab_size = getattr(text_config, "vocab_size", None)
++        pad_to_multiple_of = getattr(hf_config, "pad_to_multiple_of", 0) or 0
++        model_vocab_size = getattr(self.model, "vocab_size", None)
++        if model_vocab_size is not None:
++            self._action_vocab_size = int(model_vocab_size)
++        elif text_vocab_size is not None:
++            self._action_vocab_size = int(text_vocab_size) - int(pad_to_multiple_of)
++        else:
++            self._action_vocab_size = 32000
++        bins = np.linspace(-1, 1, self._n_action_bins)
++        self._bin_centers = torch.as_tensor((bins[:-1] + bins[1:]) / 2.0, dtype=torch.float32)
++
++    @property
++    def _n_action_bins(self) -> int:
++        hf_config = getattr(self.model, "config", None)
++        return int(getattr(hf_config, "n_action_bins", 256))
++
++    def _maybe_inject_action_stats(self) -> None:
++        """Expose `config.action_stats` (custom training q01/q99) under `unnorm_key` in the model's
++        norm_stats, so the greedy-decode unnormalization uses the training stats. For the official
++        finetuned-libero checkpoint, `_action_stats` is empty and norm_stats already carries
++        `unnorm_key`, so nothing is injected."""
++        stats = self._action_stats
++        key = self.config.unnorm_key
++        nstats = getattr(self.model, "norm_stats", None)
++        if not stats or key is None or nstats is None:
++            return
++        nstats[key] = {"action": {"q01": stats["q01"].tolist(), "q99": stats["q99"].tolist()}}
++
++    def _resolve_action_stats(self, dataset_stats: dict[str, dict[str, Any]] | None) -> dict[str, Tensor]:
++        if self.config.action_stats is not None:
++            raw_stats = self.config.action_stats
++        elif dataset_stats is not None and ACTION in dataset_stats:
++            raw_stats = dataset_stats[ACTION]
++        else:
++            raw_stats = None
++        if raw_stats is None:
++            return {}
++        q01 = torch.as_tensor(raw_stats["q01"], dtype=torch.float32).flatten()
++        q99 = torch.as_tensor(raw_stats["q99"], dtype=torch.float32).flatten()
++        if self.config.action_slice and q01.numel() != self.config.action_dim:
++            action_slice = self._parse_action_slice(q01.numel())
++            q01 = q01[action_slice]
++            q99 = q99[action_slice]
++        if q01.numel() != self.config.action_dim or q99.numel() != self.config.action_dim:
++            raise ValueError(
++                f"OpenVLA action stats must be {self.config.action_dim}D, got q01={q01.numel()} q99={q99.numel()}."
++            )
++        if torch.any(q99 <= q01):
++            raise ValueError("OpenVLA action stats require q99 > q01 for every action dimension.")
++        self.config.action_stats = {"q01": q01.tolist(), "q99": q99.tolist()}
++        return {"q01": q01, "q99": q99}
++
++    def _parse_action_slice(self, source_dim: int) -> slice:
++        spec = self.config.action_slice
++        if spec is None:
++            return slice(None)
++        if spec == "right":
++            return slice(source_dim - self.config.action_dim, source_dim)
++        if spec == "left":
++            return slice(0, self.config.action_dim)
++        if ":" in spec:
++            start_text, stop_text = spec.split(":", 1)
++            start = int(start_text) if start_text else None
++            stop = int(stop_text) if stop_text else None
++            return slice(start, stop)
++        raise ValueError(f"Unsupported OpenVLA action_slice={spec!r}; use right, left, or start:stop.")
++
++    def _actions_to_token_ids(self, actions: Tensor) -> Tensor:
++        if not self._action_stats:
++            raise ValueError("OpenVLA training requires dataset action q01/q99 stats.")
++        if actions.ndim == 3:
++            actions = actions[:, 0, :]
++        if actions.ndim != 2 or actions.shape[-1] != self.config.action_dim:
++            raise ValueError(f"Expected action tensor with shape (B, {self.config.action_dim}), got {tuple(actions.shape)}.")
++        actions = actions.detach().to(dtype=torch.float32, device="cpu")
++        q01 = self._action_stats["q01"].to(actions.device)
++        q99 = self._action_stats["q99"].to(actions.device)
++        normalized = 2.0 * (actions - q01) / (q99 - q01) - 1.0
++        normalized = normalized.clamp(-1.0, 1.0)
++        centers = self._bin_centers.to(actions.device)
++        discretized = torch.argmin(torch.abs(normalized.unsqueeze(-1) - centers), dim=-1)
++        return (self._action_vocab_size - discretized - 1).to(dtype=torch.long)
+diff --git a/src/lerobot/policies/openvla/processor_openvla.py b/src/lerobot/policies/openvla/processor_openvla.py
+new file mode 100644
+index 0000000..5acacf4
+--- /dev/null
++++ b/src/lerobot/policies/openvla/processor_openvla.py
+@@ -0,0 +1,48 @@
++from __future__ import annotations
++
++from typing import Any
++
++from lerobot.processor import PolicyProcessorPipeline, batch_to_transition, transition_to_batch
++from lerobot.processor.converters import policy_action_to_transition, transition_to_policy_action
++from lerobot.processor.relative_action_processor import (
++    AbsoluteActionsProcessorStep,
++    RelativeActionsProcessorStep,
++)
++
++from .configuration_openvla import OpenVLAConfig
++
++
++def make_openvla_pre_post_processors(
++    config: OpenVLAConfig,
++    dataset_stats: dict[str, dict[str, Any]] | None = None,
++) -> tuple[PolicyProcessorPipeline, PolicyProcessorPipeline]:
++    """Build OpenVLA pre/post processors.
++
++    OpenVLA does its own (un)normalization via action-token q01/q99 inside the policy, so the
++    pipelines are otherwise identity. When ``config.use_relative_actions`` is set, the
++    preprocessor converts ``action -> action - state`` (joints relative, gripper kept absolute)
++    so the model tokenizes deltas, and the postprocessor adds the cached state back to the
++    predicted delta for execution. Disabled => both steps are no-ops (state still cached).
++    """
++    del dataset_stats
++
++    relative_step = RelativeActionsProcessorStep(
++        enabled=config.use_relative_actions,
++        exclude_joints=getattr(config, "relative_exclude_joints", []),
++        action_names=getattr(config, "action_feature_names", None),
++    )
++
++    return (
++        PolicyProcessorPipeline(
++            steps=[relative_step],
++            name="OpenVLAInputRelativeProcessor",
++            to_transition=batch_to_transition,
++            to_output=transition_to_batch,
++        ),
++        PolicyProcessorPipeline(
++            steps=[AbsoluteActionsProcessorStep(enabled=config.use_relative_actions, relative_step=relative_step)],
++            name="OpenVLAActionAbsoluteProcessor",
++            to_transition=policy_action_to_transition,
++            to_output=transition_to_policy_action,
++        ),
++    )

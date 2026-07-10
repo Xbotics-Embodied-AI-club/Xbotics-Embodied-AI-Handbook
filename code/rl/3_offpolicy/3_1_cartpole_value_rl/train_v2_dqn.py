@@ -1,0 +1,301 @@
+"""DQN：用神经网络取代查表，CartPole 值学习的第二级。
+
+相对 `train_v1_qlearning.py` 的表格 Q，这一级换掉的是**状态的表示方式**：不再手工分桶、
+查一张离散表，而是用一个小 MLP `QNetwork` 直接把连续观测映射成每个动作的 Q 值——网络能
+在相近状态之间泛化，不用穷举组合，天然绕开了表格方法的维度爆炸。
+
+但网络不能像表格那样"即采即更新"：训练样本前后高度相关（同一条轨迹上的相邻步），
+且更新目标自己也在变（bootstrap 用的是同一个正在训练的网络），直接套用表格 Q-learning
+的更新方式会很不稳定。所以这一级新增两根稳定支柱：
+  1. **经验回放（Replay Buffer）**——把交互经验存起来，训练时随机小批量采样，打破样本间
+     的时序相关性，也让每条经验能被多次复用；
+  2. **目标网络（Target Network）**——算 TD 目标时用一份滞后更新的网络参数，避免"自己追自己"
+     导致的目标漂移。
+
+这一级依然只能处理离散动作：`act` 靠对 Q 值取 argmax 选动作，动作空间稍微一变成连续
+（比如机械臂的关节力矩），argmax 就没法做了——这是下一包 `3_2_so101_offpolicy/` 里
+DDPG 引入确定性策略网络要解决的问题。
+"""
+from __future__ import annotations
+
+import os
+from collections import deque
+from pathlib import Path
+
+import gymnasium as gym
+import lightning as L
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, IterableDataset
+
+
+class QNetwork(nn.Module):
+    """状态 -> 每个动作的 Q 值，state_dim(4) -> [128, 128] -> n_actions(2) 的普通 MLP。"""
+
+    def __init__(self, state_dim, hidden_dim, n_actions):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, n_actions),
+        )
+
+    def forward(self, obs):
+        return self.net(obs)
+
+
+class ReplayBuffer:
+    """环形缓冲区，存 (s, a, r, s', done)；容量满后覆盖最旧的经验。"""
+
+    def __init__(self, capacity, state_dim):
+        self.capacity = capacity
+        self.states = np.zeros((capacity, state_dim), dtype=np.float32)
+        self.actions = np.zeros(capacity, dtype=np.int64)
+        self.rewards = np.zeros(capacity, dtype=np.float32)
+        self.next_states = np.zeros((capacity, state_dim), dtype=np.float32)
+        self.dones = np.zeros(capacity, dtype=np.float32)
+        self.position = 0
+        self.size = 0
+
+    def push(self, state, action, reward, next_state, done):
+        idx = self.position % self.capacity
+        self.states[idx] = state
+        self.actions[idx] = action
+        self.rewards[idx] = reward
+        self.next_states[idx] = next_state
+        self.dones[idx] = done
+        self.position += 1
+        self.size = min(self.size + 1, self.capacity)
+
+    def sample(self, batch_size):
+        idxs = np.random.randint(0, self.size, size=batch_size)
+        return (
+            self.states[idxs], self.actions[idxs], self.rewards[idxs],
+            self.next_states[idxs], self.dones[idxs],
+        )
+
+    def __len__(self):
+        return self.size
+
+
+PRINT_EVERY = 20  # 每 N 回合打印一次「最近 N 回合回报的滑动均值」——与 v1 同一套统计口径
+
+
+class CollectorState:
+    """在线采集要跨越多个 Lightning epoch 持续存在的状态：当前观测、回合计数、ε 衰减进度。"""
+
+    def __init__(self, env):
+        self.obs, _ = env.reset()
+        self.episode_return = 0.0
+        self.episode_count = 0
+        self.global_env_step = 0
+        self.recent_returns = deque(maxlen=PRINT_EVERY)
+
+
+def warmup_buffer(env, buffer, stats, warmup_steps):
+    """训练开始前先用纯随机策略把回放池灌到 warmup_steps 条，避免小批量从空池里采样。"""
+    for _ in range(warmup_steps):
+        action = env.action_space.sample()
+        next_obs, reward, terminated, truncated, _ = env.step(action)
+        done = terminated or truncated
+        buffer.push(stats.obs, action, reward, next_obs, float(terminated))
+        stats.obs = next_obs
+        stats.episode_return += reward
+        if done:
+            stats.episode_count += 1
+            stats.recent_returns.append(stats.episode_return)
+            stats.obs, _ = env.reset()
+            stats.episode_return = 0.0
+
+
+class CartPoleReplayDataset(IterableDataset):
+    """在线采集：每次迭代先用当前策略（ε-greedy）采若干步进回放池，再 yield 若干条训练 minibatch。"""
+
+    def __init__(self, env, model, buffer, stats, steps_per_epoch, batches_per_epoch, batch_size,
+                 epsilon_start, epsilon_end, epsilon_decay_steps):
+        super().__init__()
+        self.env = env
+        self.model = model
+        self.buffer = buffer
+        self.stats = stats
+        self.steps_per_epoch = steps_per_epoch
+        self.batches_per_epoch = batches_per_epoch
+        self.batch_size = batch_size
+        self.epsilon_start = epsilon_start
+        self.epsilon_end = epsilon_end
+        self.epsilon_decay_steps = epsilon_decay_steps
+
+    def collect(self):
+        stats = self.stats
+        for _ in range(self.steps_per_epoch):
+            stats.global_env_step += 1
+            epsilon = max(
+                self.epsilon_end,
+                self.epsilon_start - (self.epsilon_start - self.epsilon_end)
+                * stats.global_env_step / self.epsilon_decay_steps,
+            )
+            action = self.model.act(stats.obs, epsilon)
+            next_obs, reward, terminated, truncated, _ = self.env.step(action)
+            done = terminated or truncated
+            self.buffer.push(stats.obs, action, reward, next_obs, float(terminated))
+            stats.obs = next_obs
+            stats.episode_return += reward
+            if done:
+                stats.episode_count += 1
+                stats.recent_returns.append(stats.episode_return)
+                if stats.episode_count % PRINT_EVERY == 0:
+                    print(
+                        f"episode {stats.episode_count:5d} | epsilon {epsilon:.3f} | "
+                        f"return (avg over last {PRINT_EVERY}) {np.mean(stats.recent_returns):6.1f}"
+                    )
+                stats.obs, _ = self.env.reset()
+                stats.episode_return = 0.0
+
+    def __iter__(self):
+        self.collect()
+        for _ in range(self.batches_per_epoch):
+            states, actions, rewards, next_states, dones = self.buffer.sample(self.batch_size)
+            yield (
+                torch.as_tensor(states, dtype=torch.float32),
+                torch.as_tensor(actions, dtype=torch.long),
+                torch.as_tensor(rewards, dtype=torch.float32),
+                torch.as_tensor(next_states, dtype=torch.float32),
+                torch.as_tensor(dones, dtype=torch.float32),
+            )
+
+
+class CartPoleDQNData(L.LightningDataModule):
+    def __init__(self, env, model, buffer, stats, steps_per_epoch, batches_per_epoch, batch_size,
+                 epsilon_start, epsilon_end, epsilon_decay_steps):
+        super().__init__()
+        self.env = env
+        self.model = model
+        self.buffer = buffer
+        self.stats = stats
+        self.steps_per_epoch = steps_per_epoch
+        self.batches_per_epoch = batches_per_epoch
+        self.batch_size = batch_size
+        self.epsilon_start = epsilon_start
+        self.epsilon_end = epsilon_end
+        self.epsilon_decay_steps = epsilon_decay_steps
+
+    def train_dataloader(self):
+        dataset = CartPoleReplayDataset(
+            self.env, self.model, self.buffer, self.stats,
+            self.steps_per_epoch, self.batches_per_epoch, self.batch_size,
+            self.epsilon_start, self.epsilon_end, self.epsilon_decay_steps,
+        )
+        return DataLoader(dataset, batch_size=None)
+
+
+class DQN(L.LightningModule):
+    """DQN：Q(s,a) 回归 r + γ·max_a' Q_target(s',a')，`automatic_optimization=False` 手动优化。"""
+
+    def __init__(self, state_dim, n_actions, hidden_dim, learning_rate, gamma,
+                 target_sync_every, checkpoint_path, save_interval, max_epochs):
+        super().__init__()
+        self.online = QNetwork(state_dim, hidden_dim, n_actions)
+        self.target = QNetwork(state_dim, hidden_dim, n_actions)
+        self.target.load_state_dict(self.online.state_dict())
+        self.n_actions = n_actions
+        self.learning_rate = learning_rate
+        self.gamma = gamma
+        self.target_sync_every = target_sync_every
+        self.checkpoint_path = checkpoint_path
+        self.save_interval = save_interval
+        self.max_epochs = max_epochs
+        self.automatic_optimization = False
+        self.grad_steps = 0
+
+    def act(self, obs, epsilon):
+        """ε-greedy：以 ε 概率随机探索，否则对在线网络的 Q 值取 argmax。"""
+        if np.random.rand() < epsilon:
+            return int(np.random.randint(self.n_actions))
+        with torch.no_grad():
+            q_values = self.online(torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0))
+        return int(torch.argmax(q_values, dim=1).item())
+
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.online.parameters(), lr=self.learning_rate)
+
+    def training_step(self, batch, batch_idx):
+        states, actions, rewards, next_states, dones = batch
+
+        q_values = self.online(states).gather(1, actions.unsqueeze(1)).squeeze(1)
+        with torch.no_grad():
+            # 终止（杆倒/出界）不 bootstrap；到时间上限的 done 已经在采集时用 terminated
+            # （而非 terminated or truncated）写入了 dones，所以这里直接乘 (1 - dones) 即可。
+            next_q = self.target(next_states).max(dim=1).values
+            td_target = rewards + self.gamma * next_q * (1.0 - dones)
+        loss = nn.functional.mse_loss(q_values, td_target)
+
+        optimizer = self.optimizers()
+        optimizer.zero_grad()
+        self.manual_backward(loss)
+        optimizer.step()
+
+        self.grad_steps += 1
+        if self.grad_steps % self.target_sync_every == 0:
+            self.target.load_state_dict(self.online.state_dict())
+
+        self.log("loss", loss, prog_bar=True, on_step=True, on_epoch=False)
+
+        epoch = self.current_epoch + 1
+        if epoch % self.save_interval == 0 or epoch == self.max_epochs:
+            self.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            torch.save(self.online.state_dict(), self.checkpoint_path)
+        return loss
+
+
+def main():
+    env = gym.make("CartPole-v1")
+    state_dim = env.observation_space.shape[0]
+    n_actions = env.action_space.n
+
+    hidden_dim = 128
+    buffer_capacity = 50000
+    batch_size = 64
+    warmup_steps = 1000
+    learning_rate = 1.0e-3
+    gamma = 0.99
+    epsilon_start = 1.0
+    epsilon_end = 0.02
+    epsilon_decay_steps = 15000
+    target_sync_every = 200  # 每多少次梯度更新同步一次目标网络
+
+    steps_per_epoch = 20  # 每个 epoch 先采这么多环境步
+    batches_per_epoch = 20  # 再用这么多个小批量做梯度更新（采样:更新 = 1:1）
+    total_env_steps = 60000
+    max_epochs = total_env_steps // steps_per_epoch
+    save_interval = 500
+
+    buffer = ReplayBuffer(buffer_capacity, state_dim)
+    stats = CollectorState(env)
+    warmup_buffer(env, buffer, stats, warmup_steps)
+
+    checkpoint_path = Path(os.environ["DATASETS_ROOT"]) / "models" / "trained" / "cartpole" / "dqn.pt"
+    model = DQN(state_dim, n_actions, hidden_dim, learning_rate, gamma,
+                target_sync_every, checkpoint_path, save_interval, max_epochs)
+    data = CartPoleDQNData(env, model, buffer, stats, steps_per_epoch, batches_per_epoch, batch_size,
+                           epsilon_start, epsilon_end, epsilon_decay_steps)
+
+    trainer = L.Trainer(
+        accelerator="cpu",
+        devices=1,
+        max_epochs=max_epochs,
+        reload_dataloaders_every_n_epochs=1,
+        enable_checkpointing=False,
+        logger=False,
+        enable_model_summary=False,
+        enable_progress_bar=True,
+        log_every_n_steps=1,
+    )
+    trainer.fit(model, data)
+    env.close()
+
+
+if __name__ == "__main__":
+    main()

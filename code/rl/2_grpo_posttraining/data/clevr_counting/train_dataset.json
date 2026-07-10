@@ -1,0 +1,11 @@
+{
+  "dataset_id": "leonardPKU/clevr_cogen_a_train",
+  "split": "train",
+  "columns": {
+    "image": "image",
+    "problem": "problem",
+    "solution": "solution"
+  },
+  "hf_cache_root": "${HF_HOME}",
+  "local_raw_data_policy": "do_not_store_raw_parquet_or_images_in_repo"
+}

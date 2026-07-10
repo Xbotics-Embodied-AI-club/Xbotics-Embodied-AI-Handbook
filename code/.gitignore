@@ -1,0 +1,32 @@
+# 本地密钥与环境（只提交 .env.example / .envrc.example）
+.env
+.envrc
+
+# uv 虚拟环境
+.venv/
+.venv_*/
+
+# lerobot 上游源码（由 platform/lerobot/fetch_lerobot.sh 拉取并打补丁，不入库）
+platform/lerobot/lerobot/
+
+# 官方 RDK 工具（由 platform/rdk/fetch_rdk_tools.sh 拉取，不入库）
+platform/rdk/rdk_LeRobot_tools/
+
+# 运行结果 / 录制产物 / 缓存（已入库的 result/ 演示图保留）
+.result/
+output/
+recordings/
+scratch/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# 训练输出
+outputs/
+wandb/
+
+# 本地数据/缓存根（默认 DATASETS_ROOT=./datasets，hfcache 在其下）
+datasets/
+
+# unsloth import 时自动生成的编译缓存（可随时重生）
+unsloth_compiled_cache/

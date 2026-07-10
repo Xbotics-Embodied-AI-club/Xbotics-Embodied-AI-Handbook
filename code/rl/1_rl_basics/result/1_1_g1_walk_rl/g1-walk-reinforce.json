@@ -1,0 +1,13 @@
+{
+  "action_abs_mean": 0.38622155498713256,
+  "checkpoint": "DATASETS_ROOT/models/trained/xbotics_rl_g1_walk/g1-walk-reinforce/model_3000.pt",
+  "checkpoint_iteration": 3000,
+  "done_count": 84,
+  "done_fraction": 0.013125,
+  "mean_reward": 0.07042886278126388,
+  "num_envs": 16,
+  "run_name": "g1-walk-reinforce",
+  "steps": 400,
+  "video_frames": 400,
+  "video_output": "rl/1_rl_basics/result/1_1_g1_walk_rl/g1-walk-reinforce.mp4"
+}

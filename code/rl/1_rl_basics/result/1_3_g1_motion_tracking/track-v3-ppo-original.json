@@ -1,0 +1,6 @@
+{
+  "run": "track-v3-ppo-original",
+  "mean_reward": 0.0701022059423849,
+  "done_fraction": 0.00015625,
+  "frames": 400
+}

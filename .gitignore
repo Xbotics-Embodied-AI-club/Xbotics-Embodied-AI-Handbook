@@ -42,3 +42,6 @@ assets/videos/**/*.mkv
 # Isaac / MuJoCo caches
 _isaac_sim/
 .mujoco/
+
+# Xbotics-One 迁入的已发布权重（讲15 GRPO 结果，58MB，明确入库）
+!code/rl/2_grpo_posttraining/result/2_1_grpo_vlm_counting/adapter/adapter_model.safetensors
