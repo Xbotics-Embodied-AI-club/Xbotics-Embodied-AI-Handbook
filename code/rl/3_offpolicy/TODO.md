@@ -5,17 +5,17 @@ off-policy 六级由简到繁依次提升，编号即教学序。详细规划见
 
 ## 3_1_cartpole_value_rl/（值学习入门：Q-learning → DQN，CartPole 贯穿）
 
-- [ ] `train_v1_qlearning.py`：CartPole 状态分桶 + 表格 Q（故意无网络/无 Lightning——"没有网络"即教学点）。
-- [ ] `train_v2_dqn.py`：网络 Q + 经验回放 + 目标网络（Lightning 四件套，自包含）。
+- [x] `train_v1_qlearning.py`：CartPole 状态分桶 + 表格 Q（故意无网络/无 Lightning——"没有网络"即教学点）。
+- [x] `train_v2_dqn.py`：网络 Q + 经验回放 + 目标网络（Lightning 四件套，自包含）。
 - 两级统一报回合回报，直接看结果对照；无 model.py、无 env.py、无 rollout.py。
 
 ## 3_2_so101_offpolicy/（SO101 连续控制：DDPG → TD3 → SAC → squint 分布式 SAC）
 
 squint 与 BeyondMimic 同地位的 RL 教学案例，顶点 v6 顺手产 VLA 仿真数据（callback）。
 
-- [ ] `train_v3_ddpg.py` / `train_v4_td3.py` / `train_v5_sac.py`：连续控制阶梯，**各自包含**（本算法的模型 `nn.Module` + `LightningModule` 更新 + 回放，无共享 model.py——核心在每个 model）；单代表任务做阶梯对照。
-- [ ] `train_v6_squint.py`：C51 分布式 SAC（现已验证 0.99），换 16px 视觉，铺 8 任务。
-- [ ] `datagen/`（数据生成独立文件夹）：`rollout.py`（采 env_states）→ `replay.py`（换外观重渲）→ `to_lerobot.py`（convert）→ `gen_dataset.py`（编排），产 `so101_sim/<task>` LeRobotDataset。
+- [x] `train_v3_ddpg.py` / `train_v4_td3.py` / `train_v5_sac.py`：连续控制阶梯，**各自包含**（本算法的模型 `nn.Module` + `LightningModule` 更新 + 回放，无共享 model.py——核心在每个 model）；单代表任务做阶梯对照。
+- [x] `train_v6_squint.py`：C51 分布式 SAC（现已验证 0.99），换 16px 视觉，铺 8 任务。
+- [x] `datagen/`（数据生成独立文件夹）：`rollout.py`（采 env_states）→ `replay.py`（换外观重渲）→ `to_lerobot.py`（convert）→ `gen_dataset.py`（编排），产 `so101_sim/<task>` LeRobotDataset。
 - SO101 环境不在本模块定义——统一从 `platform/so101_sim`（`make_train_env`）消费；无 env.py。
 
 ## 3_3_hilserl_so101/（HIL-SERL 真机；讲16，讲义与实验双缺口，待建）
