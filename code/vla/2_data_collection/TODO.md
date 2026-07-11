@@ -1,6 +1,6 @@
 # TODO · 组2 补仿真采集线（讲9 兜底）
 
-- [ ] `2_5_sim_teleop_record/`：SO-101 仿真器 + 键盘/手柄驱动从臂，采出与实物**同格式**的 LeRobot 数据集（讲9「无真机」兜底线，目前完全缺失）
+- [x] `2_5_sim_teleop_record/`：SO-101 仿真器 + 键盘驱动从臂，采出与实物**同格式**的 LeRobot 数据集（讲9「无真机」兜底线）——键盘遥操 + 官方 `convert_to_lerobot`，feature schema 与 `rl/3_offpolicy/datagen` 逐字段一致；含无人值守自检入口
 
 ## 代码风格（后续实现必须完全匹配既有风格）
 
