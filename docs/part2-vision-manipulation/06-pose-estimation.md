@@ -574,9 +574,7 @@
 
 本讲内容将严格遵循以下七步感知与操作闭环主线展开教学。这七个步骤构成了从原始传感器数据到机械臂物理动作的完整信息流，也是读者后续进行工程实践时必须逐一打通的关键节点：
 
-![image\.png](图片和附件/image%205.png)
-
-![image\.png](图片和附件/image%202.png)
+![image\.png](../part2-vision-manipulation/part2_picture/Lecture6_picture/image%202.png)（问题：图片字体不清晰）
 
 #### 1\.4\.3 章节内容编排与学习节奏建议
 
@@ -770,9 +768,9 @@ Unitree G1 类人形机器人具备全身自由度，多相机分布在头部、
 
 ## 3 视觉感知前端：目标检测分割与点云提取 
 
-![image\.png](图片和附件/image%203.png)
+![image\.png](../part2-vision-manipulation/part2_picture/Lecture6_picture/image%203.png)（问题：图片字体不清晰）
 
-![image\.png](图片和附件/image%204.png)
+<!-- ![image\.png](../part2-vision-manipulation/part2_picture/Lecture6_picture/image%204.png) -->
 
 ### 3\.1 输入模态：RGB\-D 数据与多相机配置
 
@@ -1114,7 +1112,7 @@ SAM系列的选型建议：
 
 反投影的前提是已知相机的内参矩阵（Intrinsic Matrix） ：
 
-![image\.png](图片和附件/image%207.png)
+![image\.png](../part2-vision-manipulation/part2_picture/Lecture6_picture/image%207.png)
 
 其中，*fx*、*fy*为相机在x和y方向的焦距（以像素为单位），\(*cx*,*cy*\)为图像主点（光轴与图像平面的交点，通常接近图像中心）。这些参数通过相机标定（如使用棋盘格标定板）获得，其精度直接影响后续三维坐标的计算精度。
 
@@ -1122,7 +1120,8 @@ SAM系列的选型建议：
 
 对于深度图中位置为\(*u*,*v*\)的像素，其深度值为*d*\(*u*,*v*\)，则该像素在相机坐标系下的三维坐标\(*X*,*Y*,*Z*\)可由以下公式精确计算得出：
 
-![image\.png](图片和附件/image%206.png)
+![image\.png](../part2-vision-manipulation/part2_picture/Lecture6_picture/image%206.png)
+
 
 这一公式的几何含义非常直观：深度值*Z*直接作为该点的三维空间深度坐标，而*X*和*Y*则由像素坐标相对于主点的偏移量，乘以深度值再除以焦距得到。本质上，它是将每个像素“从图像平面沿着光路投射回三维空间”。
 
@@ -2051,10 +2050,9 @@ $Wgrasp=Dobject+Δsafety$
 在开始标定之前，首先要搞清楚一个问题：相机装在哪儿？ 相机的安装位置决定了手眼标定的数学模型和操作流程。根据安装方式的不同，手眼系统分为两种基本拓扑：
 
 1. 眼在手外（Eye\-to\-Hand）：相机固定，全局俯视
-
 在这种配置中，相机固定安装在机器人工作空间之外——如工作台上方的支架、天花板或专用的相机立柱上。相机的位置在整个工作过程中保持不变，从全局视角俯视机器人的操作区域。
 
-![image\.png](图片和附件/image.png)
+![image\.png](../part2-vision-manipulation/part2_picture/Lecture6_picture/image.png)
 
 物理拓扑关系：
 
@@ -2076,7 +2074,7 @@ $Wgrasp=Dobject+Δsafety$
 
 在这种配置中，相机刚性安装在机械臂的末端执行器（夹爪）附近，随机械臂一同运动。相机“看到”的场景会随着机械臂的移动而变化。
 
-![image\.png](图片和附件/image%201.png)
+![image\.png](../part2-vision-manipulation/part2_picture/Lecture6_picture/image%201.png)
 
 物理拓扑关系：
 
