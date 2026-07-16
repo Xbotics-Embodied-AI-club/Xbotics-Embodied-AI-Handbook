@@ -335,201 +335,412 @@ ACT（Action Chunking with Transformers）与 Diffusion Policy 常用于模仿�
 
 ### 2.5.1 最小机器人闭环
 
+前面的章节分别介绍了层级和通信方式，现在把它们重新连成一条完整链路。最小闭环的关键不是节点数量，而是每一次动作都基于当前状态产生，执行结果又能回到下一次判断中。
+
 ```text
-读取状态
-↓
-发布目标
-↓
-生成动作
-↓
-下发控制
-↓
-执行运动
-↓
-读取反馈
-↓
-判断结果
-↓
-记录 episode
+读取 /joint_states
+        ↓
+接收 /target_joint
+        ↓
+策略生成 /action_command
+        ↓
+检查维度、限位、频率和状态新鲜度
+        ↓
+控制器更新 mock 对象或下发硬件命令
+        ↓
+读取新的 /joint_states
+        ↓
+发布 /task_status
+        ↓
+记录 episode，并进入下一控制周期
 ```
+
+如果链路只执行一次而不读取新状态，它就是开环；如果每次执行后都用最新反馈修正下一步动作，它才是闭环。
 
 ### 2.5.2 状态读取
 
-包括：
-- 关节位置；
-- 关节速度；
-- 夹爪状态；
-- 相机图像；
-- 深度图；
-- 目标点；
-- 任务状态。
+机器人状态描述“系统此刻处于什么情况”。机械臂状态通常包含关节名称、关节位置、速度和力矩；操作任务还可能使用末端位姿、夹爪状态、相机图像、深度图和接触信息。
+
+状态不仅要有数值，还要有时间。策略在 10:00:01 收到的关节位置，到 10:00:03 可能已经过期。如果系统继续根据旧状态计算动作，就可能产生振荡甚至碰撞。因此，状态消费者至少要检查：
+
+1. 消息是否收到；
+2. 关节名称和数量是否符合预期；
+3. 数值是否有限且位于合理范围；
+4. 时间戳是否足够新；
+5. 实际发布频率是否满足控制需求。
+
+本章使用标准 `sensor_msgs/msg/JointState` 表示 `/joint_states`。真实机械臂还可能通过厂商消息提供温度、错误码或电机状态，这些信息同样可以进入安全判断。
 
 ### 2.5.3 动作生成
 
-动作可以来自：
-- 手写规则；
-- 简单控制策略；
-- 模仿学习模型；
-- VLA 模型；
-- 强化学习策略；
-- 世界模型辅助规划。
+动作可以来自手写规则、比例策略、传统规划器、模仿学习、VLA、强化学习或世界模型辅助规划。无论来源如何，策略节点都要明确动作空间：输出的是绝对关节目标、关节增量、末端位姿、速度，还是力矩？
+
+本章 Demo 使用“关节增量”作为 `/action_command`。策略计算目标关节位置与当前关节位置的误差，再取其中一小部分作为本周期动作。这样动作会随着机器人接近目标而逐渐减小，便于观察闭环如何收敛。
+
+动作维度必须与当前状态一致。六关节机械臂不能接收五个或七个关节值；关节顺序也必须一致，否则原本希望移动肩关节的动作可能被错误地发送到肘关节。
 
 ### 2.5.4 动作执行
 
-执行前需要检查：
-- 动作范围；
-- 速度限制；
-- 关节限位；
-- 碰撞风险；
-- 控制频率；
-- 夹爪状态；
-- 急停条件。
+动作执行是风险最高的环节。控制器接收到 `/action_command` 后，至少要检查动作维度、单步最大变化、关节限位、速度限制、状态新鲜度、通信超时和急停状态。涉及空间运动时，还要考虑自碰撞、环境碰撞和工作空间边界。
+
+教学 mock 控制器只更新内存中的模拟关节值，不会驱动真实电机。接入真实硬件时，必须用经过验证的驱动或控制器替换该节点，并在低速、限幅、空载、有人监护且急停可用的条件下测试。
+
+控制频率也属于动作语义的一部分。同样的“每步移动 0.02 弧度”，以 10 Hz 执行和以 100 Hz 执行会产生完全不同的速度。真实接口应优先使用带时间含义的目标、速度或轨迹，而不是依赖不明确的循环频率。
 
 ### 2.5.5 任务反馈
 
-反馈信息包括：
-- 是否到达目标；
-- 是否抓取成功；
-- 是否发生碰撞；
-- 是否超时；
-- 是否丢失目标；
-- 是否需要重试。
+任务反馈回答“执行结果怎样”。对本章的到达任务，可以用所有关节的最大绝对误差判断是否到达目标；如果误差小于阈值，就发布 `reached`。在到达之前发布 `running`，状态过旧时发布 `stale_state`，超过最大执行时间则发布 `timeout`。
+
+更复杂的抓取任务还需要判断夹爪是否闭合、物体是否被提起、是否发生碰撞、目标是否丢失以及是否需要重试。反馈条件应来自可测量的状态，而不是仅根据“动作已经发送”推断任务成功。
+
+`/task_status` 让记录器和上层任务模块不用理解控制细节，也能知道当前任务是否继续、结束或失败。
 
 ### 2.5.6 Episode 数据记录
 
-一个 episode 通常包括：
-- 图像；
-- 状态；
-- action；
-- 目标；
-- 时间戳；
-- 任务结果；
-- 成功 / 失败标签；
-- 异常信息。
+Episode 是一次任务从开始到结束的时序记录。它不仅用于回放，也用于排错、评测和后续训练。一个最小记录应包含：
+
+| 字段 | 含义 | 为什么需要 |
+| --- | --- | --- |
+| `timestamp` | 当前记录时刻 | 对齐不同数据并计算频率 |
+| `joint_state` | 当前关节状态 | 知道动作从什么状态出发 |
+| `target_joint` | 当前任务目标 | 判断策略是否朝正确目标运动 |
+| `action_command` | 本周期策略动作 | 分析策略实际输出 |
+| `task_status` | 运行、到达、超时或异常 | 确定任务阶段和结束原因 |
+| `success` | 最终成功标签 | 用于评测和筛选数据 |
+| `error` | 异常信息 | 定位失败原因 |
+
+下面是一条教学记录，用于说明字段关系，并不规定 LeRobot 数据集唯一的存储格式：
+
+```json
+{
+  "timestamp": 1721102401.42,
+  "joint_state": [0.00, -0.31, 0.62, 0.00, 0.28, 0.00],
+  "target_joint": [0.00, -0.40, 0.80, 0.00, 0.40, 0.00],
+  "action_command": [0.00, -0.045, 0.05, 0.00, 0.05, 0.00],
+  "task_status": "running",
+  "success": false,
+  "error": null
+}
+```
+
+生产系统还要考虑图像与状态同步、掉帧、压缩格式、episode 边界和元数据版本。最重要的原则是：记录必须能回答“机器人看到了什么、处于什么状态、执行了什么、结果怎样”。
+
+### 2.5.7 本节小结
+
+闭环由一组可验证的数据关系构成：状态必须及时，动作必须有明确语义，执行必须受安全约束，结果必须来自反馈，数据必须足以复盘。ROS2 负责传输这些信息，系统设计负责保证它们彼此一致。
 
 ## 2.6 Demo 设计：基于 ROS2 的 LeRobot / SO101 最小闭环
 
 ### 2.6.1 Demo 目标
 
+本 Demo 不追求实现一套完整机械臂驱动，而是用最少模块展示 ROS2 闭环。默认路径使用 mock 对象，因此没有硬件的读者也可以理解和观察数据流；有 SO101 或 LeRobot 兼容机械臂时，再替换状态与控制接口。
+
 ```text
-完成一个基于 ROS2 的最小机器人闭环：
-读取 joint_states
-↓
-发布 target_pose 或 target_joint
-↓
-policy_node 生成 action_command
-↓
-controller_node 下发动作
-↓
-读取反馈状态
-↓
-判断是否到达目标
-↓
-保存 episode 数据
+target_publisher 发布 /target_joint
+                    ↓
+robot_state_node 发布 /joint_states
+                    ↓
+policy_node 生成 /action_command
+                    ↓
+controller_node 更新 mock 对象或调用硬件控制器
+                    ↓
+robot_state_node 发布新状态
+                    ↓
+task_status_node 发布 /task_status
+                    ↓
+episode_recorder 保存过程数据
 ```
 
-### 2.6.2 有硬件版 Demo
+Demo 中的 `robot_state_node` 是 `/joint_states` 的唯一发布者。`controller_node` 负责改变 mock 对象或调用硬件控制接口，不重复伪造另一路关节状态。这一约束可以避免多个发布源让读者无法判断哪一份状态是真实反馈。
 
-Demo 名称：
-- 基于 ROS2 的 LeRobot / SO101 机械臂状态读取与动作下发闭环。
+### 2.6.2 节点与接口设计
 
-适合设备：
-- SO101；
-- LeRobot 兼容机械臂；
-- ROS2；
-- 相机；
-- 夹爪；
-- 数据记录模块。
+| 节点 | 输入 | 输出 | 对应知识点 | 接入硬件时如何处理 |
+| --- | --- | --- | --- | --- |
+| `target_publisher` | 用户输入或定时目标 | `/target_joint` | Publisher、目标输入 | 通常保留 |
+| `robot_state_node` | mock 对象或硬件反馈 | `/joint_states` | 状态读取、反馈 | 替换读取逻辑，保留统一 Topic |
+| `policy_node` | `/target_joint`、`/joint_states` | `/action_command` | Subscriber、策略生成 | 可以保留或替换为学习策略 |
+| `controller_node` | `/action_command` | mock 更新或硬件控制指令 | 限幅、控制执行 | 必须适配经过验证的驱动 |
+| `task_status_node` | `/target_joint`、`/joint_states` | `/task_status` | 误差判断、超时 | 通常保留并增加硬件异常 |
+| `episode_recorder` | 四个核心 Topic | episode 文件 | 多 Topic 记录、数据闭环 | 通常保留并扩展相机等数据 |
 
-流程：
-1. 连接 LeRobot / SO101 机械臂；
-2. 启动 ROS2 驱动节点；
-3. 读取当前 /joint_states；
-4. 发布 /target_pose 或 /target_joint；
-5. 控制节点生成 /action_command；
-6. 下发机械臂动作；
-7. 读取反馈状态；
-8. 判断是否到达目标；
-9. 记录图像、状态、动作和结果；
-10. 保存为 episode_0001。
+这组接口体现了“模块可以替换、契约保持稳定”的思想。比如，把简单比例策略替换为 ACT 时，`policy_node` 的内部实现会变化，但只要仍然消费状态和目标、产生定义明确的动作，其他节点就不必全部重写。
 
-输入示例：
-target_eef = [0.20, 0.05, 0.12]
-输出示例：
-/joint_states
-/target_pose
-/action_command
-/gripper_command
-/task_status
-episode_0001
+### 2.6.3 关键代码一：根据误差生成动作
 
-### 2.6.3 无硬件仿真版 Demo
+下面的核心函数根据当前关节位置和目标关节位置计算动作。`gain` 决定每次修正多少误差，`max_step` 限制单个周期的最大动作。
 
-Demo 名称：
-- 基于 ROS2 的 LeRobot 机械臂仿真控制闭环。
+```python
+import numpy as np
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64MultiArray
 
-可选环境：
-- ROS2 mock robot；
-- MuJoCo 简化机械臂；
-- ManiSkill reaching task；
-- Isaac Lab 机械臂环境。
 
-设计节点：
-- camera_node；
-- robot_state_node；
-- target_publisher；
-- policy_node；
-- controller_node；
-- task_status_node；
-- episode_recorder。
+def build_action(current, target, gain=0.5, max_step=0.05):
+    current = np.asarray(current, dtype=float)
+    target = np.asarray(target, dtype=float)
+    if current.shape != target.shape:
+        raise ValueError("current and target must have the same shape")
 
-Topic：
-- /camera/image；
-- /joint_states；
-- /target_pose；
-- /action_command；
-- /gripper_command；
-- /task_status；
-- /episode_status。
+    error = target - current
+    return np.clip(gain * error, -max_step, max_step)
 
-流程：
-1. target_publisher 发布目标点；
-2. robot_state_node 发布当前关节状态；
-3. policy_node 根据目标和状态生成动作；
-4. controller_node 下发动作；
-5. task_status_node 判断任务是否完成；
-6. episode_recorder 记录图像、状态、动作和结果。
 
-### 2.6.4 Demo 融入的知识点
+def on_joint_state(self, msg: JointState):
+    if not msg.position or self.target is None:
+        return
 
-> 待补充：该图表内容需从原飞书文档或源素材补齐。
+    action = build_action(msg.position, self.target)
+    command = Float64MultiArray()
+    command.data = action.tolist()
+    self.action_pub.publish(command)
+```
+
+这段代码体现四个设计点：
+
+1. 当前状态和目标都会转换为数值数组；
+2. 两者形状不一致时立即报错，避免错误关节映射；
+3. 比例策略让动作随误差减小；
+4. `np.clip` 对单步动作限幅。
+
+它仍然只是策略片段，不是硬件控制器。真实系统必须继续检查关节限位、速度、工作空间、碰撞和急停条件。
+
+### 2.6.4 关键代码二：拒绝过期状态并判断任务结果
+
+只检查数值还不够。下面的片段要求关节状态不超过 200 毫秒，并以最大关节误差小于 0.02 弧度作为到达条件：
+
+```python
+state_age = self.get_clock().now() - self.last_state_time
+if state_age.nanoseconds > 200_000_000:
+    self.publish_status("stale_state")
+    return
+
+reached = max(
+    abs(target - current)
+    for target, current in zip(self.target, self.current)
+) < 0.02
+
+self.publish_status("reached" if reached else "running")
+```
+
+200 毫秒和 0.02 弧度只是教学参数。真实阈值取决于控制频率、任务精度、编码器噪声和机械结构。系统还应在规定时间内未到达目标时发布 `timeout`，而不是无限运行。
+
+### 2.6.5 关键代码三：统一启动节点
+
+Launch 文件把节点组织成一个可重复启动的系统：
+
+```python
+from launch import LaunchDescription
+from launch_ros.actions import Node
+
+
+def generate_launch_description():
+    return LaunchDescription([
+        Node(package="robot_demo", executable="robot_state_node"),
+        Node(package="robot_demo", executable="target_publisher"),
+        Node(package="robot_demo", executable="policy_node"),
+        Node(package="robot_demo", executable="controller_node"),
+        Node(package="robot_demo", executable="task_status_node"),
+        Node(package="robot_demo", executable="episode_recorder"),
+    ])
+```
+
+片段省略了参数、命名空间、输出日志和启动条件。它的重点是展示 Launch 如何描述节点集合，而不是提供可以直接构建的完整 Package。
+
+### 2.6.6 无硬件 mock 路径
+
+没有机械臂时，可以让 `controller_node` 把 `/action_command` 加到模拟关节位置上，让 `robot_state_node` 以固定频率发布更新后的 `/joint_states`。这一最小 mock 对象足以观察误差逐渐减小、任务状态从 `running` 变为 `reached`，并验证 episode 是否记录完整。
+
+如果已有 MuJoCo、ManiSkill 或 Isaac Lab 环境，也可以把 mock 对象替换为仿真机械臂。替换时仍要统一关节名称、顺序、单位和控制周期。
+
+### 2.6.7 SO101 / LeRobot 兼容硬件路径
+
+接入硬件时，主要替换两个边界：
+
+1. `robot_state_node` 从真实驱动读取关节状态，并统一发布 `/joint_states`；
+2. `controller_node` 把经过验证的动作转换为驱动支持的目标、速度或轨迹接口。
+
+首次接入前必须确认关节名称与顺序、弧度或角度单位、控制模式、关节限位、速度限制、状态频率和急停是否有效。先完成无负载、低速、小范围测试，再逐步扩大动作范围。示例 `/action_command` 不能直接绕过厂商控制器连接电机。
+
+### 2.6.8 Demo 融入的知识点
+
+| Demo 环节 | 对应知识点 | 可观察证据 |
+| --- | --- | --- |
+| 发布目标 | Node、Publisher、Topic | `/target_joint` 出现目标数组 |
+| 发布状态 | 硬件抽象、反馈、消息类型 | `/joint_states` 持续更新 |
+| 生成动作 | 策略层、Subscriber、动作空间 | `/action_command` 随误差变化 |
+| 执行动作 | 控制层、限幅、安全边界 | mock 状态逐步接近目标 |
+| 判断结果 | 闭环反馈、阈值、超时 | `/task_status` 从 `running` 变为 `reached` |
+| 记录数据 | episode、时间戳、数据飞轮 | 记录中包含目标、状态、动作和结果 |
+
+### 2.6.9 本节小结
+
+Demo 的价值不在于比例策略本身，而在于展示模块边界：状态只有一个可信来源，策略输出必须经过控制与安全处理，任务成功必须由反馈判断，执行过程必须留下可复盘数据。
 
 ## 2.7 实验步骤
 
+本实验的目标是观察系统数据流，而不是完成厂商级机械臂驱动。正文给出的是关键代码片段，课堂实践可以由教师提供教学 Package，也可以由学生把片段整理进自己的节点。建议先完成无硬件 mock 路径，再接入真实机械臂。
+
 ### 2.7.1 环境准备
 
-1. 创建 ROS2 workspace；
-2. 创建 LeRobot demo package；
-3. 配置依赖和消息类型；
-4. 准备硬件或仿真环境。
+实验前应准备一个已正确配置的 ROS2 环境。本讲不限定具体发行版；命令和消息接口适用于常见 ROS2 发行版，细节以所用发行版文档为准。
 
-### 2.7.2 节点编写
+创建工作空间和 Python Package：
 
-1. 编写 robot_state_node，发布关节状态；
-2. 编写 target_publisher，发布目标点；
-3. 编写 policy_node，生成简单动作指令；
-4. 编写 controller_node，下发动作；
-5. 编写 task_status_node，判断是否完成；
-6. 编写 episode_recorder，记录图像、状态、动作和任务结果。
+```bash
+mkdir -p ~/robot_ws/src
+cd ~/robot_ws/src
+ros2 pkg create robot_demo \
+  --build-type ament_python \
+  --dependencies rclpy sensor_msgs std_msgs
+```
 
-### 2.7.3 系统调试
+将本节关键逻辑分别整理为状态、目标、策略、控制、任务判断和记录节点，并在 `setup.py` 中声明可执行入口。然后在工作空间根目录构建并加载环境：
 
-1. 使用 ros2 topic list 查看 Topic；
-2. 使用 ros2 topic echo 查看消息内容；
-3. 使用 rqt_graph 查看节点连接；
-4. 修改目标点，观察系统响应；
-5. 修改控制参数，观察闭环稳定性；
-6. 保存并检查 episode 数据。
+```bash
+cd ~/robot_ws
+colcon build --symlink-install
+source install/setup.bash
+```
+
+如果构建失败，先阅读最早出现的错误。常见原因包括依赖名称拼写错误、入口函数没有声明、Python 文件不可导入或忘记加载当前工作空间。
+
+### 2.7.2 启动无硬件 mock 闭环
+
+先启动包含六个节点的 Launch 文件：
+
+```bash
+ros2 launch robot_demo minimal_loop.launch.py
+```
+
+新开一个已经执行 `source ~/robot_ws/install/setup.bash` 的终端，检查节点：
+
+```bash
+ros2 node list
+```
+
+预期至少能看到：
+
+```text
+/robot_state_node
+/target_publisher
+/policy_node
+/controller_node
+/task_status_node
+/episode_recorder
+```
+
+如果节点名称不同，应以实际命名空间为准；如果节点缺失，应查看启动终端中的异常，而不是继续发布目标。
+
+### 2.7.3 检查 Topic 与消息类型
+
+列出 Topic 并检查详细接口：
+
+```bash
+ros2 topic list
+ros2 topic info -v /joint_states
+ros2 topic info -v /action_command
+```
+
+`/joint_states` 应使用 `sensor_msgs/msg/JointState`，并且只有 `robot_state_node` 负责发布。`/action_command` 应由 `policy_node` 发布、由 `controller_node` 订阅。
+
+继续观察状态内容和频率：
+
+```bash
+ros2 topic echo /joint_states
+ros2 topic hz /joint_states
+```
+
+如果状态频率明显低于节点配置值，或时间戳长时间不更新，后续策略结果就不可信。
+
+### 2.7.4 发布目标并观察闭环
+
+使用命令行发布一次六关节目标：
+
+```bash
+ros2 topic pub --once /target_joint \
+  std_msgs/msg/Float64MultiArray \
+  "{data: [0.0, -0.4, 0.8, 0.0, 0.4, 0.0]}"
+```
+
+分别观察动作和任务状态：
+
+```bash
+ros2 topic echo /action_command
+ros2 topic echo /task_status
+```
+
+正常情况下，`/action_command` 的幅值受到单步限幅，`/joint_states` 逐渐接近目标，`/task_status` 先为 `running`，误差进入阈值后变为 `reached`。如果动作始终为零，应检查目标是否已经等于当前状态；如果动作达到限幅但状态不变，应检查 `controller_node` 是否收到消息并更新 mock 对象。
+
+### 2.7.5 使用 rqt_graph 查看连接关系
+
+运行：
+
+```bash
+rqt_graph
+```
+
+节点图应能显示目标、状态、策略、控制、任务判断和记录之间的连接。重点检查：
+
+1. `policy_node` 是否同时订阅目标和状态；
+2. `controller_node` 是否订阅动作；
+3. `robot_state_node` 是否是 `/joint_states` 的唯一发布者；
+4. `episode_recorder` 是否订阅需要记录的 Topic。
+
+图连通不代表语义正确，但它能快速发现 Topic 名称不一致或订阅关系缺失。
+
+### 2.7.6 检查 episode
+
+任务结束后，打开记录文件，至少检查以下字段：
+
+```text
+timestamp
+joint_state
+target_joint
+action_command
+task_status
+success
+error
+```
+
+任选三个时间点，确认状态确实向目标变化，动作与误差方向一致，最终状态与 `success` 标签一致。若只有动作而没有执行后的状态，就无法判断动作是否生效；若没有失败原因，也很难形成有效的数据飞轮。
+
+### 2.7.7 调整参数并观察系统行为
+
+在 mock 环境中，可以逐项修改比例增益、单步限幅、发布频率和到达阈值，并记录现象：
+
+- 增益过小：动作平稳，但到达时间变长；
+- 增益或单步上限过大：到达更快，但可能出现越过目标或振荡；
+- 状态频率过低：控制反应迟缓，过期状态检查可能触发；
+- 到达阈值过小：系统可能长时间保持 `running`；
+- 到达阈值过大：系统可能过早报告成功。
+
+每次只修改一个参数，才能判断现象与参数之间的关系。
+
+### 2.7.8 替换为真实机械臂
+
+只有 mock 闭环稳定后，才进入硬件路径。替换前逐项确认：
+
+1. 驱动报告的关节名称、顺序和数量；
+2. 位置使用弧度还是角度，速度与时间单位是什么；
+3. 当前控制模式接受位置、增量、速度还是轨迹；
+4. 关节限位、速度限制和工作空间限制是否生效；
+5. `/joint_states` 频率能否满足策略和控制需要；
+6. 急停是否可用，测试人员是否能随时停止系统；
+7. 首次测试是否为空载、低速、小范围且有人监护。
+
+不要把教学示例中的 `/action_command` 直接连接到电机。正确做法是由 `controller_node` 完成消息校验、动作空间转换和驱动适配，并保留厂商控制器提供的底层保护。
+
+### 2.7.9 实验完成标准
+
+完成实验后，读者应能展示：
+
+- 节点和 Topic 列表；
+- `/joint_states` 的内容与频率；
+- 目标改变后动作与状态的变化；
+- `/task_status` 从运行到结束的过程；
+- `rqt_graph` 节点连接图；
+- 包含目标、状态、动作、时间戳和结果的 episode 样例。
 
 ## 2.8 作业交付与失败复盘
 
