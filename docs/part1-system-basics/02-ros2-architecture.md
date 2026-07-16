@@ -595,7 +595,7 @@ ros2 pkg create robot_demo \
   --dependencies rclpy sensor_msgs std_msgs
 ```
 
-将本节关键逻辑分别整理为状态、目标、策略、控制、任务判断和记录节点，并在 `setup.py` 中声明可执行入口。然后在工作空间根目录构建并加载环境：
+策略片段还使用了 NumPy。应确认当前 Python 环境可以导入 `numpy`，并在 Package 的运行依赖中声明系统或发行版对应的 NumPy 依赖。将本节关键逻辑分别整理为状态、目标、策略、控制、任务判断和记录节点，并在 `setup.py` 中声明可执行入口。然后在工作空间根目录构建并加载环境：
 
 ```bash
 cd ~/robot_ws
@@ -746,52 +746,92 @@ error
 
 ### 2.8.1 作业交付
 
-学生需要提交：
-- ROS2 package 源码；
-- rqt_graph 截图；
-- Topic / Service / Action 使用说明；
-- 一张 LeRobot 机械臂数据流图；
-- 一段硬件或仿真闭环运行视频；
-- 一个 episode 数据样例；
-- 一段说明：VLA、世界模型、控制器分别位于机器人系统的哪个模块。
+本讲作业不是只提交“能运行的程序”，而是提交一组能够证明系统闭环正确的材料。
 
-### 2.8.2 常见失败 checklist
+| 交付物 | 最低要求 | 验收重点 |
+| --- | --- | --- |
+| ROS2 Package 源码 | 包含状态、目标、策略、控制、任务判断和记录节点 | 节点职责与接口清晰，不要求厂商级完整驱动 |
+| `rqt_graph` 截图 | 显示核心节点和 Topic 连接 | `policy_node` 同时接收目标与状态，记录器接入完整 |
+| Topic / Service / Action 说明 | 各举一个适用场景并解释选择原因 | 不是只背定义，而是根据通信特征选择 |
+| 机械臂数据流图 | 标明四层结构和四个核心 Topic | 状态上行、动作下行、反馈闭环方向正确 |
+| 闭环运行视频 | 展示目标改变、状态变化和任务结束 | 能看到 `/task_status` 或等价结果证据 |
+| episode 样例 | 包含目标、状态、动作、时间戳和结果 | 数据能复原一次任务过程 |
+| 模型位置说明 | 说明 VLA、世界模型和控制器的位置与接口 | 明确模型输出不能绕过控制和安全模块 |
 
-1. Topic 名称是否一致？
-2. 消息类型是否匹配？
-3. 节点是否全部启动？
-4. Topic 是否真的有数据发布？
-5. 控制频率是否太低？
-6. 状态更新是否滞后？
-7. 动作下发后是否有反馈？
-8. 目标点坐标系是否正确？
-9. 是否只记录动作，没有记录观测和任务结果？
-10. 策略输出动作是否经过安全限制？
-11. episode 是否包含图像、状态、动作、时间戳和结果？
-12. rqt_graph 中节点连接是否符合预期？
+无硬件读者提交 mock 闭环即可；使用真实机械臂不会自动获得更高评价。评估重点是系统解释是否正确、证据是否完整、安全边界是否清楚。
+
+### 2.8.2 常见失败排查表
+
+机器人系统排错应从可观察证据开始。先确认节点是否存在，再确认 Topic 是否连接，然后检查消息内容与频率，最后再分析策略和控制逻辑。
+
+| 现象 | 可能原因 | 检查方法 | 修复方向 |
+| --- | --- | --- | --- |
+| 预期节点没有出现 | 节点启动失败、入口未注册、环境未加载 | `ros2 node list`；查看 Launch 终端最早的报错 | 修正入口或依赖，重新构建并 `source` 环境 |
+| Topic 存在但没有数据 | 发布节点未运行、回调未触发 | `ros2 topic info -v /joint_states`、`ros2 topic echo /joint_states` | 确认发布者数量和状态读取逻辑 |
+| 发布者与订阅者无法通信 | Topic 名称或消息类型不同 | `ros2 topic info -v <topic>` | 统一名称、命名空间和消息类型 |
+| 状态频率明显偏低 | 计时器配置、驱动或计算阻塞 | `ros2 topic hz /joint_states` | 调整发布周期，移除回调中的阻塞操作 |
+| 系统报告 `stale_state` | 状态时间戳过旧或发布中断 | 查看消息 header 与当前时间，检查频率 | 修正时间源，恢复状态发布，过期时停止动作 |
+| 策略没有发布动作 | 目标缺失、状态为空或维度不一致 | 查看 `/target_joint`、`/joint_states` 和策略日志 | 补齐目标，统一关节数量与顺序 |
+| 动作始终达到上限 | 目标过远、增益过大或单位错误 | 查看 `/action_command`，核对弧度与角度 | 降低增益和单步上限，统一单位 |
+| 动作在变化但状态不变 | 控制节点未订阅、mock 对象未更新或驱动拒绝命令 | `ros2 topic info -v /action_command`；查看控制日志 | 修复订阅与控制适配，检查驱动错误码 |
+| 状态越过目标并振荡 | 增益或单步上限过大、反馈延迟 | 对比连续状态和动作，测量状态频率 | 降低参数，提高反馈频率并增加平滑 |
+| 长时间保持 `running` | 到达阈值过小、状态噪声大或目标不可达 | 计算最大关节误差，检查是否触发超时 | 设置合理阈值与超时，报告不可达原因 |
+| 真实机械臂运动方向异常 | 关节顺序、正方向或单位映射错误 | 逐关节低速小范围测试 | 修正映射；验证前停止批量动作 |
+| episode 无法复盘 | 缺少目标、状态、动作、时间戳或结果 | 检查记录字段和样例时间序列 | 在同一时序记录中补齐字段和结束原因 |
+| `rqt_graph` 连通但任务失败 | 数据语义、单位、时间或控制逻辑错误 | 继续检查消息内容、频率和任务状态 | 不把“通信连通”误判为“系统正确” |
+
+排查时一次只改变一个因素，并保存修改前后的日志。否则即使问题消失，也很难知道真正原因。
 
 ### 2.8.3 复盘问题
 
-- 为什么机器人任务需要持续反馈？
-- Topic 和 Service 分别适合什么场景？
-- 为什么长任务更适合 Action？
-- 为什么 LeRobot 数据不能只记录动作？
-- 为什么 VLA 需要接入状态、控制和安全模块？
-- 为什么失败样本比成功样本更有迭代价值？
+完成实验后，请结合自己的节点图和 episode 回答：
+
+1. 为什么机器人任务需要持续反馈，而不能只在开始时计算一次动作？
+2. `/joint_states` 为什么适合 Topic？“保存当前 episode”为什么可以设计为 Service？
+3. 如果把“移动到目标”封装成长任务，Action 相比 Service 提供了哪些能力？
+4. 为什么 episode 不能只记录动作，还要记录动作之前和之后的状态？
+5. VLA 已经输出动作后，为什么仍然需要控制器、限幅和急停？
+6. 如果 `rqt_graph` 显示所有节点已经连接，任务仍然失败，还应检查哪些证据？
+7. 世界模型预测的未来为什么不能替代真实传感器反馈？
+8. 失败样本怎样帮助团队区分感知、策略、控制和硬件问题？
+
+### 2.8.4 本讲总结
+
+本讲从一个最小机械臂任务出发，建立了机器人系统的完整地图：本体层提供身体和传感器，感知层形成可行动信息，策略层决定下一步动作，控制层保证动作稳定安全地执行；ROS2 用 Node 和不同通信机制连接这些模块；反馈与 episode 记录让系统能够判断结果、排查失败并持续改进。
+
+判断一个具身智能系统是否完整，可以连续追问六个问题：
+
+```text
+观测从哪里来？
+目标怎样表达？
+策略输出什么？
+动作由谁检查和执行？
+系统怎样判断成功或失败？
+过程数据是否足以复盘？
+```
+
+如果其中任何一个问题没有明确答案，系统就还没有形成可靠闭环。
 
 ## 2.9 参考开源项目
 
-LeRobot
-https://github.com/huggingface/lerobot
-LeRobot 官方资源页
-https://huggingface.co/lerobot
-LeRobot ROS
-https://github.com/ycheng517/lerobot-ros
-SO101 ROS2
-https://github.com/msf4-0/so101_ros2
-SO101 ROS Physical AI
-https://github.com/legalaspro/so101-ros-physical-ai
-ROS2 examples
-https://github.com/ros2/examples
-ROS2 demos
-https://github.com/ros2/demos
+以下资料可用于继续学习。ROS2 与 LeRobot 官方资料适合查阅概念和主线功能；社区机械臂项目的接口与维护状态可能变化，接入真实硬件前应自行核对代码、许可证和安全说明。
+
+### 2.9.1 ROS2 官方资料
+
+- [ROS 2 Documentation](https://docs.ros.org/)：查询 ROS2 概念、安装说明和各发行版文档。
+- [ROS 2 Tutorials](https://docs.ros.org/en/rolling/Tutorials.html)：学习节点、Topic、Service、Action 和 Launch。
+- [ROS 2 Examples](https://github.com/ros2/examples)：查看 ROS2 客户端库的基础示例。
+- [ROS 2 Demos](https://github.com/ros2/demos)：查看通信、组件和工具相关演示。
+
+### 2.9.2 LeRobot 资料
+
+- [LeRobot GitHub](https://github.com/huggingface/lerobot)：查看机器人数据、策略训练和设备支持代码。
+- [LeRobot on Hugging Face](https://huggingface.co/lerobot)：浏览 LeRobot 相关数据集、模型和项目资源。
+
+### 2.9.3 社区 ROS 项目
+
+- [LeRobot ROS](https://github.com/ycheng517/lerobot-ros)：社区维护的 LeRobot 与 ROS 集成示例。
+- [SO101 ROS2](https://github.com/msf4-0/so101_ros2)：社区 SO101 ROS2 项目。
+- [SO101 ROS Physical AI](https://github.com/legalaspro/so101-ros-physical-ai)：社区 SO101 与 ROS 相关实践项目。
+
+这些项目可以帮助读者了解不同接口设计，但本章使用的 `/target_joint`、`/action_command` 和节点名称是教学契约，不代表上述项目采用完全相同的消息定义。
