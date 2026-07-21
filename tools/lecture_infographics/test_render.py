@@ -136,6 +136,15 @@ class AssetTests(unittest.TestCase):
 
 
 class LayoutTests(unittest.TestCase):
+    def test_figure_1_6_uses_vector_checkmark_not_font_glyph(self):
+        import inspect
+
+        from tools.lecture_infographics.layouts_a import draw_1_6
+
+        source = inspect.getsource(draw_1_6)
+        self.assertNotIn("✓", source)
+        self.assertIn("draw_checkmark(", source)
+
     def test_all_a_figures_have_explicit_layouts(self):
         from tools.lecture_infographics.layouts_a import A_LAYOUTS
 

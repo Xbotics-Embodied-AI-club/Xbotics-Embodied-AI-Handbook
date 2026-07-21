@@ -67,6 +67,20 @@ def _badge(draw: ImageDraw.ImageDraw, center: tuple[int, int], number: int) -> N
     draw.text((x, y), str(number), font=font(26, "bold"), fill=WHITE, anchor="mm")
 
 
+def draw_checkmark(
+    draw: ImageDraw.ImageDraw,
+    center: tuple[int, int],
+    color: str,
+) -> None:
+    x, y = center
+    draw.line(
+        ((x - 18, y), (x - 5, y + 14), (x + 20, y - 15)),
+        fill=color,
+        width=6,
+        joint="curve",
+    )
+
+
 def _semantic_icon(draw: ImageDraw.ImageDraw, center: tuple[int, int], kind: str) -> None:
     x, y = center
     stroke = 4
@@ -216,8 +230,10 @@ def draw_1_6(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, as
         _pill(draw, (x + 28, 325, x + 302, 395), action, fill=SOFT, outline="#8AB5E7", size=27)
         _paste_asset(image, asset_dir, "robot_arm", (x + 35, 420, x + 295, 660))
         draw_card(draw, (x + 35, 690, x + 295, 825), style=style, radius=18)
-        symbol = "✓" if color == GREEN else "×"
-        draw.text((x + 80, 758), symbol, font=font(46, "bold"), fill=color, anchor="mm")
+        if color == GREEN:
+            draw_checkmark(draw, (x + 80, 758), color)
+        else:
+            draw.text((x + 80, 758), "×", font=font(46, "bold"), fill=color, anchor="mm")
         fit_text(draw, outcome, (x + 122, 708, x + 282, 808), 27, 26, "bold", color)
         if index == 2:
             draw.rounded_rectangle((x + 15, 280, x + 315, 883), radius=28, outline=GREEN, width=6)
