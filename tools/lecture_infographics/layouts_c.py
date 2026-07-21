@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -25,6 +26,19 @@ YELLOW = THEME.accent
 GREEN = THEME.success
 
 
+@dataclass(frozen=True)
+class LaneLayout:
+    box: tuple[int, int, int, int]
+    text_x: int
+    arrow_x: int
+
+
+LANE_LAYOUTS = {
+    "state_up": LaneLayout((100, 288, 195, 866), text_x=122, arrow_x=170),
+    "command_down": LaneLayout((1310, 288, 1405, 866), text_x=1333, arrow_x=1381),
+}
+
+
 def _module(
     draw: ImageDraw.ImageDraw,
     box: tuple[int, int, int, int],
@@ -38,29 +52,29 @@ def _module(
 
 def _flow_lane(
     draw: ImageDraw.ImageDraw,
-    box: tuple[int, int, int, int],
+    layout: LaneLayout,
     label: str,
     *,
     upward: bool,
     color: str,
     fill: str,
 ) -> None:
-    x1, y1, x2, y2 = box
-    draw.rounded_rectangle(box, radius=20, fill=fill, outline=color, width=3)
-    center_x = (x1 + x2) // 2
-    start = (center_x, y2 - 42) if upward else (center_x, y1 + 42)
-    end = (center_x, y1 + 42) if upward else (center_x, y2 - 42)
+    x1, y1, x2, y2 = layout.box
+    draw.rounded_rectangle(layout.box, radius=20, fill=fill, outline=color, width=3)
+    divider_x = (layout.text_x + layout.arrow_x) // 2
+    draw.line((divider_x, y1 + 22, divider_x, y2 - 22), fill=color, width=2)
+    start = (layout.arrow_x, y2 - 42) if upward else (layout.arrow_x, y1 + 42)
+    end = (layout.arrow_x, y1 + 42) if upward else (layout.arrow_x, y2 - 42)
     draw_arrow(draw, start, end, color=color, width=8)
-    direction = "↑" if upward else "↓"
     vertical_label = "\n".join(label)
-    fit_text(
-        draw,
-        f"{vertical_label}\n{direction}",
-        (x1 + 5, y1 + 155, x2 - 5, y2 - 155),
-        26,
-        24,
-        "bold",
-        color,
+    draw.multiline_text(
+        (layout.text_x, (y1 + y2) // 2),
+        vertical_label,
+        font=font(25, "bold"),
+        fill=color,
+        anchor="mm",
+        align="center",
+        spacing=10,
     )
 
 
@@ -120,7 +134,7 @@ def draw_2_2(
 
     _flow_lane(
         draw,
-        (108, 288, 178, 866),
+        LANE_LAYOUTS["state_up"],
         spec.labels[13],
         upward=True,
         color=GREEN,
@@ -128,7 +142,7 @@ def draw_2_2(
     )
     _flow_lane(
         draw,
-        (1320, 288, 1390, 866),
+        LANE_LAYOUTS["command_down"],
         spec.labels[14],
         upward=False,
         color="#B97300",

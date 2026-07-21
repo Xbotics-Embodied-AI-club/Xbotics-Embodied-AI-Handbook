@@ -183,9 +183,26 @@ class LayoutTests(unittest.TestCase):
         from tools.lecture_infographics.layouts_b import B_LAYOUTS
         from tools.lecture_infographics.layouts_c import C_LAYOUTS
 
-        assigned = set(A_LAYOUTS) | set(B_LAYOUTS) | set(C_LAYOUTS)
+        a_keys, b_keys, c_keys = set(A_LAYOUTS), set(B_LAYOUTS), set(C_LAYOUTS)
+        self.assertTrue(a_keys.isdisjoint(b_keys))
+        self.assertTrue(a_keys.isdisjoint(c_keys))
+        self.assertTrue(b_keys.isdisjoint(c_keys))
+        assigned = a_keys | b_keys | c_keys
         self.assertEqual(assigned, set(load_manifest()))
         self.assertEqual(len(assigned), 14)
+
+    def test_c_lane_text_and_arrow_columns_are_separated(self):
+        from tools.lecture_infographics.layouts_c import LANE_LAYOUTS
+
+        self.assertEqual(set(LANE_LAYOUTS), {"state_up", "command_down"})
+        for name, lane in LANE_LAYOUTS.items():
+            with self.subTest(name=name):
+                x1, _, x2, _ = lane.box
+                self.assertGreater(lane.text_x, x1)
+                self.assertLess(lane.text_x, x2)
+                self.assertGreater(lane.arrow_x, x1)
+                self.assertLess(lane.arrow_x, x2)
+                self.assertGreaterEqual(abs(lane.text_x - lane.arrow_x), 40)
 
     def test_all_b_figures_declare_rendered_loop_routes(self):
         from tools.lecture_infographics.layouts_b import LOOP_ROUTES
