@@ -135,6 +135,15 @@ class AssetTests(unittest.TestCase):
                 self.assertIn(image.mode, {"RGB", "RGBA"})
 
 
+class LayoutTests(unittest.TestCase):
+    def test_all_a_figures_have_explicit_layouts(self):
+        from tools.lecture_infographics.layouts_a import A_LAYOUTS
+
+        figures = load_manifest()
+        expected = {key for key, spec in figures.items() if spec.template == "A"}
+        self.assertEqual(set(A_LAYOUTS), expected)
+
+
 class RenderTests(unittest.TestCase):
     def test_render_figure_writes_1920_by_1080_png(self):
         figures = load_manifest()

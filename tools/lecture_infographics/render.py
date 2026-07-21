@@ -14,6 +14,7 @@ from .components import (
 )
 from .manifest import FigureSpec
 from .theme import THEME
+from .layouts_a import render_a
 
 
 W, H = 1920, 1080
@@ -313,6 +314,11 @@ def generic_c(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
 def render_figure(spec: FigureSpec, asset_dir: Path, output: Path) -> None:
     image = Image.new("RGB", (W, H), WHITE)
     draw = ImageDraw.Draw(image)
+    if spec.template == "A":
+        render_a(image, draw, spec, asset_dir)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        image.save(output, "PNG", optimize=True, icc_profile=SRGB_PROFILE)
+        return
     header(draw, spec)
     custom = {
         "1-1": visual_1_1,
@@ -329,8 +335,6 @@ def render_figure(spec: FigureSpec, asset_dir: Path, output: Path) -> None:
         visual_2_1(draw, spec, image, asset_dir)
     elif custom:
         custom(draw, spec)
-    elif spec.template == "A":
-        generic_a(draw, spec)
     elif spec.template == "B":
         generic_b(draw, spec)
     else:
