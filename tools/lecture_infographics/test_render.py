@@ -166,6 +166,18 @@ class LayoutTests(unittest.TestCase):
         }
         self.assertTrue(legacy_names.isdisjoint(vars(render)))
 
+    def test_all_b_figures_have_explicit_layouts(self):
+        from tools.lecture_infographics.layouts_b import B_LAYOUTS
+
+        figures = load_manifest()
+        expected = {key for key, spec in figures.items() if spec.template == "B"}
+        self.assertEqual(set(B_LAYOUTS), expected)
+
+    def test_closed_loop_figures_are_marked_as_loops(self):
+        from tools.lecture_infographics.layouts_b import LOOP_FIGURES
+
+        self.assertEqual(LOOP_FIGURES, {"1-3", "1-7", "1-9", "2-3", "2-5"})
+
 
 class RenderTests(unittest.TestCase):
     def test_render_figure_writes_1920_by_1080_png(self):

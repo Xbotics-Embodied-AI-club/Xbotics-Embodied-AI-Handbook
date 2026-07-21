@@ -13,6 +13,7 @@ from .components import (
     font,
 )
 from .layouts_a import render_a
+from .layouts_b import render_b
 from .manifest import FigureSpec
 from .theme import THEME
 
@@ -22,7 +23,6 @@ BLUE = THEME.primary
 NAVY = THEME.primary_dark
 YELLOW = THEME.accent
 TEXT = THEME.text
-MUTED = THEME.muted
 WHITE = THEME.canvas
 SRGB_PROFILE = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
 
@@ -91,32 +91,6 @@ def visual_2_4(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
         pill(draw, (x, 675, x + 185, 790), item, fill=WHITE, outline="#D8A0A0", text_fill="#8B3D3D", size=26)
 
 
-def generic_b(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
-    steps = spec.steps
-    count = len(steps)
-    cols = 4 if count > 6 else 3
-    rows = (count + cols - 1) // cols
-    card_w = 450 if cols == 3 else 330
-    gap = 50
-    total_w = cols * card_w + (cols - 1) * gap
-    left = (W - total_w) // 2
-    card_h = 190 if rows <= 2 else 145
-    top = 292
-    for index, label in enumerate(steps):
-        row, col = divmod(index, cols)
-        x, y = left + col * (card_w + gap), top + row * (card_h + 54)
-        rounded(draw, (x, y, x + card_w, y + card_h), fill="#F8FBFF", outline="#7BB0EC")
-        draw.rounded_rectangle((x + 18, y + 18, x + 78, y + 78), radius=14, fill=BLUE)
-        draw.text((x + 48, y + 49), str(index + 1), font=font(32, True), fill=WHITE, anchor="mm")
-        fit_text(draw, label, (x + 92, y + 25, x + card_w - 18, y + card_h - 20), 33, 24, True)
-        if col < cols - 1 and index + 1 < count:
-            arrow(draw, (x + card_w + 9, y + card_h // 2), (x + card_w + gap - 9, y + card_h // 2), width=6)
-        elif row < rows - 1 and index + 1 < count:
-            arrow(draw, (x + card_w // 2, y + card_h + 8), (x + card_w // 2, y + card_h + 43), width=6)
-    if spec.labels:
-        fit_text(draw, " · ".join(spec.labels), (260, 852, 1660, 914), 25, 24, False, MUTED)
-
-
 def generic_c(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
     labels = spec.labels
     groups = [labels[i::3] for i in range(3)]
@@ -141,6 +115,11 @@ def render_figure(spec: FigureSpec, asset_dir: Path, output: Path) -> None:
         output.parent.mkdir(parents=True, exist_ok=True)
         image.save(output, "PNG", optimize=True, icc_profile=SRGB_PROFILE)
         return
+    if spec.template == "B":
+        render_b(image, draw, spec, asset_dir)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        image.save(output, "PNG", optimize=True, icc_profile=SRGB_PROFILE)
+        return
     header(draw, spec)
     custom = {
         "2-2": visual_2_2,
@@ -148,8 +127,6 @@ def render_figure(spec: FigureSpec, asset_dir: Path, output: Path) -> None:
     }.get(spec.key)
     if custom:
         custom(draw, spec)
-    elif spec.template == "B":
-        generic_b(draw, spec)
     else:
         generic_c(draw, spec)
     takeaway(draw, spec.takeaway)
