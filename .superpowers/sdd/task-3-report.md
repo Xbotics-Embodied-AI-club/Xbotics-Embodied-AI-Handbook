@@ -41,5 +41,27 @@
 ## 自检与关注点
 
 - 自检：`A_LAYOUTS` 键集与 manifest 的 A 类键集完全一致；渲染器在资产目录缺失时会回退到包内统一资产目录，保持测试可重复。
-- 关注点：图 1-8 的「家庭服务」复用移动操作平台素材，语义依靠标签区分；这是现有五个统一素材的可控限制，未引入新素材或改动 manifest。
+- 初版关注点（已在审查修复中解决）：图 1-8 的「家庭服务」曾复用移动操作平台素材；现已替换为独立客厅矢量场景。
 - 非本任务的 `.superpowers/sdd/` 简报与既有未跟踪文件不纳入提交，仅显式添加本报告。
+
+## 审查修复（2026-07-22）
+
+审查修复提交：`f3be289` (`修复概念图审查问题`)。
+
+### 追加 TDD 证据
+
+- RED：新增 `test_household_stage_has_dedicated_scene_cues` 后，因 `HOUSEHOLD_SCENE_CUES` 不存在而报 `ImportError`；新增 `test_render_module_has_no_legacy_a_layouts` 后，因 `render.py` 仍暴露旧 A 实现而断言失败。
+- GREEN：家庭场景约束和 A 单一来源约束通过；`LayoutTests + RenderTests` 5/5 通过。
+- 完整回归：`python3 -m unittest tools.lecture_infographics.test_render -v` 为 16/16 通过，用时 2.593 s。
+- 静态边界：`render.py` 中已无 `visual_1_*`、`visual_2_1`、`generic_a` 或旧 `2-1` 特判；`git diff --check` 通过。
+
+### 追加修复内容
+
+- Important 1：图 1-8 「家庭服务」不再复用移动操作素材，改为窗户、沙发、落地灯和茶几组成的独立客厅矢量场景，与第 2 阶形成明确区分。
+- Important 2：删除 `render.py` 中七张旧 A 函数、`generic_a`、旧 A custom dispatch 与仅为旧 A 服务的辅助绘图函数；A 类现只由 `layouts_a.py` 提供。
+- Minor：图 1-2 和 2-1 的中央 3D 素材外增加有意的白色圆角承载卡和柔和描边，消除白色矩形底像贴图截断的观感。
+- 保留项：资产目录缺失时的包内静默回退未修改，以继续支持现有临时目录渲染测试。
+
+### 追加视觉 QA
+
+重新生成七张 A 图后，按原尺寸复查图 1-8、1-2、2-1。图 1-8 的家庭环境语义清楚，与移动机器人无视觉混淆；图 1-2 和 2-1 的中央承载卡边界完整、留白均匀，未造成标签或指引线遮挡。
