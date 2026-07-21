@@ -26,6 +26,7 @@ MUTED = THEME.muted
 YELLOW = THEME.accent
 GREEN = THEME.success
 RED = THEME.danger
+HOUSEHOLD_SCENE_CUES = ("sofa", "floor_lamp", "coffee_table")
 
 
 def _asset_dir(asset_dir: Path) -> Path:
@@ -138,7 +139,8 @@ def draw_1_1(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, as
 
 def draw_1_2(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, asset_dir: Path) -> None:
     draw.ellipse((690, 300, 1230, 840), fill="#F3F9FF", outline="#78AFE9", width=5)
-    _paste_asset(image, asset_dir, "robot_arm_camera", (720, 330, 1200, 750))
+    draw_card(draw, (705, 385, 1215, 700), fill=WHITE, outline="#C7DCF3", radius=26)
+    _paste_asset(image, asset_dir, "robot_arm_camera", (730, 405, 1190, 680))
     _pill(draw, (790, 770, 1130, 844), "具身智能体", fill=BLUE, outline=BLUE, text_fill=WHITE, size=32)
     items = [
         ((165, 325, 485, 445), "身体", "body", (650, 430)),
@@ -222,12 +224,42 @@ def draw_1_6(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, as
             draw.text((x + 165, 842), "推荐", font=font(26, "bold"), fill=GREEN, anchor="mm")
 
 
+def _draw_household_scene(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+) -> None:
+    x1, y1, x2, y2 = box
+    draw.rounded_rectangle(box, radius=18, fill=WHITE, outline="#C7DCF3", width=3)
+    floor_y = y2 - 54
+    draw.line((x1 + 14, floor_y, x2 - 14, floor_y), fill="#A9CBEF", width=4)
+    draw.rectangle((x1 + 28, y1 + 30, x1 + 104, y1 + 112), fill="#EAF4FF", outline="#7EAFE5", width=3)
+    draw.line((x1 + 66, y1 + 30, x1 + 66, y1 + 112), fill="#A9CBEF", width=3)
+    draw.line((x1 + 28, y1 + 71, x1 + 104, y1 + 71), fill="#A9CBEF", width=3)
+
+    sofa = (x1 + 28, floor_y - 88, x1 + 172, floor_y - 12)
+    draw.rounded_rectangle(sofa, radius=16, fill="#DCEBFA", outline=BLUE, width=4)
+    draw.rounded_rectangle((x1 + 38, floor_y - 120, x1 + 162, floor_y - 58), radius=14, fill="#EEF6FF", outline=BLUE, width=4)
+    draw.line((x1 + 100, floor_y - 112, x1 + 100, floor_y - 62), fill="#A9CBEF", width=3)
+    draw.line((x1 + 48, floor_y - 10, x1 + 45, floor_y + 3), fill=NAVY, width=4)
+    draw.line((x1 + 152, floor_y - 10, x1 + 155, floor_y + 3), fill=NAVY, width=4)
+
+    lamp_x = x2 - 50
+    draw.polygon(((lamp_x - 26, y1 + 70), (lamp_x + 26, y1 + 70), (lamp_x + 17, y1 + 108), (lamp_x - 17, y1 + 108)), fill="#FFF3C7", outline="#C89416")
+    draw.line((lamp_x, y1 + 108, lamp_x, floor_y - 5), fill=NAVY, width=5)
+    draw.ellipse((lamp_x - 28, floor_y - 8, lamp_x + 28, floor_y + 5), fill="#CCD7E3", outline=NAVY, width=3)
+
+    table_x = x1 + 185
+    draw.ellipse((table_x - 40, floor_y - 58, table_x + 40, floor_y - 32), fill="#E6EDF5", outline=NAVY, width=3)
+    draw.line((table_x - 24, floor_y - 34, table_x - 30, floor_y - 2), fill=NAVY, width=4)
+    draw.line((table_x + 24, floor_y - 34, table_x + 30, floor_y - 2), fill=NAVY, width=4)
+
+
 def draw_1_8(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, asset_dir: Path) -> None:
     scenes = [
         ("桌面抓取", "desktop_pick", 610),
         ("移动操作", "mobile_manipulator", 540),
         ("工业 / 商超", "robot_arm", 470),
-        ("家庭服务", "mobile_manipulator", 400),
+        ("家庭服务", None, 400),
         ("人形机器人", "humanoid_robot", 330),
     ]
     for index, (label, asset_name, top) in enumerate(scenes):
@@ -235,7 +267,11 @@ def draw_1_8(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, as
         bottom = 860
         draw_card(draw, (x, top, x + 312, bottom), fill="#F5FAFF", outline="#7CACDF", radius=22)
         _badge(draw, (x + 38, top + 38), index + 1)
-        _paste_asset(image, asset_dir, asset_name, (x + 18, top + 55, x + 294, bottom - 78))
+        scene_box = (x + 18, top + 55, x + 294, bottom - 78)
+        if asset_name is None:
+            _draw_household_scene(draw, scene_box)
+        else:
+            _paste_asset(image, asset_dir, asset_name, scene_box)
         _pill(draw, (x + 18, bottom - 78, x + 294, bottom - 15), label, fill=WHITE, outline="#91B9E5", size=27)
         if index < len(scenes) - 1:
             draw_arrow(draw, (x + 312, top + 95), (x + 344, top + 68), semantic="secondary", width=4)
@@ -245,7 +281,8 @@ def draw_1_8(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, as
 
 def draw_2_1(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, asset_dir: Path) -> None:
     draw.ellipse((620, 275, 1300, 895), fill="#F2F8FF", outline="#7AAFE8", width=5)
-    _paste_asset(image, asset_dir, "robot_arm_camera", (650, 300, 1270, 835))
+    draw_card(draw, (625, 370, 1295, 770), fill=WHITE, outline="#C7DCF3", radius=28)
+    _paste_asset(image, asset_dir, "robot_arm_camera", (650, 395, 1270, 745))
     _pill(draw, (785, 814, 1135, 880), "机器人硬件系统", fill=BLUE, outline=BLUE, text_fill=WHITE, size=30)
     items = [
         ((105, 290, 480, 420), "本体与机构", "body", (665, 410)),

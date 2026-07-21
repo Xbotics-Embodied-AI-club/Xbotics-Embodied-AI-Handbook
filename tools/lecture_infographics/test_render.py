@@ -143,6 +143,29 @@ class LayoutTests(unittest.TestCase):
         expected = {key for key, spec in figures.items() if spec.template == "A"}
         self.assertEqual(set(A_LAYOUTS), expected)
 
+    def test_household_stage_has_dedicated_scene_cues(self):
+        from tools.lecture_infographics.layouts_a import HOUSEHOLD_SCENE_CUES
+
+        self.assertEqual(
+            set(HOUSEHOLD_SCENE_CUES),
+            {"sofa", "floor_lamp", "coffee_table"},
+        )
+
+    def test_render_module_has_no_legacy_a_layouts(self):
+        from tools.lecture_infographics import render
+
+        legacy_names = {
+            "generic_a",
+            "visual_1_1",
+            "visual_1_2",
+            "visual_1_4",
+            "visual_1_5",
+            "visual_1_6",
+            "visual_1_8",
+            "visual_2_1",
+        }
+        self.assertTrue(legacy_names.isdisjoint(vars(render)))
+
 
 class RenderTests(unittest.TestCase):
     def test_render_figure_writes_1920_by_1080_png(self):
