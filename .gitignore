@@ -30,6 +30,7 @@ code/**/outputs/
 .idea/
 .vscode/
 *.swp
+.worktrees/
 
 # OS
 .DS_Store
