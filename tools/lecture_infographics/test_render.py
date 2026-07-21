@@ -67,6 +67,13 @@ class ThemeTests(unittest.TestCase):
         self.assertNotEqual(THEME.success, THEME.danger)
         self.assertNotEqual(THEME.accent, THEME.primary)
 
+    def test_font_rejects_sizes_below_theme_floor(self):
+        from tools.lecture_infographics.components import font
+        from tools.lecture_infographics.theme import THEME
+
+        with self.assertRaises(ValueError):
+            font(THEME.min_text_size - 1)
+
 
 class ComponentTests(unittest.TestCase):
     def test_fit_text_never_goes_below_minimum(self):

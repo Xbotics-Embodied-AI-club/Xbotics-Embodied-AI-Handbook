@@ -25,6 +25,8 @@ def _weight_name(weight: str | bool) -> str:
 
 
 def font(size: int, weight: str = "regular") -> ImageFont.FreeTypeFont:
+    if size < THEME.min_text_size:
+        raise ValueError(f"font size must be at least {THEME.min_text_size}")
     path = FONT_BOLD if _weight_name(weight) == "bold" else FONT_REGULAR
     return ImageFont.truetype(path, size)
 

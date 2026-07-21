@@ -220,7 +220,13 @@ def visual_2_2(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
     for i, item in enumerate(contract):
         y = 395 + i * 73
         draw.ellipse((1462, y + 10, 1494, y + 42), fill=YELLOW)
-        draw.text((1478, y + 27), str(i + 1), font=font(18, True), fill=NAVY, anchor="mm")
+        draw.text(
+            (1478, y + 27),
+            str(i + 1),
+            font=font(THEME.small_size, "bold"),
+            fill=NAVY,
+            anchor="mm",
+        )
         draw.text((1510, y + 27), item, font=font(25, True), fill=TEXT, anchor="lm")
 
 
