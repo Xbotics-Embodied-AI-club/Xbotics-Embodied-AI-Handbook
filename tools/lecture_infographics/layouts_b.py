@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -19,7 +20,106 @@ YELLOW = THEME.accent
 GREEN = THEME.success
 RED = THEME.danger
 
-LOOP_FIGURES = {"1-3", "1-7", "1-9", "2-3", "2-5"}
+
+@dataclass(frozen=True)
+class LoopRoute:
+    name: str
+    source: str
+    target: str
+    points: tuple[tuple[int, int], ...]
+    semantic: str
+    topic: str | None = None
+    topic_box: tuple[int, int, int, int] | None = None
+
+
+LOOP_ROUTES = {
+    "1-3": (
+        LoopRoute(
+            "feedback_to_perception",
+            "data_record",
+            "environment_perception",
+            ((630, 820), (250, 820), (250, 485), (600, 485), (600, 420)),
+            "success",
+        ),
+    ),
+    "1-7": (
+        LoopRoute(
+            "deploy_to_execution",
+            "redeploy",
+            "real_execution",
+            ((810, 742), (245, 742), (245, 475)),
+            "success",
+        ),
+        LoopRoute(
+            "failure_to_filter_training",
+            "evaluation",
+            "filter_training",
+            ((1455, 742), (1735, 742), (1735, 275), (955, 275), (955, 350)),
+            "danger",
+            "失败样本",
+            (1470, 500, 1775, 570),
+        ),
+    ),
+    "1-9": (
+        LoopRoute(
+            "retry_with_latest_position",
+            "trajectory_record",
+            "read_current_position",
+            ((80, 787), (55, 787), (55, 465), (557, 465), (557, 415)),
+            "success",
+        ),
+    ),
+    "2-3": (
+        LoopRoute(
+            "body_to_sensor",
+            "actuator_body",
+            "sensor_feedback",
+            ((805, 847), (720, 747)),
+            "success",
+        ),
+        LoopRoute(
+            "sensor_to_state_estimation",
+            "sensor_feedback",
+            "drive_state_estimation",
+            ((575, 690), (575, 585)),
+            "success",
+        ),
+        LoopRoute(
+            "state_to_policy",
+            "drive_state_estimation",
+            "planning_policy",
+            ((430, 527), (380, 527), (380, 420), (950, 420), (950, 385)),
+            "success",
+        ),
+    ),
+    "2-5": (
+        LoopRoute(
+            "controller_to_robot_state",
+            "controller_node",
+            "robot_state_node",
+            ((1200, 485), (1080, 485), (1080, 605), (390, 735)),
+            "success",
+        ),
+        LoopRoute(
+            "joint_states_to_policy",
+            "robot_state_node",
+            "policy_node",
+            ((390, 690), (505, 690), (505, 490), (620, 490)),
+            "success",
+            "/joint_states",
+            (405, 615, 605, 675),
+        ),
+        LoopRoute(
+            "joint_states_to_status",
+            "robot_state_node",
+            "task_status_node",
+            ((390, 755), (620, 785)),
+            "success",
+            "/joint_states",
+            (405, 785, 605, 845),
+        ),
+    ),
+}
 
 
 def _path_arrow(
@@ -149,6 +249,16 @@ def _topic(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], label: str
     fit_text(draw, label, box, 27, 24, "bold", color)
 
 
+def _draw_loop_route(draw: ImageDraw.ImageDraw, figure_key: str, route_name: str) -> None:
+    route = next(
+        route for route in LOOP_ROUTES[figure_key] if route.name == route_name
+    )
+    _path_arrow(draw, route.points, semantic=route.semantic, width=7)
+    if route.topic is not None and route.topic_box is not None:
+        color = GREEN if route.semantic == "success" else RED
+        _topic(draw, route.topic_box, route.topic, color=color)
+
+
 def draw_1_3(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, asset_dir: Path) -> None:
     cards = [
         ((90, 300, 390, 420), "任务输入", "target"),
@@ -166,7 +276,7 @@ def draw_1_3(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, as
         ((1470, 360), (1618, 550)), ((1618, 670), (1410, 820)), ((1110, 820), (930, 820)),
     ):
         draw_arrow(draw, start, end, width=7)
-    _path_arrow(draw, ((630, 820), (250, 820), (250, 485), (600, 485), (600, 420)), semantic="success", width=7)
+    _draw_loop_route(draw, spec.key, "feedback_to_perception")
     draw.text((395, 466), "新反馈驱动下一次感知", font=font(24, "bold"), fill=GREEN, anchor="mm")
     draw.text((960, 605), "执行链", font=font(34, "bold"), fill=BLUE, anchor="mm")
     draw.text((960, 650), "边做 · 边看 · 边修正", font=font(28), fill=MUTED, anchor="mm")
@@ -188,10 +298,9 @@ def draw_1_7(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, as
         ((1310, 475), (1310, 680)), ((1165, 742), (1100, 742)),
     ):
         draw_arrow(draw, start, end, width=7)
-    _path_arrow(draw, ((810, 742), (245, 742), (245, 475)), semantic="success", width=7)
+    _draw_loop_route(draw, spec.key, "deploy_to_execution")
     draw.text((455, 708), "新版系统回到真实世界", font=font(24, "bold"), fill=GREEN, anchor="mm")
-    _path_arrow(draw, ((1455, 742), (1735, 742), (1735, 275), (955, 275), (955, 350)), semantic="danger", width=7)
-    _topic(draw, (1470, 500, 1775, 570), "失败样本", color=RED)
+    _draw_loop_route(draw, spec.key, "failure_to_filter_training")
     draw.text((1538, 305), "回到筛选 / 训练", font=font(24, "bold"), fill=RED, anchor="mm")
 
 
@@ -228,7 +337,7 @@ def draw_1_9(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, as
     ):
         draw_arrow(draw, start, end, width=7)
     draw_arrow(draw, (1415, 787), (455, 787), width=7)
-    _path_arrow(draw, ((80, 787), (55, 787), (55, 465), (557, 465), (557, 415)), semantic="success", width=7)
+    _draw_loop_route(draw, spec.key, "retry_with_latest_position")
     draw.text((305, 446), "未到达：用最新位置继续修正", font=font(24, "bold"), fill=GREEN, anchor="mm")
     _draw_xy_plane(draw)
     _topic(draw, (190, 540, 585, 610), spec.labels[0], color=MUTED)
@@ -251,10 +360,12 @@ def draw_2_3(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, as
         _step_card(draw, box, label, kind, text_size=27)
     for start, end in (
         ((720, 327), (805, 327)), ((1095, 327), (1325, 470)), ((1325, 585), (1325, 690)),
-        ((1180, 747), (1095, 847)), ((805, 847), (720, 747)), ((575, 690), (575, 585)),
+        ((1180, 747), (1095, 847)),
     ):
         draw_arrow(draw, start, end, width=7)
-    _path_arrow(draw, ((430, 527), (380, 527), (380, 420), (950, 420), (950, 385)), semantic="success", width=7)
+    _draw_loop_route(draw, spec.key, "body_to_sensor")
+    _draw_loop_route(draw, spec.key, "sensor_to_state_estimation")
+    _draw_loop_route(draw, spec.key, "state_to_policy")
     draw.text((700, 401), "状态上行", font=font(24, "bold"), fill=GREEN, anchor="mm")
     draw.text((1512, 598), "指令下行", font=font(24, "bold"), fill=BLUE, anchor="lm")
     draw.text((1700, 330), "慢", font=font(30, "bold"), fill=BLUE, anchor="mm")
@@ -287,14 +398,12 @@ def draw_2_5(image: Image.Image, draw: ImageDraw.ImageDraw, spec: FigureSpec, as
     draw_arrow(draw, (920, 430), (1200, 430), width=7)
     _topic(draw, (930, 345, 1190, 405), "/action_command")
 
-    _path_arrow(draw, ((1200, 485), (1080, 485), (1080, 605), (390, 735)), semantic="success", width=7)
+    _draw_loop_route(draw, spec.key, "controller_to_robot_state")
     draw.text((825, 595), "执行后更新机器人状态", font=font(24, "bold"), fill=GREEN, anchor="mm")
 
-    _path_arrow(draw, ((390, 690), (505, 690), (505, 490), (620, 490)), semantic="success", width=7)
-    _topic(draw, (405, 615, 605, 675), "/joint_states", color=GREEN)
+    _draw_loop_route(draw, spec.key, "joint_states_to_policy")
 
-    draw_arrow(draw, (390, 755), (620, 785), semantic="success", width=7)
-    _topic(draw, (405, 785, 605, 845), "/joint_states", color=GREEN)
+    _draw_loop_route(draw, spec.key, "joint_states_to_status")
 
     draw_arrow(draw, (920, 785), (1460, 785), width=7)
     _topic(draw, (1085, 700, 1295, 760), "/task_status")

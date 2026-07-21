@@ -173,10 +173,62 @@ class LayoutTests(unittest.TestCase):
         expected = {key for key, spec in figures.items() if spec.template == "B"}
         self.assertEqual(set(B_LAYOUTS), expected)
 
-    def test_closed_loop_figures_are_marked_as_loops(self):
-        from tools.lecture_infographics.layouts_b import LOOP_FIGURES
+    def test_all_b_figures_declare_rendered_loop_routes(self):
+        from tools.lecture_infographics.layouts_b import LOOP_ROUTES
 
-        self.assertEqual(LOOP_FIGURES, {"1-3", "1-7", "1-9", "2-3", "2-5"})
+        figures = load_manifest()
+        expected = {key for key, spec in figures.items() if spec.template == "B"}
+        self.assertEqual(set(LOOP_ROUTES), expected)
+        for key, routes in LOOP_ROUTES.items():
+            self.assertGreaterEqual(len(routes), 1, key)
+            for route in routes:
+                self.assertGreaterEqual(len(route.points), 2, (key, route.name))
+                self.assertIn(route.semantic, {"success", "danger"}, (key, route.name))
+
+    def test_failure_samples_return_to_filtering_and_training(self):
+        from tools.lecture_infographics.layouts_b import LOOP_ROUTES
+
+        failure_routes = [
+            route
+            for route in LOOP_ROUTES["1-7"]
+            if route.semantic == "danger"
+        ]
+        self.assertEqual(len(failure_routes), 1)
+        self.assertEqual(failure_routes[0].target, "filter_training")
+
+    def test_joint_states_returns_to_policy_and_status(self):
+        from tools.lecture_infographics.layouts_b import LOOP_ROUTES
+
+        joint_state_routes = [
+            route
+            for route in LOOP_ROUTES["2-5"]
+            if route.semantic == "success" and route.topic == "/joint_states"
+        ]
+        self.assertEqual(
+            {route.target for route in joint_state_routes},
+            {"policy_node", "task_status_node"},
+        )
+
+    def test_b_layouts_draw_every_declared_loop_route(self):
+        from unittest.mock import patch
+
+        from tools.lecture_infographics.layouts_b import B_LAYOUTS, LOOP_ROUTES
+
+        image = Image.new("RGB", (1920, 1080), "white")
+        draw = ImageDraw.Draw(image)
+        for key, routes in LOOP_ROUTES.items():
+            with self.subTest(key=key):
+                with patch(
+                    "tools.lecture_infographics.layouts_b._draw_loop_route"
+                ) as draw_loop_route:
+                    B_LAYOUTS[key](image, draw, load_manifest()[key], Path("."))
+                rendered_names = {
+                    call.args[2] for call in draw_loop_route.call_args_list
+                }
+                self.assertEqual(
+                    rendered_names,
+                    {route.name for route in routes},
+                )
 
 
 class RenderTests(unittest.TestCase):
