@@ -109,6 +109,32 @@ class ComponentTests(unittest.TestCase):
             )
 
 
+class AssetTests(unittest.TestCase):
+    def test_required_asset_catalog_is_complete(self):
+        from tools.lecture_infographics.assets import ASSETS
+
+        self.assertEqual(
+            set(ASSETS),
+            {
+                "robot_arm",
+                "robot_arm_camera",
+                "desktop_pick",
+                "mobile_manipulator",
+                "humanoid_robot",
+            },
+        )
+
+    def test_project_assets_are_large_clean_rgb_images(self):
+        from tools.lecture_infographics.assets import ASSETS
+
+        asset_dir = Path("tools/lecture_infographics/generated_assets")
+        for spec in ASSETS.values():
+            with Image.open(asset_dir / spec.filename) as image:
+                self.assertGreaterEqual(image.width, 1024)
+                self.assertGreaterEqual(image.height, 768)
+                self.assertIn(image.mode, {"RGB", "RGBA"})
+
+
 class RenderTests(unittest.TestCase):
     def test_render_figure_writes_1920_by_1080_png(self):
         figures = load_manifest()
