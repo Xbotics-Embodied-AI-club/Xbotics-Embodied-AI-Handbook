@@ -75,6 +75,32 @@ class ComponentTests(unittest.TestCase):
         size = fit_text(ImageDraw.Draw(image), "机器人系统架构", (0, 0, 600, 200), 36, 24)
         self.assertGreaterEqual(size, 24)
 
+    def test_fit_text_enforces_theme_floor_when_caller_passes_lower_minimum(self):
+        from tools.lecture_infographics.components import fit_text
+
+        image = Image.new("RGB", (180, 100), "white")
+        with self.assertRaises(ValueError):
+            fit_text(
+                ImageDraw.Draw(image),
+                "机器人系统架构",
+                (0, 0, 180, 100),
+                36,
+                18,
+            )
+
+    def test_fit_text_raises_when_text_cannot_fit_at_24(self):
+        from tools.lecture_infographics.components import fit_text
+
+        image = Image.new("RGB", (80, 40), "white")
+        with self.assertRaises(ValueError):
+            fit_text(
+                ImageDraw.Draw(image),
+                "机器人系统架构",
+                (0, 0, 80, 40),
+                36,
+                24,
+            )
+
 
 class RenderTests(unittest.TestCase):
     def test_render_figure_writes_1920_by_1080_png(self):

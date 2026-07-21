@@ -71,14 +71,14 @@ def pill(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], text_value: 
          fill: str = WHITE, outline: str = "#8CB9EC", text_fill: str = TEXT,
          size: int = 26, bold: bool = True) -> None:
     rounded(draw, box, fill=fill, outline=outline, width=2, radius=16)
-    fit_text(draw, text_value, box, size, 18, bold, text_fill)
+    fit_text(draw, text_value, box, size, 24, bold, text_fill)
 
 
 def visual_1_1(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
     rounded(draw, (125, 300, 795, 830), fill="#F4F7FB", outline="#B4C8E0")
-    rounded(draw, (1125, 300, 1795, 830), fill="#F2FAF7", outline="#84CDB1")
+    rounded(draw, (1125, 300, 1795, 830), fill=CYAN, outline=BLUE)
     draw.text((460, 350), "数字 AI", font=font(42, True), fill=NAVY, anchor="mm")
-    draw.text((1460, 350), "具身智能", font=font(42, True), fill="#147A58", anchor="mm")
+    draw.text((1460, 350), "具身智能", font=font(42, True), fill=NAVY, anchor="mm")
     rounded(draw, (275, 430, 645, 625), fill=WHITE, outline="#86A9CE")
     for i, width in enumerate((240, 190, 220, 145)):
         draw.rounded_rectangle((330, 470 + i * 30, 330 + width, 482 + i * 30), radius=6, fill="#7C9CBE")
@@ -88,8 +88,8 @@ def visual_1_1(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
     draw.ellipse((1560, 660, 1620, 720), fill=YELLOW, outline="#C79400", width=3)
     arrow(draw, (820, 565), (1090, 565), color=BLUE, width=10)
     draw.text((955, 515), "行动", font=font(31, True), fill=BLUE, anchor="mm")
-    draw.arc((815, 600, 1095, 780), 10, 170, fill="#1A9B67", width=7)
-    draw.text((955, 780), "环境反馈", font=font(28, True), fill="#147A58", anchor="mm")
+    draw.arc((815, 600, 1095, 780), 10, 170, fill="#B66B0D", width=7)
+    draw.text((955, 780), "环境反馈", font=font(28, True), fill="#B66B0D", anchor="mm")
 
 
 def visual_1_2(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
@@ -114,7 +114,7 @@ def visual_1_4(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
         rounded(draw, (x - 135, y2 - h, x + 135, y2), fill=color, outline=BLUE, radius=24)
         draw.ellipse((x - 48, y2 - h + 35, x + 48, y2 - h + 131), fill=WHITE, outline=BLUE, width=3)
         draw.text((x, y2 - h + 83), str(i + 1), font=font(34, True), fill=BLUE, anchor="mm")
-        fit_text(draw, label, (x - 115, y2 - h + 145, x + 115, y2 - 25), 31, 21, True)
+        fit_text(draw, label, (x - 115, y2 - h + 145, x + 115, y2 - 25), 31, 24, True)
         if i:
             arrow(draw, (x - 210, y2 - h // 2), (x - 150, y2 - h // 2), color="#83AEE0", width=5)
     draw.text((960, 300), "可靠执行  →  从示范学习  →  探索优化  →  多模态泛化  →  预测未来",
@@ -168,9 +168,9 @@ def visual_1_8(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
         y2, h = 815, 180 + i * 90
         draw.polygon([(x1, y2), (x1 + 290, y2), (x1 + 290, y2 - h), (x1, y2 - h + 55)], fill="#EAF5FF", outline=BLUE)
         draw.text((x1 + 145, y2 - h + 85), str(i + 1), font=font(38, True), fill=BLUE, anchor="mm")
-        fit_text(draw, label, (x1 + 20, y2 - h + 120, x1 + 270, y2 - 18), 29, 20, True)
-    arrow(draw, (140, 855), (1765, 855), color="#1A9B67", width=7)
-    draw.text((950, 900), "开放性 · 任务时长 · 安全要求  持续上升", font=font(29, True), fill="#147A58", anchor="mm")
+        fit_text(draw, label, (x1 + 20, y2 - h + 120, x1 + 270, y2 - 18), 29, 24, True)
+    arrow(draw, (140, 855), (1765, 855), color="#B66B0D", width=7)
+    draw.text((950, 900), "开放性 · 任务时长 · 安全要求  持续上升", font=font(29, True), fill="#B66B0D", anchor="mm")
 
 
 def visual_2_1(draw: ImageDraw.ImageDraw, spec: FigureSpec, image: Image.Image,
@@ -202,7 +202,7 @@ def visual_2_2(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
     for top, bottom, name, fill, items in layers:
         rounded(draw, (x1, top, x2, bottom), fill=fill, outline="#7AA9DF")
         draw.rounded_rectangle((x1 + 16, top + 16, x1 + 235, bottom - 16), radius=15, fill=BLUE)
-        fit_text(draw, name, (x1 + 28, top + 20, x1 + 223, bottom - 20), 28, 20, True, WHITE)
+        fit_text(draw, name, (x1 + 28, top + 20, x1 + 223, bottom - 20), 28, 24, True, WHITE)
         available = x2 - (x1 + 275) - 30
         gap = 16
         item_w = (available - gap * (len(items) - 1)) // len(items)
@@ -232,7 +232,7 @@ def visual_2_4(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
         rounded(draw, (x, 315, x + 380, 555), fill=fill, outline="#78A9DF")
         draw.ellipse((x + 135, 340, x + 245, 450), fill=WHITE, outline=BLUE, width=4)
         draw.text((x + 190, 395), str(i + 1), font=font(39, True), fill=BLUE, anchor="mm")
-        fit_text(draw, label, (x + 25, 465, x + 355, 535), 26, 19, True)
+        fit_text(draw, label, (x + 15, 465, x + 365, 535), 26, 24, True)
     rounded(draw, (180, 625, 1740, 845), fill="#FFF7F7", outline="#DB7777")
     draw.text((400, 680), "通信连通 ≠ 系统正确", font=font(36, True), fill="#B33F3F", anchor="mm")
     arrow(draw, (630, 730), (760, 730), color="#D95B5B", width=7)
@@ -259,7 +259,7 @@ def generic_a(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
         rounded(draw, (x, y, x + card_w, y + card_h), fill="#F7FBFF", outline="#75ADEB")
         draw.ellipse((x + 125, y + 24, x + 205, y + 104), fill=CYAN, outline=BLUE, width=4)
         draw.text((x + 165, y + 64), str(index + 1), font=font(34, True), fill=BLUE, anchor="mm")
-        fit_text(draw, label, (x + 20, y + 112, x + card_w - 20, y + card_h - 12), 31, 22, True)
+        fit_text(draw, label, (x + 20, y + 112, x + card_w - 20, y + card_h - 12), 31, 24, True)
 
 
 def generic_b(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
@@ -279,13 +279,13 @@ def generic_b(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
         rounded(draw, (x, y, x + card_w, y + card_h), fill="#F8FBFF", outline="#7BB0EC")
         draw.rounded_rectangle((x + 18, y + 18, x + 78, y + 78), radius=14, fill=BLUE)
         draw.text((x + 48, y + 49), str(index + 1), font=font(32, True), fill=WHITE, anchor="mm")
-        fit_text(draw, label, (x + 92, y + 25, x + card_w - 18, y + card_h - 20), 33, 22, True)
+        fit_text(draw, label, (x + 92, y + 25, x + card_w - 18, y + card_h - 20), 33, 24, True)
         if col < cols - 1 and index + 1 < count:
             arrow(draw, (x + card_w + 9, y + card_h // 2), (x + card_w + gap - 9, y + card_h // 2), width=6)
         elif row < rows - 1 and index + 1 < count:
             arrow(draw, (x + card_w // 2, y + card_h + 8), (x + card_w // 2, y + card_h + 43), width=6)
     if spec.labels:
-        fit_text(draw, " · ".join(spec.labels), (260, 852, 1660, 914), 25, 20, False, MUTED)
+        fit_text(draw, " · ".join(spec.labels), (260, 852, 1660, 914), 25, 24, False, MUTED)
 
 
 def generic_c(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
@@ -301,7 +301,7 @@ def generic_c(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
         for row, label in enumerate(groups[col][:6]):
             y = 380 + row * 76
             rounded(draw, (x + 34, y, x + 486, y + 58), fill=WHITE, outline="#B5D2F2", width=2, radius=13)
-            fit_text(draw, label, (x + 45, y + 4, x + 475, y + 54), 25, 18, row == 0)
+            fit_text(draw, label, (x + 45, y + 4, x + 475, y + 54), 25, 24, row == 0)
 
 
 def render_figure(spec: FigureSpec, asset_dir: Path, output: Path) -> None:

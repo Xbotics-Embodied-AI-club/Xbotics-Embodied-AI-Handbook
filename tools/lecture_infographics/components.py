@@ -3,7 +3,7 @@ from __future__ import annotations
 from math import hypot
 from typing import TypeAlias
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import ImageDraw, ImageFont
 
 from .manifest import FigureSpec
 from .theme import THEME
@@ -39,13 +39,16 @@ def fit_text(
     fill: str | None = None,
     anchor: str = "mm",
 ) -> int:
-    if min_size > max_size:
-        raise ValueError("min_size must not exceed max_size")
+    effective_min_size = max(min_size, THEME.min_text_size)
+    if effective_min_size > max_size:
+        raise ValueError(
+            f"max_size must be at least the theme minimum {THEME.min_text_size}"
+        )
 
     x1, y1, x2, y2 = box
     available_width = x2 - x1 - 20
     available_height = y2 - y1 - 16
-    for size in range(max_size, min_size - 1, -1):
+    for size in range(max_size, effective_min_size - 1, -1):
         chosen_font = font(size, _weight_name(weight))
         bounds = draw.multiline_textbbox(
             (0, 0), text, font=chosen_font, spacing=8, align="center"
@@ -65,23 +68,18 @@ def fit_text(
             )
             return size
 
-    raise ValueError(f"text cannot fit box at minimum size {min_size}: {text!r}")
+    raise ValueError(
+        f"text cannot fit box at minimum size {effective_min_size}: {text!r}"
+    )
 
 
 def _draw_major_shadow(draw: ImageDraw.ImageDraw, box: Box, radius: int) -> None:
-    image = draw._image
-    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    shadow = ImageDraw.Draw(overlay)
     x1, y1, x2, y2 = box
-    shadow.rounded_rectangle(
+    draw.rounded_rectangle(
         (x1, y1 + 6, x2, y2 + 6),
         radius=radius,
-        fill=(82, 111, 142, 38),
+        fill="#E5E9EE",
     )
-    if image.mode == "RGBA":
-        image.alpha_composite(overlay)
-    else:
-        image.paste(overlay, (0, 0), overlay)
 
 
 def draw_card(
