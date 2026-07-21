@@ -173,6 +173,20 @@ class LayoutTests(unittest.TestCase):
         expected = {key for key, spec in figures.items() if spec.template == "B"}
         self.assertEqual(set(B_LAYOUTS), expected)
 
+    def test_all_c_figures_have_explicit_layouts(self):
+        from tools.lecture_infographics.layouts_c import C_LAYOUTS
+
+        self.assertEqual(set(C_LAYOUTS), {"2-2", "2-4"})
+
+    def test_every_manifest_key_has_one_layout(self):
+        from tools.lecture_infographics.layouts_a import A_LAYOUTS
+        from tools.lecture_infographics.layouts_b import B_LAYOUTS
+        from tools.lecture_infographics.layouts_c import C_LAYOUTS
+
+        assigned = set(A_LAYOUTS) | set(B_LAYOUTS) | set(C_LAYOUTS)
+        self.assertEqual(assigned, set(load_manifest()))
+        self.assertEqual(len(assigned), 14)
+
     def test_all_b_figures_declare_rendered_loop_routes(self):
         from tools.lecture_infographics.layouts_b import LOOP_ROUTES
 
