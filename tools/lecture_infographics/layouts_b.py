@@ -32,13 +32,45 @@ class LoopRoute:
     topic_box: tuple[int, int, int, int] | None = None
 
 
+NODE_ANCHORS = {
+    "1-3": {
+        "data_record": (630, 820),
+        "environment_perception": (600, 420),
+    },
+    "1-7": {
+        "redeploy": (810, 742),
+        "real_execution": (245, 475),
+        "evaluation": (1455, 742),
+        "filter_training": (955, 350),
+    },
+    "1-9": {
+        "trajectory_record": (80, 787),
+        "read_current_position": (557, 415),
+    },
+    "2-3": {
+        "actuator_body.left": (805, 847),
+        "sensor_feedback.right": (720, 747),
+        "sensor_feedback.top": (575, 690),
+        "drive_state_estimation.bottom": (575, 585),
+        "drive_state_estimation.left": (430, 527),
+        "planning_policy.bottom": (950, 385),
+    },
+    "2-5": {
+        "controller_node": (1200, 485),
+        "robot_state_node": (390, 735),
+        "policy_node": (620, 490),
+        "task_status_node": (620, 785),
+    },
+}
+
+
 LOOP_ROUTES = {
     "1-3": (
         LoopRoute(
             "feedback_to_perception",
             "data_record",
             "environment_perception",
-            ((630, 820), (250, 820), (250, 485), (600, 485), (600, 420)),
+            ((250, 820), (250, 485), (600, 485)),
             "success",
         ),
     ),
@@ -47,14 +79,14 @@ LOOP_ROUTES = {
             "deploy_to_execution",
             "redeploy",
             "real_execution",
-            ((810, 742), (245, 742), (245, 475)),
+            ((245, 742),),
             "success",
         ),
         LoopRoute(
             "failure_to_filter_training",
             "evaluation",
             "filter_training",
-            ((1455, 742), (1735, 742), (1735, 275), (955, 275), (955, 350)),
+            ((1735, 742), (1735, 275), (955, 275)),
             "danger",
             "失败样本",
             (1470, 500, 1775, 570),
@@ -65,30 +97,30 @@ LOOP_ROUTES = {
             "retry_with_latest_position",
             "trajectory_record",
             "read_current_position",
-            ((80, 787), (55, 787), (55, 465), (557, 465), (557, 415)),
+            ((55, 787), (55, 465), (557, 465)),
             "success",
         ),
     ),
     "2-3": (
         LoopRoute(
             "body_to_sensor",
-            "actuator_body",
-            "sensor_feedback",
-            ((805, 847), (720, 747)),
+            "actuator_body.left",
+            "sensor_feedback.right",
+            (),
             "success",
         ),
         LoopRoute(
             "sensor_to_state_estimation",
-            "sensor_feedback",
-            "drive_state_estimation",
-            ((575, 690), (575, 585)),
+            "sensor_feedback.top",
+            "drive_state_estimation.bottom",
+            (),
             "success",
         ),
         LoopRoute(
             "state_to_policy",
-            "drive_state_estimation",
-            "planning_policy",
-            ((430, 527), (380, 527), (380, 420), (950, 420), (950, 385)),
+            "drive_state_estimation.left",
+            "planning_policy.bottom",
+            ((380, 527), (380, 420), (950, 420)),
             "success",
         ),
     ),
@@ -97,23 +129,23 @@ LOOP_ROUTES = {
             "controller_to_robot_state",
             "controller_node",
             "robot_state_node",
-            ((1200, 485), (1080, 485), (1080, 605), (390, 735)),
+            ((1080, 485), (1080, 605)),
             "success",
         ),
         LoopRoute(
             "joint_states_to_policy",
             "robot_state_node",
             "policy_node",
-            ((390, 690), (505, 690), (505, 490), (620, 490)),
+            ((505, 735), (505, 550)),
             "success",
             "/joint_states",
-            (405, 615, 605, 675),
+            (520, 600, 720, 660),
         ),
         LoopRoute(
             "joint_states_to_status",
             "robot_state_node",
             "task_status_node",
-            ((390, 755), (620, 785)),
+            (),
             "success",
             "/joint_states",
             (405, 785, 605, 845),
@@ -253,7 +285,9 @@ def _draw_loop_route(draw: ImageDraw.ImageDraw, figure_key: str, route_name: str
     route = next(
         route for route in LOOP_ROUTES[figure_key] if route.name == route_name
     )
-    _path_arrow(draw, route.points, semantic=route.semantic, width=7)
+    anchors = NODE_ANCHORS[figure_key]
+    full_points = (anchors[route.source], *route.points, anchors[route.target])
+    _path_arrow(draw, full_points, semantic=route.semantic, width=7)
     if route.topic is not None and route.topic_box is not None:
         color = GREEN if route.semantic == "success" else RED
         _topic(draw, route.topic_box, route.topic, color=color)

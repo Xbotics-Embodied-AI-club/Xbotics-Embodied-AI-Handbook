@@ -182,7 +182,6 @@ class LayoutTests(unittest.TestCase):
         for key, routes in LOOP_ROUTES.items():
             self.assertGreaterEqual(len(routes), 1, key)
             for route in routes:
-                self.assertGreaterEqual(len(route.points), 2, (key, route.name))
                 self.assertIn(route.semantic, {"success", "danger"}, (key, route.name))
 
     def test_failure_samples_return_to_filtering_and_training(self):
@@ -229,6 +228,68 @@ class LayoutTests(unittest.TestCase):
                     rendered_names,
                     {route.name for route in routes},
                 )
+
+    def test_loop_route_endpoints_resolve_to_node_anchors(self):
+        from tools.lecture_infographics.layouts_b import LOOP_ROUTES, NODE_ANCHORS
+
+        self.assertEqual(set(NODE_ANCHORS), set(LOOP_ROUTES))
+        for key, routes in LOOP_ROUTES.items():
+            for route in routes:
+                self.assertIn(route.source, NODE_ANCHORS[key], (key, route.name))
+                self.assertIn(route.target, NODE_ANCHORS[key], (key, route.name))
+                self.assertNotIn(NODE_ANCHORS[key][route.source], route.points)
+                self.assertNotIn(NODE_ANCHORS[key][route.target], route.points)
+
+    def test_draw_loop_route_uses_resolved_source_and_target_anchors(self):
+        from unittest.mock import patch
+
+        from tools.lecture_infographics.layouts_b import (
+            LOOP_ROUTES,
+            NODE_ANCHORS,
+            _draw_loop_route,
+        )
+
+        image = Image.new("RGB", (1920, 1080), "white")
+        draw = ImageDraw.Draw(image)
+        for key, routes in LOOP_ROUTES.items():
+            for route in routes:
+                with self.subTest(key=key, route=route.name):
+                    with patch(
+                        "tools.lecture_infographics.layouts_b._path_arrow"
+                    ) as path_arrow:
+                        _draw_loop_route(draw, key, route.name)
+                    path_arrow.assert_called_once_with(
+                        draw,
+                        (
+                            NODE_ANCHORS[key][route.source],
+                            *route.points,
+                            NODE_ANCHORS[key][route.target],
+                        ),
+                        semantic=route.semantic,
+                        width=7,
+                    )
+
+    def test_critical_loop_route_metadata_is_exact(self):
+        from tools.lecture_infographics.layouts_b import LOOP_ROUTES
+
+        routes_1_7 = {route.name: route for route in LOOP_ROUTES["1-7"]}
+        failure = routes_1_7["failure_to_filter_training"]
+        self.assertEqual(
+            (failure.source, failure.target, failure.semantic, failure.topic),
+            ("evaluation", "filter_training", "danger", "失败样本"),
+        )
+
+        routes_2_5 = {route.name: route for route in LOOP_ROUTES["2-5"]}
+        policy = routes_2_5["joint_states_to_policy"]
+        status = routes_2_5["joint_states_to_status"]
+        self.assertEqual(
+            (policy.source, policy.target, policy.semantic, policy.topic),
+            ("robot_state_node", "policy_node", "success", "/joint_states"),
+        )
+        self.assertEqual(
+            (status.source, status.target, status.semantic, status.topic),
+            ("robot_state_node", "task_status_node", "success", "/joint_states"),
+        )
 
 
 class RenderTests(unittest.TestCase):
