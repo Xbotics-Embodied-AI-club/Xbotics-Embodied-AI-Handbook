@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 
 EXPECTED_KEYS = {
@@ -51,6 +51,31 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(len(figures["2-5"].steps), 6)
 
 
+class ThemeTests(unittest.TestCase):
+    def test_typography_floor_and_hierarchy(self):
+        from tools.lecture_infographics.theme import THEME
+        self.assertGreaterEqual(THEME.title_size, 64)
+        self.assertLessEqual(THEME.title_size, 68)
+        self.assertEqual(THEME.subtitle_size, 30)
+        self.assertGreaterEqual(THEME.body_size, 26)
+        self.assertGreaterEqual(THEME.min_text_size, 24)
+        self.assertGreater(THEME.title_size, THEME.section_size)
+        self.assertGreater(THEME.section_size, THEME.body_size)
+
+    def test_semantic_colors_are_distinct(self):
+        from tools.lecture_infographics.theme import THEME
+        self.assertNotEqual(THEME.success, THEME.danger)
+        self.assertNotEqual(THEME.accent, THEME.primary)
+
+
+class ComponentTests(unittest.TestCase):
+    def test_fit_text_never_goes_below_minimum(self):
+        from tools.lecture_infographics.components import fit_text
+        image = Image.new("RGB", (600, 200), "white")
+        size = fit_text(ImageDraw.Draw(image), "机器人系统架构", (0, 0, 600, 200), 36, 24)
+        self.assertGreaterEqual(size, 24)
+
+
 class RenderTests(unittest.TestCase):
     def test_render_figure_writes_1920_by_1080_png(self):
         figures = load_manifest()
@@ -68,6 +93,15 @@ class RenderTests(unittest.TestCase):
                 self.assertEqual(image.format, "PNG")
                 self.assertIn(image.mode, {"RGB", "RGBA"})
                 self.assertIn("icc_profile", image.info)
+
+    def test_all_manifest_figures_render_without_omitting_text(self):
+        from tools.lecture_infographics.render import render_figure
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            for key, spec in load_manifest().items():
+                with self.subTest(key=key):
+                    render_figure(spec, output_dir, output_dir / f"{key}.png")
 
 
 if __name__ == "__main__":

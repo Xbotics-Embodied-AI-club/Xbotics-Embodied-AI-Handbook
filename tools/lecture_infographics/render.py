@@ -2,76 +2,29 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageCms, ImageDraw, ImageFont
+from PIL import Image, ImageCms, ImageDraw
 
+from .components import (
+    draw_arrow as arrow,
+    draw_card as rounded,
+    draw_header as header,
+    draw_takeaway as takeaway,
+    fit_text,
+    font,
+)
 from .manifest import FigureSpec
+from .theme import THEME
 
 
 W, H = 1920, 1080
-BLUE = "#0759C7"
-NAVY = "#123463"
-CYAN = "#EAF5FF"
-YELLOW = "#FFC928"
-TEXT = "#24364B"
-MUTED = "#61738A"
-WHITE = "#FFFFFF"
-FONT_REGULAR = "/System/Library/Fonts/STHeiti Light.ttc"
-FONT_BOLD = "/System/Library/Fonts/STHeiti Medium.ttc"
+BLUE = THEME.primary
+NAVY = THEME.primary_dark
+CYAN = THEME.primary_soft
+YELLOW = THEME.accent
+TEXT = THEME.text
+MUTED = THEME.muted
+WHITE = THEME.canvas
 SRGB_PROFILE = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
-
-
-def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    return ImageFont.truetype(FONT_BOLD if bold else FONT_REGULAR, size)
-
-
-def rounded(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int],
-            fill: str = WHITE, outline: str = "#B9D7F8", width: int = 3,
-            radius: int = 24) -> None:
-    draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
-
-
-def fit_text(draw: ImageDraw.ImageDraw, text: str, box: tuple[int, int, int, int],
-             max_size: int, min_size: int = 24, bold: bool = False,
-             fill: str = TEXT, anchor: str = "mm") -> None:
-    x1, y1, x2, y2 = box
-    for size in range(max_size, min_size - 1, -2):
-        f = font(size, bold)
-        bounds = draw.multiline_textbbox((0, 0), text, font=f, spacing=8, align="center")
-        if bounds[2] - bounds[0] <= x2 - x1 - 20 and bounds[3] - bounds[1] <= y2 - y1 - 16:
-            draw.multiline_text(((x1 + x2) // 2, (y1 + y2) // 2), text, font=f,
-                                fill=fill, anchor=anchor, align="center", spacing=8)
-            return
-
-
-def header(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
-    draw.text((960, 76), spec.title, font=font(60, True), fill=BLUE, anchor="mm")
-    draw.rounded_rectangle((900, 120, 1020, 129), radius=5, fill=YELLOW)
-    draw.text((960, 166), spec.subtitle, font=font(30), fill=NAVY, anchor="mm")
-    rounded(draw, (52, 204, 1868, 934), outline="#62A1EA", width=3, radius=28)
-
-
-def takeaway(draw: ImageDraw.ImageDraw, text: str) -> None:
-    rounded(draw, (230, 960, 1690, 1042), outline=BLUE, width=3, radius=20)
-    draw.rounded_rectangle((250, 976, 306, 1027), radius=12, fill=BLUE)
-    draw.ellipse((267, 993, 289, 1015), outline=WHITE, width=4)
-    draw.line((278, 983, 278, 1024), fill=WHITE, width=3)
-    draw.line((258, 1004, 298, 1004), fill=WHITE, width=3)
-    fit_text(draw, text, (325, 970, 1670, 1033), 30, 23, True, BLUE)
-
-
-def arrow(draw: ImageDraw.ImageDraw, start: tuple[int, int], end: tuple[int, int],
-          color: str = BLUE, width: int = 8) -> None:
-    draw.line((*start, *end), fill=color, width=width)
-    ex, ey = end
-    sx, sy = start
-    dx, dy = ex - sx, ey - sy
-    length = max((dx * dx + dy * dy) ** 0.5, 1)
-    ux, uy = dx / length, dy / length
-    px, py = -uy, ux
-    s = 20
-    points = [(ex, ey), (ex - ux * s + px * s * .55, ey - uy * s + py * s * .55),
-              (ex - ux * s - px * s * .55, ey - uy * s - py * s * .55)]
-    draw.polygon(points, fill=color)
 
 
 def robot_arm(draw: ImageDraw.ImageDraw, x: int, y: int, scale: float = 1.0,
@@ -212,7 +165,7 @@ def visual_1_8(draw: ImageDraw.ImageDraw, spec: FigureSpec) -> None:
     scenes = spec.labels[:5]
     for i, label in enumerate(scenes):
         x1 = 100 + i * 345
-        y2, h = 815, 150 + i * 90
+        y2, h = 815, 180 + i * 90
         draw.polygon([(x1, y2), (x1 + 290, y2), (x1 + 290, y2 - h), (x1, y2 - h + 55)], fill="#EAF5FF", outline=BLUE)
         draw.text((x1 + 145, y2 - h + 85), str(i + 1), font=font(38, True), fill=BLUE, anchor="mm")
         fit_text(draw, label, (x1 + 20, y2 - h + 120, x1 + 270, y2 - 18), 29, 20, True)
