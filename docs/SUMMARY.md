@@ -16,7 +16,7 @@
 
 - [部分导言](part1-system-basics/00-part-overview.md)
 - [第 1 讲：具身智能导论](part1-system-basics/01-introduction.md)
-- [第 2 讲：机器人系统架构](part1-system-basics/02-ros2-architecture.md)
+- [第 2 讲：机器人系统架构：硬件、软件与 ROS2](part1-system-basics/02-ros2-architecture.md)
 - [第 3 讲：机器人本体与控制基础](part1-system-basics/03-robot-body-control.md)
 - [第 4 讲：传感器与感知基础](part1-system-basics/04-sensors-coordinates.md)
 
