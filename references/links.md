@@ -72,7 +72,19 @@
 
 ## Lecture 07 — 操作技能 {#lecture-07}
 
-MoveIt2、ManiSkill、robosuite、RoboCasa、Open3D、GraspNet — 链接同 Lecture 03/05/06。
+| 项目 | URL |
+|------|-----|
+| MoveIt 2 Documentation | https://moveit.picknik.ai/ |
+| MoveIt 2 Tutorials | https://moveit.picknik.ai/main/doc/tutorials/tutorials.html |
+| ManiSkill | https://github.com/haosulab/ManiSkill |
+| ManiSkill Docs | https://maniskill.readthedocs.io/ |
+| robosuite | https://robosuite.ai/docs/ |
+| MuJoCo Menagerie | https://github.com/google-deepmind/mujoco_menagerie |
+| Isaac Lab | https://isaac-sim.github.io/IsaacLab/ |
+| AnyGrasp SDK | https://github.com/graspnet/anygrasp_sdk |
+| GraspNet Baseline | https://github.com/graspnet/graspnet-baseline |
+| GraspNet-1Billion | https://graspnet.net/ |
+| Open3D | https://github.com/isl-org/Open3D |
 
 ## Lecture 08 — 端到端导论 {#lecture-08}
 
