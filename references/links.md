@@ -139,13 +139,50 @@ OpenVLA-OFT、LIBERO — https://github.com/moojink/openvla-oft ，https://githu
 | MuJoCo Playground | https://github.com/google-deepmind/mujoco_playground |
 | unitree_rl_mjlab | https://github.com/unitreerobotics/unitree_rl_mjlab |
 
-## Lecture 17 — Robot Agent {#lecture-17}
+## Lecture 17 — Embodied Agent {#lecture-17}
 
 | 项目 | URL |
 |------|-----|
 | LangGraph | https://github.com/langchain-ai/langgraph |
 | LangChain | https://github.com/langchain-ai/langchain |
 | agents-from-scratch | https://github.com/langchain-ai/agents-from-scratch |
+| LLM Powered Autonomous Agents | https://lilianweng.github.io/posts/2023-06-23-agent/ |
+| ReAct | https://arxiv.org/abs/2210.03629 |
+| Generative Agents | https://arxiv.org/abs/2304.03442 |
+| Mem0 | https://arxiv.org/abs/2504.19413 |
+| nanobot | https://github.com/HKUDS/nanobot |
+| Building Effective Agents | https://www.anthropic.com/engineering/building-effective-agents |
+| Effective Harnesses for Long-Running Agents | https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents |
+| Harness Engineering for Self-Improvement | https://lilianweng.github.io/posts/2026-07-04-harness/ |
+| Agent Skills | https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills |
+| MCP Specification | https://modelcontextprotocol.io/ |
+| MCP Architecture | https://modelcontextprotocol.io/docs/learn/architecture |
+| MCP Server Features | https://modelcontextprotocol.io/specification/2025-11-25/server |
+| MCP Security Best Practices | https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices |
+| MCP Governance | https://modelcontextprotocol.io/community/governance |
+| SayCan | https://arxiv.org/abs/2204.01691 |
+| Inner Monologue | https://arxiv.org/abs/2207.05608 |
+| AutoRT | https://arxiv.org/abs/2401.12963 |
+| OK-Robot | https://arxiv.org/abs/2401.12202 |
+| What Matters in Orchestrating Robot Policies | https://arxiv.org/abs/2606.10267 |
+| HoloAgent-0 | https://arxiv.org/abs/2606.23565 |
+| π0.7 | https://arxiv.org/abs/2604.15483 |
+| MEM | https://arxiv.org/abs/2603.03596 |
+| Agentic-VLA | https://arxiv.org/abs/2605.22896 |
+| Hi Robot paper | https://arxiv.org/abs/2502.19417 |
+| Hi Robot project page | https://www.pi.website/research/hirobot |
+| ABot-Claw | https://arxiv.org/abs/2604.10096 |
+| RoboOS | https://github.com/FlagOpen/RoboOS |
+| OK-Robot code | https://github.com/ok-robot/ok-robot |
+| Dimos | https://github.com/dimensionalOS/dimos |
+| OpenMind OM1 | https://github.com/OpenMind/OM1 |
+| HoloAgent code | https://github.com/HorizonRobotics/HoloAgent |
+| RoboCrew | https://github.com/Grigorij-Dudnik/RoboCrew |
+| HomeBot | https://github.com/choco-robot/HomeBot |
+| Vector OS Nano | https://github.com/VectorRobotics/vector-os-nano |
+| Hey Robot | https://github.com/Xbotics-Embodied-AI-club/Xbotics-Hey-Robot |
+| LimX COSA | https://www.limxdynamics.com/zh/news/BK000054 |
+| Vbot | https://vbot.cn/Detail |
 
 ## Lecture 18 — VLN 理论 {#lecture-18}
 
