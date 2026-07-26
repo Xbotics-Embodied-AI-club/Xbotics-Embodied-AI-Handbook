@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#1F6FEB"/>
+    </marker>
+    <marker id="arrow-dark" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#55738E"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#123B64" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      text { font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; fill: #172B3A; }
+      .title { font-size: 42px; font-weight: 700; letter-spacing: 1px; }
+      .subtitle { font-size: 21px; fill: #5B6B7A; }
+      .h { font-size: 27px; font-weight: 700; }
+      .m { font-size: 23px; font-weight: 600; }
+      .b { font-size: 20px; }
+      .s { font-size: 17px; fill: #5B6B7A; }
+      .mono { font-family: "SFMono-Regular", Consolas, monospace; font-size: 18px; }
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="18" height="900" fill="#1F6FEB"/>
+  <text x="70" y="72" class="title">任务契约落在哪里</text>
+  <text x="72" y="108" class="subtitle">MJCF 描述世界与执行器，Python 负责闭环、时序和判定</text>
+  <line x1="70" y1="130" x2="1530" y2="130" stroke="#A9BED1" stroke-width="2"/><rect x="80" y="155" width="285" height="48" rx="24" fill="#EAF3FF" stroke="#1F6FEB" stroke-width="2"/><text x="222.5" y="187" class="b" font-weight="700" text-anchor="middle">七项任务契约</text><rect x="90" y="225" width="660" height="575" rx="26" fill="#F6FAFF" stroke="#1F6FEB" stroke-width="3" filter="url(#shadow)"/><rect x="850" y="225" width="660" height="575" rx="26" fill="#FFFFFF" stroke="#55738E" stroke-width="3" filter="url(#shadow)"/><text x="420" y="275" class="h" text-anchor="middle">MJCF / 机器人资产</text><text x="1180" y="275" class="h" text-anchor="middle">Python / 实验程序</text><rect x="135" y="315" width="570" height="70" rx="15" fill="#FFFFFF" stroke="#A9BED1" stroke-width="2"/><text x="170" y="344" class="m">模型</text><text x="170" y="370" class="mono">body · joint · geom · inertial</text><rect x="135" y="409" width="570" height="70" rx="15" fill="#FFFFFF" stroke="#A9BED1" stroke-width="2"/><text x="170" y="438" class="m">场景</text><text x="170" y="464" class="mono">worldbody · freejoint · contact</text><rect x="135" y="503" width="570" height="70" rx="15" fill="#FFFFFF" stroke="#A9BED1" stroke-width="2"/><text x="170" y="532" class="m">观测锚点</text><text x="170" y="558" class="mono">site · sensor</text><rect x="135" y="597" width="570" height="70" rx="15" fill="#FFFFFF" stroke="#A9BED1" stroke-width="2"/><text x="170" y="626" class="m">动作入口</text><text x="170" y="652" class="mono">actuator · ctrlrange · forcerange</text><rect x="135" y="691" width="570" height="70" rx="15" fill="#FFFFFF" stroke="#A9BED1" stroke-width="2"/><text x="170" y="720" class="m">物理基线</text><text x="170" y="746" class="mono">option/timestep · damping · friction</text><rect x="895" y="315" width="570" height="70" rx="15" fill="#F6FAFF" stroke="#A9BED1" stroke-width="2"/><text x="930" y="344" class="m">目标</text><text x="930" y="370" class="mono">target_pos</text><rect x="895" y="409" width="570" height="70" rx="15" fill="#F6FAFF" stroke="#A9BED1" stroke-width="2"/><text x="930" y="438" class="m">观测读取</text><text x="930" y="464" class="mono">qpos · qvel · site_xpos</text><rect x="895" y="503" width="570" height="70" rx="15" fill="#F6FAFF" stroke="#A9BED1" stroke-width="2"/><text x="930" y="532" class="m">控制闭环</text><text x="930" y="558" class="mono">Jacobian → IK → data.ctrl</text><rect x="895" y="597" width="570" height="70" rx="15" fill="#F6FAFF" stroke="#A9BED1" stroke-width="2"/><text x="930" y="626" class="m">时钟</text><text x="930" y="652" class="mono">physics step · control period · render</text><rect x="895" y="691" width="570" height="70" rx="15" fill="#F6FAFF" stroke="#A9BED1" stroke-width="2"/><text x="930" y="720" class="m">判定与证据</text><text x="930" y="746" class="mono">success · timeout · log · seed</text><line x1="750" y1="510" x2="850" y2="510" stroke="#1F6FEB" stroke-width="5" marker-end="url(#arrow-blue)"/><text x="800" y="485" class="s" text-anchor="middle">编译后由 name / id 对齐</text></svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#1F6FEB"/>
+    </marker>
+    <marker id="arrow-dark" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#55738E"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#123B64" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      text { font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; fill: #172B3A; }
+      .title { font-size: 42px; font-weight: 700; letter-spacing: 1px; }
+      .subtitle { font-size: 21px; fill: #5B6B7A; }
+      .h { font-size: 27px; font-weight: 700; }
+      .m { font-size: 23px; font-weight: 600; }
+      .b { font-size: 20px; }
+      .s { font-size: 17px; fill: #5B6B7A; }
+      .mono { font-family: "SFMono-Regular", Consolas, monospace; font-size: 18px; }
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="18" height="900" fill="#1F6FEB"/>
+  <text x="70" y="72" class="title">Isaac Lab：把任务契约组织成环境协议</text>
+  <text x="72" y="108" class="subtitle">机器人资产改变了，目标—观测—动作—判定的阅读方法不变</text>
+  <line x1="70" y1="130" x2="1530" y2="130" stroke="#A9BED1" stroke-width="2"/><rect x="65" y="175" width="435" height="565" rx="25" fill="#F6FAFF" stroke="#1F6FEB" stroke-width="3" filter="url(#shadow)"/><text x="282" y="225" class="h" text-anchor="middle">场景与资产层</text><rect x="115" y="280" width="335" height="92" rx="18" fill="#FFFFFF" stroke="#A9BED1" stroke-width="2"/><text x="282" y="317" class="m" text-anchor="middle">Scene</text><text x="282" y="347" class="s" text-anchor="middle">地面、机器人、目标</text><rect x="115" y="415" width="335" height="92" rx="18" fill="#FFFFFF" stroke="#A9BED1" stroke-width="2"/><text x="282" y="452" class="m" text-anchor="middle">Asset / Articulation</text><text x="282" y="482" class="s" text-anchor="middle">USD 资产与关节系统</text><rect x="115" y="550" width="335" height="92" rx="18" fill="#FFFFFF" stroke="#A9BED1" stroke-width="2"/><text x="282" y="587" class="m" text-anchor="middle">Sensor</text><text x="282" y="617" class="s" text-anchor="middle">相机、接触、IMU</text><rect x="585" y="175" width="950" height="565" rx="25" fill="#FFFFFF" stroke="#55738E" stroke-width="3" filter="url(#shadow)"/><text x="1060" y="225" class="h" text-anchor="middle">环境任务层</text><rect x="635" y="285" width="260" height="125" rx="20" fill="#F6FAFF" stroke="#1F6FEB" stroke-width="2"/><text x="765" y="333" class="m" text-anchor="middle">Observation</text><text x="765" y="368" class="s" text-anchor="middle">策略读什么</text><rect x="925" y="285" width="260" height="125" rx="20" fill="#F6FAFF" stroke="#55738E" stroke-width="2"/><text x="1055" y="333" class="m" text-anchor="middle">Action</text><text x="1055" y="368" class="s" text-anchor="middle">策略输出什么</text><rect x="1215" y="285" width="260" height="125" rx="20" fill="#F6FAFF" stroke="#1F6FEB" stroke-width="2"/><text x="1345" y="333" class="m" text-anchor="middle">Command</text><text x="1345" y="368" class="s" text-anchor="middle">任务条件是什么</text><rect x="635" y="520" width="260" height="125" rx="20" fill="#FFFFFF" stroke="#55738E" stroke-width="2"/><text x="765" y="568" class="m" text-anchor="middle">Reward</text><text x="765" y="603" class="s" text-anchor="middle">训练时鼓励什么</text><rect x="925" y="520" width="260" height="125" rx="20" fill="#FFFFFF" stroke="#1F6FEB" stroke-width="2"/><text x="1055" y="568" class="m" text-anchor="middle">Termination</text><text x="1055" y="603" class="s" text-anchor="middle">成功/失败何时结束</text><rect x="1215" y="520" width="260" height="125" rx="20" fill="#FFFFFF" stroke="#55738E" stroke-width="2"/><text x="1345" y="568" class="m" text-anchor="middle">Metrics</text><text x="1345" y="603" class="s" text-anchor="middle">评测怎样统计</text><line x1="500" y1="455" x2="585" y2="455" stroke="#1F6FEB" stroke-width="4" marker-end="url(#arrow-blue)"/><path d="M765 410 v92 M1055 410 v92 M1345 410 v92" stroke="#55738E" stroke-width="3" marker-end="url(#arrow-dark)"/><text x="1060" y="790" class="b" text-anchor="middle">Manager-based 环境将这些概念拆成可组合管理器；Direct 环境则在类中直接实现</text></svg>
