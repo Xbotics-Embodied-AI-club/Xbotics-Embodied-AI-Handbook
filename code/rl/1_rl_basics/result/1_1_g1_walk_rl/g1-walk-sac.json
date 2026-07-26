@@ -1,0 +1,12 @@
+{
+  "action_abs_mean": 0.29855826636155447,
+  "checkpoint": "DATASETS_ROOT/models/trained/xbotics_rl_g1_walk/g1-walk-sac/model_900.pt",
+  "checkpoint_iteration": 900,
+  "done_fraction": 0.009635416666666667,
+  "env_steps": 7372800,
+  "mean_reward": 0.025794027315763135,
+  "num_envs": 256,
+  "run_name": "g1-walk-sac",
+  "steps": 300,
+  "train_wall_seconds_to_iter900": 247.71253395080566
+}

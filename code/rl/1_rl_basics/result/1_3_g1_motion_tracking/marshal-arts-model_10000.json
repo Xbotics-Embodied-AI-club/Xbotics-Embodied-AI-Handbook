@@ -1,0 +1,17 @@
+{
+  "action_abs_max": 15.554582595825195,
+  "action_abs_mean": 1.577956236600876,
+  "checkpoint": "DATASETS_ROOT/models/trained/xbotics_rl_beyondmimic/beyondmimic-marshal-arts-lightning-10000/model_10000.pt",
+  "checkpoint_iteration": 10000,
+  "done_count": 1,
+  "done_fraction": 0.0003125,
+  "mean_reward": 0.06954433302395045,
+  "motion_file": "rl/data/beyondmimic/marshal-arts.npz",
+  "motion_fps": 50.0,
+  "motion_frames": 682,
+  "num_envs": 16,
+  "output": "rl/result/3_9_beyondmimic/marshal-arts-model_10000.json",
+  "steps": 200,
+  "video_frames": 200,
+  "video_output": "rl/result/3_9_beyondmimic/marshal-arts-model_10000.mp4"
+}

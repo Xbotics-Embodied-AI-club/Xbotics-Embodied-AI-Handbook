@@ -8,7 +8,7 @@
 |------|--------|----------|
 | 第一部分 L01–L04 | 丛林（翼茗、锦丰） | `docs/part1-*`、`code/lecture01–04` |
 | 第二部分 L05–L07 | 育帆（昊旺、志凯、彤彤、宝华） | `docs/part2-*`、`code/lecture05–07` |
-| 第三、四部分 L08–L16 | harry（陈老师、诸老师、罗辑） | `docs/part3-*`、`part4-*`、`code/lecture08–16` |
+| 第三、四部分 L08–L16 | harry（陈老师、诸老师、罗辑） | `docs/part3-*`、`part4-*`、`code/vla`、`code/rl`、`code/platform` |
 | 第五部分 L18–L19 | **新梦**（雨浩协同） | `docs/part5-vln/`、`code/lecture18–19` |
 | 第六部分 L17、L20–L21 | 雨浩（富平 L17、煜恒 L20） | `docs/part6-agent-world-model/`、`code/lecture17、20–21` |
 | 代码管理 | 志凯 | `code/` 结构、CI、跨讲依赖 |

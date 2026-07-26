@@ -1,0 +1,192 @@
+# Xbotics 全课程统一 uv 开发环境（环境根 = code/）。
+#
+# 只有三种部署形态，每台机器按硬件选一个 extra（彼此互斥）：
+#   gpu_x86   —— x86 GPU 工作站（CUDA 12.8）：VLA + RL 全部训练/推理/演示 一套环境全包。
+#                uv sync --extra gpu_x86
+#   nogpu_x86 —— x86 无 GPU（CPU torch）：SO101 数据采集 + ACT ONNX/BPU 导出。
+#                uv sync --extra nogpu_x86
+#   rdk_s100  —— 地瓜 RDK S100/S600 板端（aarch64）：SO101 数据采集。
+#                uv sync --extra rdk_s100 --no-editable
+#
+# lerobot 先由 ./platform/lerobot/fetch_lerobot.sh 把 v0.5.1 源 clone 到 ./platform/lerobot/lerobot/
+# 并打上本地补丁（groot 修复 / vla0_smol / openvla），再以 editable 方式安装
+# （path source 见 [tool.uv.sources]）。
+# 资产（数据集/模型）：本地部署随用随下；Docker 构建时由 docker_cfg/scripts/ 烘进镜像。
+
+[project]
+name = "xbotics-experiments"
+version = "0.0.3"
+requires-python = ">=3.12,<3.13"
+# 通用依赖（所有 extra 都带）：wandb 跨课程通用——训练记录、eval 视频上传等工具都要，
+# 纯 python 无 torch 冲突，不会污染 GPU/CPU/aarch64 三套 torch 路线。
+dependencies = [
+    "wandb",
+]
+
+[project.optional-dependencies]
+# —— x86 GPU 工作站（CUDA 12.8）：VLA + RL 全课程一套环境 ——
+gpu_x86 = [
+    # PyTorch（GPU，cu128 index 见 [tool.uv.sources]）
+    "torch==2.8.0",
+    "torchvision==0.23.0",
+    "torchaudio==2.8.0",
+    "torchcodec==0.7.0",
+    # lerobot 全量（含 pi0 / libero / smolvla / aloha …；all 因 flash-attn 故意不含 groot）
+    "lerobot[all]",
+    "transformers==5.3.0",
+    # vla0_smol policy（0002 补丁）在 factory.py 顶层被 eager import，其 modeling
+    # 顶层 `import xgrammar`（整数串动作约束解码）。缺它则任何 get_policy_class（含 pi0）都会
+    # ImportError，故必须带 xgrammar。
+    "xgrammar",
+    # openvla policy（0003 补丁）：prismatic remote code 依赖 timm<1.0 的视觉骨干 + tokenizer
+    "timm==0.9.12",
+    "sentencepiece",
+    "accelerate",
+    # 课程章节依赖（2_1 pytorch / 2_3 GPT2 / 5_4 flow_matching 等）
+    "lightning",
+    "torchmetrics",
+    "torchsummary",
+    "tiktoken",
+    "flow-matching==1.0.10",
+    "numpy",
+    "matplotlib",
+    "scikit-learn",
+    "tqdm",
+    "ipython",
+    "ipykernel",
+    "nbconvert",
+    "nbclient",
+    # G1 并行仿真 + BeyondMimic 训练（rl/1_rl_basics）
+    "mjlab",
+    "mujoco",
+    "mujoco-warp",
+    "warp-lang",
+    "tyro",
+    "mediapy",
+    # SO101 仿真闭环：mani_skill（GPU 并行仿真+无头 RGB，带入 sapien/mplib/pytorch-kinematics）
+    # + so101_sim（我们的环境包，editable，见 [tool.uv.sources]；含 vendor squint 8 任务）。
+    # 供 lerobot-eval --env.type=so101_sim 与 rl/3_offpolicy/3_1 数据生成。
+    "mani-skill==3.0.1",
+    "so101_sim",
+    # squint SAC 训练器（rl/3_offpolicy/3_1 数据生产线薄包它出专家）依赖；
+    # 实测与 torch2.8+cu128 共存，钉版防 uv 拉新版崩（tensordict CudaGraphModule / torchrl ReplayBuffer）。
+    "torchrl==0.13.2",
+    "tensordict==0.13.0",
+    # GVHMR raw-video inference runtime（rl/1_2 人体视频 -> G1 reference motion）。
+    # GVHMR 包自身不声明依赖，运行时依赖手工列在这里；av 不钉版本，跟随 lerobot 的 av>=15。
+    "pytorch3d==0.7.9+pt2.8.0cu128",
+    "hydra-core",
+    "hydra-zen",
+    "hydra-colorlog",
+    "ffmpeg-python",
+    "scikit-image",
+    "termcolor",
+    "einops",
+    "imageio==2.34.1",
+    "joblib",
+    "trimesh",
+    "chumpy",
+    "smplx",
+    "wis3d",
+    "pycolmap",
+    # GVHMR 原配方钉 8.2.42，但它要 numpy<2 与 lerobot 的 numpy>=2 冲突；
+    # GVHMR 只用基础 YOLO 推理 API，放开到 8.3+（numpy 2 兼容）。
+    "ultralytics>=8.3",
+    "cython_bbox",
+    "lapx",
+    "yacs",
+    "scipy",
+    "gvhmr",
+    "general-motion-retargeting",
+    # GRPO 后训练（rl/2_1 Unsloth VLM 数数 + rl/2_2 VLA-0 LIBERO）
+    "unsloth",
+    # unsloth-zoo 会拉最新 torchao，但 lerobot 钉 diffusers<0.36，而 diffusers 0.35 的
+    # torchao quantizer 遇 torchao>=0.16 import 即炸（内部 logger 未定义）；压回兼容区间。
+    "torchao<0.16",
+    "trl",
+    "datasets",
+    "peft",
+    "bitsandbytes",
+    "vllm>=0.11",
+    "pillow",
+    "qwen-vl-utils",
+    # RDK ACT BPU 导出（加载已训模型 + 导出 ONNX + 生成校准数据；
+    # rdk_LeRobot_tools 由 platform/rdk/fetch_rdk_tools.sh clone，gitignored）
+    "onnx",
+    "onnxruntime",
+    "onnxsim",
+    "safetensors",
+]
+
+# —— x86 无 GPU（CPU torch）：SO101 数据采集 + ACT ONNX/BPU 导出 ——
+nogpu_x86 = [
+    # PyTorch（CPU index；lerobot core 强依赖 torch，不能不装，只用 CPU 轮子）
+    "torch==2.8.0",
+    "torchvision==0.23.0",
+    "torchcodec==0.7.0",
+    # SO101 = 飞特(Feetech)舵机；USB 摄像头由 lerobot core 的 opencv 覆盖
+    "lerobot[feetech]",
+    # ACT BPU 导出/校准依赖（onnxruntime 供 onnxsim 图简化，CPU 即可）
+    "onnx",
+    "onnxruntime",
+    "onnxsim",
+    "termcolor",
+    "safetensors",
+    "tqdm",
+    "numpy",
+]
+
+# —— 地瓜 RDK S100/S600 板端 SO101 数据采集（aarch64；--no-editable）——
+rdk_s100 = [
+    # 不走 x86 index；PyPI 上有 Linux aarch64 torch/torchvision wheel。
+    # torchcodec 0.7.0 无 Linux aarch64 wheel；lerobot 自身也在 aarch64 marker 中避开它。
+    "torch==2.8.0",
+    "torchvision==0.23.0",
+    "lerobot[feetech]",
+    "numpy",
+]
+
+[tool.uv]
+package = false
+# 三种部署形态互斥，使各套依赖（尤其 GPU cu128 / x86 CPU / aarch64 的 torch 路线）各自独立解析。
+conflicts = [[{ extra = "gpu_x86" }, { extra = "nogpu_x86" }, { extra = "rdk_s100" }]]
+
+[tool.uv.sources]
+# 本地 clone + 打补丁后的 lerobot 源（由 lerobot/fetch_lerobot.sh 生成，gitignore）
+lerobot = { path = "./platform/lerobot/lerobot", editable = true }
+# so101_sim：我们的 SO101 仿真环境包（editable；package_name=so101_sim，0004 补丁运行时 import 它）
+so101_sim = { path = "./platform/so101_sim", editable = true }
+# torch 系按所选 extra 命中不同 index：gpu_x86→cu128，nogpu_x86→cpu，rdk_s100→PyPI(aarch64)
+gvhmr = { git = "https://github.com/zju3dv/GVHMR.git" }
+general-motion-retargeting = { git = "https://github.com/YanjieZe/GMR.git" }
+pytorch3d = { url = "https://github.com/MiroPsota/torch_packages_builder/releases/download/pytorch3d-0.7.9/pytorch3d-0.7.9%2Bpt2.8.0cu128-cp312-cp312-linux_x86_64.whl" }
+torch = [
+    { index = "pytorch-cu128", extra = "gpu_x86" },
+    { index = "pytorch-cpu", extra = "nogpu_x86" },
+]
+torchvision = [
+    { index = "pytorch-cu128", extra = "gpu_x86" },
+    { index = "pytorch-cpu", extra = "nogpu_x86" },
+]
+torchaudio = [
+    { index = "pytorch-cu128", extra = "gpu_x86" },
+]
+warp-lang = { index = "nvidia" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com/"
+explicit = true
+
+[tool.uv.extra-build-dependencies]
+chumpy = ["pip"]

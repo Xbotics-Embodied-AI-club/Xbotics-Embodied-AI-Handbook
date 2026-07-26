@@ -40,15 +40,15 @@ lectures:
   - { id: 5, slug: simulation, title: 仿真环境与操作任务搭建, path: docs/part2-vision-manipulation/05-simulation.md, code: code/lecture05, part: 2 }
   - { id: 6, slug: pose-estimation, title: 机器人感知与位姿估计, path: docs/part2-vision-manipulation/06-pose-estimation.md, code: code/lecture06, part: 2 }
   - { id: 7, slug: manipulation-skills, title: 机器人操作技能, path: docs/part2-vision-manipulation/07-manipulation-skills.md, code: code/lecture07, part: 2 }
-  - { id: 8, slug: policy-intro, title: 端到端策略学习导论, path: docs/part3-end-to-end/08-policy-intro.md, code: code/lecture08, part: 3 }
-  - { id: 9, slug: data-collection, title: 操作数据采集与评测, path: docs/part3-end-to-end/09-data-collection.md, code: code/lecture09, part: 3 }
-  - { id: 10, slug: imitation-learning, title: 模仿学习训练, path: docs/part3-end-to-end/10-imitation-learning.md, code: code/lecture10, part: 3 }
-  - { id: 11, slug: diffusion-policy, title: Diffusion Policy, path: docs/part3-end-to-end/11-diffusion-policy.md, code: code/lecture11, part: 3 }
-  - { id: 12, slug: vla-theory, title: VLA 理论基础, path: docs/part3-end-to-end/12-vla-theory.md, code: code/lecture12, part: 3 }
-  - { id: 13, slug: vla-practice, title: VLA 实操, path: docs/part3-end-to-end/13-vla-practice.md, code: code/lecture13, part: 3 }
-  - { id: 14, slug: rl-basics, title: 强化学习基础, path: docs/part4-reinforcement-learning/14-rl-basics.md, code: code/lecture14, part: 4 }
-  - { id: 15, slug: rl-locomotion, title: 强化学习运动控制, path: docs/part4-reinforcement-learning/15-rl-locomotion.md, code: code/lecture15, part: 4 }
-  - { id: 16, slug: rl-post-training, title: RL 后训练与 Recovery, path: docs/part4-reinforcement-learning/16-rl-post-training.md, code: code/lecture16, part: 4 }
+  - { id: 8, slug: e2e-policy-intro, title: 端到端策略导论, path: docs/part3-end-to-end/08-端到端策略导论.md, code: code/vla/1_policy_rollout, part: 3 }
+  - { id: 9, slug: data-loop, title: 操作数据闭环, path: docs/part3-end-to-end/09-操作数据闭环.md, code: code/vla/2_data_collection, part: 3 }
+  - { id: 10, slug: imitation-learning, title: 模仿学习实战, path: docs/part3-end-to-end/10-模仿学习实战.md, code: code/vla/3_imitation_learning, part: 3 }
+  - { id: 11, slug: vla-models-overview, title: VLA 模型导览, path: docs/part3-end-to-end/11-VLA模型导览.md, code: code/vla/4_vla_inference, part: 3 }
+  - { id: 12, slug: vla-finetune, title: VLA 微调实战, path: docs/part3-end-to-end/12-VLA微调实战.md, code: code/vla/5_vla_finetune, part: 3 }
+  - { id: 13, slug: vla-frontier, title: VLA 前沿, path: docs/part3-end-to-end/13-VLA前沿.md, code: ~, part: 3 }
+  - { id: 14, slug: rl-intro, title: 强化学习入门, path: docs/part4-reinforcement-learning/14-强化学习入门.md, code: code/rl/1_rl_basics, part: 4 }
+  - { id: 15, slug: grpo-posttraining, title: GRPO 后训练, path: docs/part4-reinforcement-learning/15-GRPO后训练.md, code: code/rl/2_grpo_posttraining, part: 4 }
+  - { id: 16, slug: offpolicy-real-rl, title: Off-policy 真机强化学习, path: docs/part4-reinforcement-learning/16-真机强化学习.md, code: code/rl/3_offpolicy, part: 4 }
   - { id: 17, slug: robot-agent, title: Robot Agent 与技能调用, path: docs/part6-agent-world-model/17-robot-agent.md, code: code/lecture17, part: 6 }
   - { id: 18, slug: vln-theory, title: VLN 理论基础, path: docs/part5-vln/18-vln-theory.md, code: code/lecture18, part: 5 }
   - { id: 19, slug: vln-practice, title: VLN 实操与评测, path: docs/part5-vln/19-vln-practice.md, code: code/lecture19, part: 5 }

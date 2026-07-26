@@ -1,0 +1,6 @@
+{
+  "run": "track-v1-reinforce",
+  "mean_reward": 0.0523995646671392,
+  "done_fraction": 0.02625,
+  "frames": 400
+}

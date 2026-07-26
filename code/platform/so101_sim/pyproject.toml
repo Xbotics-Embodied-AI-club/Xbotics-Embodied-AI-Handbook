@@ -1,0 +1,15 @@
+# so101_sim —— SO101 ManiSkill3 仿真环境（vendored squint），作可 import 的 editable 依赖包。
+# 由 experiments 顶层 pyproject 的 [tool.uv.sources] 以 editable 装入统一 uv 环境；
+# 运行依赖（mani_skill / torch / gymnasium）由所选 extra（gpu_x86）提供，本包不重复声明。
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "so101_sim"
+version = "0.0.1"
+description = "SO101 ManiSkill3 仿真环境（vendored squint）：lerobot-eval 评测口 + RL 数据生成底座"
+requires-python = ">=3.12,<3.13"
+
+[tool.hatch.build.targets.wheel]
+packages = ["so101_sim"]

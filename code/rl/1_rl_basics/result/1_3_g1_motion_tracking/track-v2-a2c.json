@@ -1,0 +1,6 @@
+{
+  "run": "track-v2-a2c",
+  "mean_reward": 0.04569053367245943,
+  "done_fraction": 0.0115625,
+  "frames": 400
+}

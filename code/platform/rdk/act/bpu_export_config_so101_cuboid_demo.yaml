@@ -1,0 +1,14 @@
+dataset:
+  repo_id: "so101/put_black_cuboid_into_basket"
+  root: "$DATASETS_ROOT/hf-hub/lerobot/so101/put_black_cuboid_into_basket"
+policy:
+  type: "act"
+  device: "cpu"
+wandb:
+  enable: false
+act_path: "$DATASETS_ROOT/models/so101_act_cuboid_topwrist/pretrained_model"
+export_path: "$DATASETS_ROOT/models/bpu_export_demo"
+cal_num: 100
+onnx_sim: true
+type: "nash-p"          # S600=nash-p；S100 改 nash-e（脚本只认 config 里的 type，命令行 --type 会被忽略）
+combine_jobs: 6

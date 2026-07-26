@@ -1,0 +1,241 @@
+{
+  "eval_protocol": {
+    "num_envs": 256,
+    "steps": 300,
+    "action": "deterministic"
+  },
+  "ppo": [
+    {
+      "iteration": 200,
+      "env_steps": 19660800,
+      "wall": 374.391588699,
+      "mean_reward": 0.06418226037174463,
+      "action_abs_mean": 0.23811483720938365,
+      "done_fraction": 0.009583333333333333
+    },
+    {
+      "iteration": 400,
+      "env_steps": 39321600,
+      "wall": 799.774916878,
+      "mean_reward": 0.07207001237819592,
+      "action_abs_mean": 0.2573735129088163,
+      "done_fraction": 0.002955729166666667
+    },
+    {
+      "iteration": 600,
+      "env_steps": 58982400,
+      "wall": 1227.93389036,
+      "mean_reward": 0.07616109465559323,
+      "action_abs_mean": 0.2794114690522353,
+      "done_fraction": 1.3020833333333334e-05
+    },
+    {
+      "iteration": 800,
+      "env_steps": 78643200,
+      "wall": 1644.82075564,
+      "mean_reward": 0.08080146651715041,
+      "action_abs_mean": 0.38190563877423606,
+      "done_fraction": 0.0
+    },
+    {
+      "iteration": 1000,
+      "env_steps": 98304000,
+      "wall": 2055.341197618,
+      "mean_reward": 0.0904234179481864,
+      "action_abs_mean": 0.3795493053396543,
+      "done_fraction": 0.0
+    },
+    {
+      "iteration": 1200,
+      "env_steps": 117964800,
+      "wall": 2470.937872107,
+      "mean_reward": 0.09372094551722208,
+      "action_abs_mean": 0.3754289517303308,
+      "done_fraction": 0.0
+    },
+    {
+      "iteration": 1400,
+      "env_steps": 137625600,
+      "wall": 2886.590658048,
+      "mean_reward": 0.09537282356371482,
+      "action_abs_mean": 0.37959527189532916,
+      "done_fraction": 0.0
+    },
+    {
+      "iteration": 1600,
+      "env_steps": 157286400,
+      "wall": 3303.211144302,
+      "mean_reward": 0.09649261452257633,
+      "action_abs_mean": 0.3679932403564453,
+      "done_fraction": 0.0
+    },
+    {
+      "iteration": 1800,
+      "env_steps": 176947200,
+      "wall": 3717.398733324,
+      "mean_reward": 0.09735752787441015,
+      "action_abs_mean": 0.37150116980075837,
+      "done_fraction": 0.0
+    },
+    {
+      "iteration": 2000,
+      "env_steps": 196608000,
+      "wall": 4131.649217972,
+      "mean_reward": 0.09699930692712466,
+      "action_abs_mean": 0.3745595916112264,
+      "done_fraction": 1.3020833333333334e-05
+    },
+    {
+      "iteration": 2200,
+      "env_steps": 216268800,
+      "wall": 4545.648648869,
+      "mean_reward": 0.09817603727181752,
+      "action_abs_mean": 0.3754497695962588,
+      "done_fraction": 0.0
+    },
+    {
+      "iteration": 2400,
+      "env_steps": 235929600,
+      "wall": 4960.306663304,
+      "mean_reward": 0.0977180856714646,
+      "action_abs_mean": 0.36146652773022653,
+      "done_fraction": 0.0
+    },
+    {
+      "iteration": 2600,
+      "env_steps": 255590400,
+      "wall": 5373.36924642,
+      "mean_reward": 0.09786660696069399,
+      "action_abs_mean": 0.3715568228562673,
+      "done_fraction": 0.0
+    },
+    {
+      "iteration": 2800,
+      "env_steps": 275251200,
+      "wall": 5783.145046082,
+      "mean_reward": 0.09646165276567141,
+      "action_abs_mean": 0.3768186860283216,
+      "done_fraction": 0.0
+    },
+    {
+      "iteration": 3000,
+      "env_steps": 294912000,
+      "wall": 6191.528934423,
+      "mean_reward": 0.09711968762179216,
+      "action_abs_mean": 0.3821720883746942,
+      "done_fraction": 0.0
+    }
+  ],
+  "sac": [
+    {
+      "iteration": 300,
+      "env_steps": 2457600,
+      "wall": 79.80215859413147,
+      "mean_reward": 0.026295599435300878,
+      "action_abs_mean": 0.1211605979502201,
+      "done_fraction": 0.010247395833333334
+    },
+    {
+      "iteration": 600,
+      "env_steps": 4915200,
+      "wall": 163.6372184753418,
+      "mean_reward": 0.02532758450077381,
+      "action_abs_mean": 0.21374501337607701,
+      "done_fraction": 0.009583333333333333
+    },
+    {
+      "iteration": 900,
+      "env_steps": 7372800,
+      "wall": 247.71253395080566,
+      "mean_reward": 0.025794027315763135,
+      "action_abs_mean": 0.29855826636155447,
+      "done_fraction": 0.009635416666666667
+    },
+    {
+      "iteration": 1200,
+      "env_steps": 9830400,
+      "wall": 386.0720114707947,
+      "mean_reward": 0.01820167708482283,
+      "action_abs_mean": 0.359724062482516,
+      "done_fraction": 0.010143229166666667
+    },
+    {
+      "iteration": 1500,
+      "env_steps": 12288000,
+      "wall": 469.34827971458435,
+      "mean_reward": 0.011346089720415573,
+      "action_abs_mean": 0.37258553723494214,
+      "done_fraction": 0.0141796875
+    },
+    {
+      "iteration": 1800,
+      "env_steps": 14745600,
+      "wall": 551.4890961647034,
+      "mean_reward": 0.017068063787495095,
+      "action_abs_mean": 0.378226424853007,
+      "done_fraction": 0.012903645833333333
+    },
+    {
+      "iteration": 2100,
+      "env_steps": 17203200,
+      "wall": 633.3343017101288,
+      "mean_reward": 0.013117519985923233,
+      "action_abs_mean": 0.37989260216554005,
+      "done_fraction": 0.011171875
+    },
+    {
+      "iteration": 2400,
+      "env_steps": 19660800,
+      "wall": 715.0614321231842,
+      "mean_reward": 0.01754932969653358,
+      "action_abs_mean": 0.3982730590303739,
+      "done_fraction": 0.010520833333333333
+    },
+    {
+      "iteration": 2700,
+      "env_steps": 22118400,
+      "wall": 796.0293033123016,
+      "mean_reward": 0.00559251305142728,
+      "action_abs_mean": 0.4701306660970052,
+      "done_fraction": 0.011731770833333334
+    },
+    {
+      "iteration": 3000,
+      "env_steps": 24576000,
+      "wall": 875.3660116195679,
+      "mean_reward": 0.012254692936937013,
+      "action_abs_mean": 0.4412042294939359,
+      "done_fraction": 0.012526041666666666
+    }
+  ],
+  "thresholds": {
+    "0.015": {
+      "ppo_env_steps": 19660800,
+      "ppo_wall": 374.391588699,
+      "sac_env_steps": 2457600,
+      "sac_wall": 79.80215859413147,
+      "envstep_speedup": 8.0
+    },
+    "0.02": {
+      "ppo_env_steps": 19660800,
+      "ppo_wall": 374.391588699,
+      "sac_env_steps": 2457600,
+      "sac_wall": 79.80215859413147,
+      "envstep_speedup": 8.0
+    },
+    "0.025": {
+      "ppo_env_steps": 19660800,
+      "ppo_wall": 374.391588699,
+      "sac_env_steps": 2457600,
+      "sac_wall": 79.80215859413147,
+      "envstep_speedup": 8.0
+    },
+    "0.03": {
+      "ppo_env_steps": 19660800,
+      "ppo_wall": 374.391588699,
+      "sac_env_steps": null,
+      "sac_wall": null,
+      "envstep_speedup": null
+    }
+  }
+}

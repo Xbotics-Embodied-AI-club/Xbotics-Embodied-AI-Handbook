@@ -34,21 +34,21 @@
 ## 第三部分：端到端机器人操作（第 8–13 讲）
 
 - [部分导言](part3-end-to-end/00-part-overview.md)
-- [第 8 讲：端到端策略学习导论](part3-end-to-end/08-policy-intro.md)
-- [第 9 讲：操作数据采集、任务设计与评测](part3-end-to-end/09-data-collection.md)
-- [第 10 讲：模仿学习训练](part3-end-to-end/10-imitation-learning.md)
-- [第 11 讲：生成式动作策略 Diffusion Policy](part3-end-to-end/11-diffusion-policy.md)
-- [第 12 讲：VLA 理论基础](part3-end-to-end/12-vla-theory.md)
-- [第 13 讲：VLA 实操](part3-end-to-end/13-vla-practice.md)
+- [第 8 讲：端到端策略导论 —— 从 Pipeline 到 Policy](part3-end-to-end/08-端到端策略导论.md)（[PDF](part3-end-to-end/pdf/第8讲_端到端策略导论.pdf)）
+- [第 9 讲：操作数据闭环 —— 采一份能训练的数据集](part3-end-to-end/09-操作数据闭环.md)（[PDF](part3-end-to-end/pdf/第9讲_操作数据闭环.pdf)）
+- [第 10 讲：模仿学习实战 —— ACT、Diffusion 与 Flow Matching](part3-end-to-end/10-模仿学习实战.md)（[PDF](part3-end-to-end/pdf/第10讲_模仿学习实战.pdf)）
+- [第 11 讲：VLA 模型导览 —— 从 OpenVLA 到 π0 家族](part3-end-to-end/11-VLA模型导览.md)（[PDF](part3-end-to-end/pdf/第11讲_VLA模型导览.pdf)）
+- [第 12 讲：VLA 微调实战 —— 从全量 SFT 到 LoRA 上真机](part3-end-to-end/12-VLA微调实战.md)（[PDF](part3-end-to-end/pdf/第12讲_VLA微调实战.pdf)）
+- [第 13 讲：VLA 前沿 —— 跑得更快、记得更久、用上全身](part3-end-to-end/13-VLA前沿.md)（[PDF](part3-end-to-end/pdf/第13讲_VLA前沿.pdf)）
 
 ---
 
 ## 第四部分：强化学习（第 14–16 讲）
 
 - [部分导言](part4-reinforcement-learning/00-part-overview.md)
-- [第 14 讲：强化学习基础](part4-reinforcement-learning/14-rl-basics.md)
-- [第 15 讲：强化学习运动控制（G1）](part4-reinforcement-learning/15-rl-locomotion.md)
-- [第 16 讲：机械臂抓取 RL 后训练与 Recovery Policy](part4-reinforcement-learning/16-rl-post-training.md)
+- [第 14 讲：强化学习入门 —— 从策略梯度到 PPO](part4-reinforcement-learning/14-强化学习入门.md)（[PDF](part4-reinforcement-learning/pdf/第14讲_强化学习入门.pdf)）
+- [第 15 讲：GRPO 后训练 —— 让 VLM 学会数数、让 VLA 自我提升](part4-reinforcement-learning/15-GRPO后训练.md)（[PDF](part4-reinforcement-learning/pdf/第15讲_GRPO后训练.pdf)）
+- [第 16 讲：Off-policy 强化学习 —— 从仿真提速到真机落地](part4-reinforcement-learning/16-真机强化学习.md)（[PDF](part4-reinforcement-learning/pdf/第16讲_真机强化学习.pdf)）
 
 ---
 
