@@ -41,6 +41,9 @@ except ModuleNotFoundError:
     )
 
 
+REQUIRED_INTRINSIC_KEYS = ("fx", "fy", "cx", "cy")
+
+
 # ============================================================
 # 辅助函数：加载数据
 # ============================================================
@@ -75,16 +78,101 @@ def load_rgb(path: str) -> np.ndarray:
     return np.asarray(Image.open(path).convert("RGB"))
 
 
+def validate_intrinsics(intrinsics: dict, image_shape, depth_scale: float) -> dict:
+    """检查相机内参与深度尺度，避免静默生成错误尺度的点云。"""
+    missing = [key for key in REQUIRED_INTRINSIC_KEYS if key not in intrinsics]
+    if missing:
+        raise KeyError(f"intrinsics.json 缺少字段: {', '.join(missing)}")
+
+    height, width = image_shape
+    checked = {}
+    for key in REQUIRED_INTRINSIC_KEYS:
+        value = float(intrinsics[key])
+        if not np.isfinite(value):
+            raise ValueError(f"相机内参 {key} 不是有限数值: {value}")
+        checked[key] = value
+
+    if checked["fx"] <= 0 or checked["fy"] <= 0:
+        raise ValueError("fx/fy 必须为正数。")
+    if depth_scale <= 0 or not np.isfinite(depth_scale):
+        raise ValueError("depth_scale 必须为正数。")
+
+    warnings = []
+    if not (0 <= checked["cx"] < width):
+        warnings.append(f"cx={checked['cx']} 超出图像宽度范围 [0, {width})")
+    if not (0 <= checked["cy"] < height):
+        warnings.append(f"cy={checked['cy']} 超出图像高度范围 [0, {height})")
+    if warnings:
+        print("  ⚠️ 相机内参检查提示：")
+        for item in warnings:
+            print(f"    - {item}")
+
+    return checked
+
+
+def validate_filter_params(z_min: float, z_max: float, voxel_size: float, nb_neighbors: int, std_ratio: float) -> None:
+    """检查滤波参数是否处在可执行范围内。"""
+    if z_min >= z_max:
+        raise ValueError(f"z_min 必须小于 z_max，当前为 {z_min} >= {z_max}。")
+    if voxel_size < 0:
+        raise ValueError("voxel_size 不能为负数。")
+    if nb_neighbors < 1:
+        raise ValueError("nb_neighbors 至少为 1。")
+    if std_ratio <= 0:
+        raise ValueError("std_ratio 必须为正数。")
+
+
+def save_depth(path: str, depth_mm: np.ndarray) -> None:
+    """保存 16-bit 深度图，便于检查 mask 筛选后的深度区域。"""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    depth_uint16 = np.asarray(depth_mm)
+    if depth_uint16.dtype != np.uint16:
+        depth_uint16 = np.clip(depth_uint16, 0, np.iinfo(np.uint16).max).astype(np.uint16)
+    Image.fromarray(depth_uint16, mode="I;16").save(path)
+
+
+def summarize_point_cloud(pcd: o3d.geometry.PointCloud) -> dict:
+    """返回点云点数和 XYZ 范围，用于生成可复现实验摘要。"""
+    points = np.asarray(pcd.points)
+    summary = {"points": int(len(points))}
+    if len(points) == 0:
+        summary["bounds_m"] = None
+        return summary
+
+    summary["bounds_m"] = {
+        "x": [float(points[:, 0].min()), float(points[:, 0].max())],
+        "y": [float(points[:, 1].min()), float(points[:, 1].max())],
+        "z": [float(points[:, 2].min()), float(points[:, 2].max())],
+    }
+    return summary
+
+
+def save_json(path: str, data: dict) -> None:
+    """保存 JSON 文件，记录本次实验的输入、参数、点数和输出路径。"""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fp:
+        json.dump(data, fp, ensure_ascii=False, indent=2)
+
+
 # ============================================================
 # 可视化辅助函数（截图、并排对比、拼图）
 # ============================================================
 
 def _save_screenshot(geometries, image_path, window_name, width=1280, height=720):
     """将当前几何体渲染结果保存为 PNG 截图"""
+    non_empty = []
+    for geometry in geometries:
+        if isinstance(geometry, o3d.geometry.PointCloud) and len(geometry.points) == 0:
+            continue
+        non_empty.append(geometry)
+    if not non_empty:
+        print(f"  ⚠️ 跳过截图，当前阶段没有可渲染几何体: {window_name}")
+        return False
+
     vis = o3d.visualization.Visualizer()
     try:
         vis.create_window(window_name=window_name, width=width, height=height, visible=False)
-        for geometry in geometries:
+        for geometry in non_empty:
             vis.add_geometry(geometry)
         render_option = vis.get_render_option()
         render_option.background_color = np.asarray([1.0, 1.0, 1.0])
@@ -259,6 +347,10 @@ def step1_mask_filtering(depth_mm: np.ndarray, mask: np.ndarray) -> np.ndarray:
     nonzero_after = np.count_nonzero(masked_depth)
     print(f"  掩膜前有效深度像素: {nonzero_before:,}")
     print(f"  掩膜后有效深度像素: {nonzero_after:,} (减少了 {nonzero_before - nonzero_after:,})")
+    if foreground_pixels == 0:
+        raise ValueError("mask 中没有前景像素，无法生成目标点云。")
+    if nonzero_after == 0:
+        raise ValueError("mask 区域内没有有效深度，请检查 RGB-D 对齐、深度单位或 mask 位置。")
     print()
 
     return masked_depth
@@ -302,6 +394,12 @@ def step2_backprojection(
 
     print(f"  相机内参: fx={fx:.1f}, fy={fy:.1f}, cx={cx:.1f}, cy={cy:.1f}")
     print(f"  depth_scale = {depth_scale} (毫米→米)")
+
+    if rgb_image is not None and rgb_image.shape[:2] != masked_depth.shape:
+        raise ValueError(
+            f"RGB 尺寸 {rgb_image.shape[:2]} 与深度图尺寸 {masked_depth.shape} 不一致，"
+            "请先完成 RGB-D 对齐或不要给点云上色。"
+        )
 
     # ── 构造 Open3D 深度图像对象 ──
     depth_m = masked_depth.astype(np.float32) / depth_scale
@@ -435,6 +533,16 @@ def step4_denoise_and_downsample(
     print("=" * 60)
 
     before_all = len(pcd.points)
+    if before_all == 0:
+        print("  ⚠️ 输入点云为空，跳过统计滤波和体素降采样。")
+        empty = o3d.geometry.PointCloud()
+        return {
+            "statistical": empty,
+            "downsampled": empty,
+            "count_before": 0,
+            "count_after_stat": 0,
+            "count_after_voxel": 0,
+        }
 
     # ── (a) 先执行统计滤波（剔除离群飞点） ──
     print(f"\n  ┌─ (a) 统计滤波去噪 ──")
@@ -538,13 +646,20 @@ def run_syllabus_pipeline(
     按课堂大纲顺序执行完整的"掩膜→深度→点云"5 步流水线。
     返回每步的中间结果，方便课堂分析和调试。
     """
+    validate_filter_params(z_min, z_max, voxel_size, nb_neighbors, std_ratio)
+
     # ── 路径准备 ──
     rgb_path = os.path.join(demo_dir, "rgb.png")
     depth_path = os.path.join(demo_dir, "depth.png")
     mask_path = os.path.join(demo_dir, "mask.png")
     intrinsics_path = os.path.join(demo_dir, "intrinsics.json")
     output_dir = os.path.join(demo_dir, "output")
+    masked_depth_path = os.path.join(output_dir, "syllabus_masked_depth.png")
+    raw_pcd_path = os.path.join(output_dir, "syllabus_target_raw.pcd")
+    passthrough_pcd_path = os.path.join(output_dir, "syllabus_target_passthrough.pcd")
+    statistical_pcd_path = os.path.join(output_dir, "syllabus_target_statistical.pcd")
     output_pcd = os.path.join(output_dir, "syllabus_target_clean.pcd")
+    summary_path = os.path.join(output_dir, "syllabus_pipeline_summary.json")
     screenshots_dir = os.path.join(output_dir, "screenshots_syllabus")
     montage_path = os.path.join(screenshots_dir, "montage_2x2.png")
 
@@ -558,6 +673,7 @@ def run_syllabus_pipeline(
     mask = load_mask(mask_path, depth_mm.shape)
     intrinsics = load_intrinsics(intrinsics_path)
     depth_scale = float(intrinsics.get("depth_scale", 1000.0))
+    intrinsics_checked = validate_intrinsics(intrinsics, depth_mm.shape, depth_scale)
 
     rgb_image = None
     if os.path.exists(rgb_path):
@@ -572,12 +688,16 @@ def run_syllabus_pipeline(
 
     # ── 步骤 1：掩膜筛选 ──
     masked_depth = step1_mask_filtering(depth_mm, mask)
+    save_depth(masked_depth_path, masked_depth)
+    print(f"  掩膜筛选深度图已保存: {masked_depth_path}\n")
 
     # ── 步骤 2：反投影生成 ──
-    pcd_raw = step2_backprojection(masked_depth, intrinsics, depth_scale, rgb_image)
+    pcd_raw = step2_backprojection(masked_depth, intrinsics_checked, depth_scale, rgb_image)
+    o3d.io.write_point_cloud(raw_pcd_path, pcd_raw)
 
     # ── 步骤 3：空间粗裁（直通滤波） ──
     pcd_passthrough = step3_passthrough(pcd_raw, z_min=z_min, z_max=z_max)
+    o3d.io.write_point_cloud(passthrough_pcd_path, pcd_passthrough)
 
     # ── 步骤 4：精洗去噪（统计 + 体素） ──
     denoise_result = step4_denoise_and_downsample(
@@ -587,9 +707,58 @@ def run_syllabus_pipeline(
         voxel_size=voxel_size,
     )
     pcd_clean = denoise_result["downsampled"]
+    o3d.io.write_point_cloud(statistical_pcd_path, denoise_result["statistical"])
 
     # ── 步骤 5：目标点云提取与导出 ──
     step5_export(pcd_clean, output_pcd)
+
+    output_paths = {
+        "masked_depth": masked_depth_path,
+        "raw_pcd": raw_pcd_path,
+        "passthrough_pcd": passthrough_pcd_path,
+        "statistical_pcd": statistical_pcd_path,
+        "clean_pcd": output_pcd,
+        "summary_json": summary_path,
+        "screenshots_dir": screenshots_dir,
+        "montage_2x2": montage_path,
+    }
+
+    summary = {
+        "inputs": {
+            "rgb": rgb_path if os.path.exists(rgb_path) else None,
+            "depth": depth_path,
+            "mask": mask_path,
+            "intrinsics": intrinsics_path,
+        },
+        "parameters": {
+            "depth_scale": depth_scale,
+            "z_min": z_min,
+            "z_max": z_max,
+            "voxel_size": voxel_size,
+            "nb_neighbors": nb_neighbors,
+            "std_ratio": std_ratio,
+        },
+        "pixel_counts": {
+            "depth_total": int(depth_mm.size),
+            "mask_foreground": int(mask.sum()),
+            "depth_nonzero_before_mask": int(np.count_nonzero(depth_mm)),
+            "depth_nonzero_after_mask": int(np.count_nonzero(masked_depth)),
+        },
+        "point_clouds": {
+            "raw": summarize_point_cloud(pcd_raw),
+            "passthrough": summarize_point_cloud(pcd_passthrough),
+            "statistical": summarize_point_cloud(denoise_result["statistical"]),
+            "clean": summarize_point_cloud(pcd_clean),
+        },
+        "sanity_checks": {
+            "mask_depth_coverage": float(np.count_nonzero(masked_depth) / max(int(mask.sum()), 1)),
+            "clean_retention_from_raw": float(len(pcd_clean.points) / max(len(pcd_raw.points), 1)),
+            "rgb_depth_shape_aligned": bool(rgb_image is None or rgb_image.shape[:2] == depth_mm.shape),
+        },
+        "outputs": output_paths,
+    }
+    save_json(summary_path, summary)
+    print(f"  流水线摘要已保存: {summary_path}\n")
 
     # ── 保存各阶段截图 + 并排对比 + 2×2 拼图 ──
     if not skip_screenshots:
@@ -622,6 +791,8 @@ def run_syllabus_pipeline(
         "pcd_statistical": denoise_result["statistical"],
         "pcd_clean": pcd_clean,
         "output_pcd": output_pcd,
+        "output_paths": output_paths,
+        "summary_path": summary_path,
         "counts": {
             "raw": len(pcd_raw.points),
             "passthrough": len(pcd_passthrough.points),
@@ -689,6 +860,8 @@ def main():
     print(f"  ─────────────────────────────────────")
     print(f"  压缩率: {c['clean'] / max(c['raw'], 1) * 100:.2f}%")
     print(f"  最终输出: {result['output_pcd']}")
+    print(f"  阶段摘要: {result['summary_path']}")
+    print(f"  阶段截图: {result['output_paths']['screenshots_dir']}")
     print()
 
 

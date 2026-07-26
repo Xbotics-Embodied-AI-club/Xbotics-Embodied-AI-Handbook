@@ -16,10 +16,10 @@
 步骤 5 ── 目标点云提取：    导出最终 .pcd 文件，用于下一讲的位姿估计
 ```
 
-相比其他脚本，该脚本使用 **Open3D 内置 `create_from_depth_image()`** 进行反投影（大纲推荐方式），并使用 **numpy 数组切片** 做直通滤波，每步打印详细点数变化，适合课堂演示和学生自学。
+相比其他脚本，该脚本使用 **Open3D 内置 `create_from_depth_image()`** 进行反投影（大纲推荐方式），并使用 **numpy 数组切片** 做直通滤波。脚本会保存 masked depth、各阶段点云、阶段截图和 JSON 摘要，便于和教材中的图 6.8 至图 6.12 对照阅读。
 
 ```
-深度图 + 相机内参 ──→ 反投影为场景点云 ──→ 掩膜提取目标 ──→ 直通滤波 ──→ 体素降采样 ──→ 统计滤波去噪 ──→ 干净点云
+深度图 + mask + 相机内参 ──→ 掩膜筛选深度 ──→ 反投影目标点云 ──→ 直通滤波 ──→ 统计滤波去噪 ──→ 体素降采样 ──→ 干净点云
 ```
 
 ---
@@ -101,6 +101,13 @@ PointCloud_Sandbox.py                  (独立运行 - 滤波参数探索)
 | `output/screenshots/00_scene_raw.png` ~ `03_target_clean.png` | 各阶段截图 |
 | `output/screenshots/04_pipeline_comparison.png` | 四阶段并排对比图 |
 | `output/screenshots/05_pipeline_montage_2x2.png` | 四张截图 2×2 拼图 |
+| `output/syllabus_masked_depth.png` | 课堂 5 步法第 1 步输出：mask 筛选后的深度图 |
+| `output/syllabus_target_raw.pcd` | 课堂 5 步法第 2 步输出：反投影后的目标原始点云 |
+| `output/syllabus_target_passthrough.pcd` | 课堂 5 步法第 3 步输出：直通滤波后的目标点云 |
+| `output/syllabus_target_statistical.pcd` | 课堂 5 步法第 4 步中间输出：统计滤波后的目标点云 |
+| `output/syllabus_target_clean.pcd` | 课堂 5 步法第 5 步输出：最终清洗点云 |
+| `output/syllabus_pipeline_summary.json` | 课堂 5 步法运行摘要：输入路径、参数、像素统计、点数变化和 XYZ 范围 |
+| `output/screenshots_syllabus/` | 课堂 5 步法各阶段截图与 2×2 拼图 |
 
 ### 其他目录 / 文件
 
@@ -152,6 +159,26 @@ python pipeline_from_syllabus.py --demo-dir data/clutter_depth_demo --no-vis
 
 不带 `--no-vis` 会在最终弹出 3D 窗口显示清洗后的目标点云。
 
+### 7. 最小自检命令（推荐先跑）
+
+无头服务器或远程终端中，建议先跳过截图和窗口，只验证核心几何链路是否能跑通：
+
+```bash
+python pipeline_from_syllabus.py \
+  --demo-dir data/clutter_depth_demo \
+  --no-vis \
+  --skip-screenshots
+```
+
+成功后重点查看两个文件：
+
+| 文件 | 用途 |
+|---|---|
+| `data/clutter_depth_demo/output/syllabus_target_clean.pcd` | 第 4 讲/第 6 讲后续位姿估计可读取的目标点云 |
+| `data/clutter_depth_demo/output/syllabus_pipeline_summary.json` | 输入路径、相机内参、滤波参数、像素统计、各阶段点数和 XYZ 范围 |
+
+如果运行失败，优先根据报错检查三件事：`mask.png` 是否有前景、`depth.png` 在 mask 区域是否有有效深度、`intrinsics.json` 中的 `fx/fy/cx/cy/depth_scale` 是否与当前图像分辨率和单位一致。
+
 ---
 
 ## 数据流总览
@@ -202,6 +229,8 @@ python pipeline_from_syllabus.py --demo-dir data/clutter_depth_demo --no-vis
 | `voxel_size` | 0.01 m | 体素降采样：每个体素内只保留一个点，减少数据量 |
 | `nb_neighbors` | 20 | 统计滤波：检查每个点最近的 K 个邻居 |
 | `std_ratio` | 1.5 | 统计滤波：标准差倍数阈值，剔除离群飞点 |
+
+课堂 5 步法脚本会在启动时检查这些参数：`z_min` 必须小于 `z_max`，`voxel_size` 不能为负，`nb_neighbors` 至少为 1，`std_ratio` 必须为正数。这样可以避免参数写错后仍然生成一个看似正常、实际不可用的点云。
 
 ---
 

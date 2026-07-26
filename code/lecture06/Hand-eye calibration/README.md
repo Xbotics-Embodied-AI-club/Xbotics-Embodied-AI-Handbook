@@ -69,6 +69,74 @@ $$
    - Eye-to-Hand：检查恢复出的 `T_end_board` 是否近似恒定；
    - 用 `validate_hand_eye.py` 输出逐样本残差和最差样本。
 
+## 最小可运行自检
+
+如果还没有真实机器人和相机数据，可以先用合成样本验证代码链路。下面命令不会依赖外部硬件，适合确认 Python 环境、矩阵方向和 JSON 输出是否正常。
+
+### Eye-in-Hand 自检
+
+```bash
+cd "code/lecture06/Hand-eye calibration"
+
+python generate_synthetic_hand_eye_data.py \
+  --topology eye_in_hand \
+  --output-dir synthetic/eye_in_hand_case \
+  --sample-count 16 \
+  --noise-translation-mm 0.5 \
+  --noise-rotation-deg 0.2
+
+python inspect_hand_eye_dataset.py \
+  --topology eye_in_hand \
+  --robot-poses synthetic/eye_in_hand_case/robot_poses.json \
+  --camera-poses synthetic/eye_in_hand_case/camera_poses.json \
+  --report synthetic/eye_in_hand_case/inspect_report.json
+
+python calibrate_eye_in_hand.py \
+  --robot-poses synthetic/eye_in_hand_case/robot_poses.json \
+  --camera-poses synthetic/eye_in_hand_case/camera_poses.json \
+  --output synthetic/eye_in_hand_case/eye_in_hand.json \
+  --report-output synthetic/eye_in_hand_case/eye_in_hand_report.json
+
+python validate_hand_eye.py \
+  --transform synthetic/eye_in_hand_case/eye_in_hand.json \
+  --robot-poses synthetic/eye_in_hand_case/robot_poses.json \
+  --camera-poses synthetic/eye_in_hand_case/camera_poses.json \
+  --report synthetic/eye_in_hand_case/validation_report.json
+```
+
+### Eye-to-Hand 自检
+
+```bash
+cd "code/lecture06/Hand-eye calibration"
+
+python generate_synthetic_hand_eye_data.py \
+  --topology eye_to_hand \
+  --output-dir synthetic/eye_to_hand_case \
+  --sample-count 16 \
+  --noise-translation-mm 0.5 \
+  --noise-rotation-deg 0.2
+
+python inspect_hand_eye_dataset.py \
+  --topology eye_to_hand \
+  --robot-poses synthetic/eye_to_hand_case/robot_poses.json \
+  --camera-poses synthetic/eye_to_hand_case/camera_poses.json \
+  --report synthetic/eye_to_hand_case/inspect_report.json
+
+python calibrate_eye_to_hand.py \
+  --robot-poses synthetic/eye_to_hand_case/robot_poses.json \
+  --camera-poses synthetic/eye_to_hand_case/camera_poses.json \
+  --output synthetic/eye_to_hand_case/eye_to_hand.json \
+  --report-output synthetic/eye_to_hand_case/eye_to_hand_report.json
+
+python validate_hand_eye.py \
+  --transform synthetic/eye_to_hand_case/eye_to_hand.json \
+  --robot-poses synthetic/eye_to_hand_case/robot_poses.json \
+  --camera-poses synthetic/eye_to_hand_case/camera_poses.json \
+  --report synthetic/eye_to_hand_case/validation_report.json
+```
+
+`inspect`、`calibrate` 和 `validate` 的 JSON 报告都会包含 `pairing` 字段，用于检查机器人侧和相机侧样本是否按 `id` 成功配对；同时包含 `diagnostics` 字段，用于提示样本数量不足、平移/旋转激励不足或弱运动对过多等问题。真实标定时，建议先让 `inspect` 报告没有明显警告，再执行求解。
+
 ## 输入数据格式
 
 ### 机器人侧样本
@@ -214,6 +282,7 @@ python estimate_board_pose_aruco.py \
 ```bash
 cd "code/lecture06/Hand-eye calibration"
 python inspect_hand_eye_dataset.py \
+  --topology eye_in_hand \
   --robot-poses data/robot_poses.json \
   --camera-poses data/camera_poses.json \
   --report outputs/inspect_report.json
@@ -303,6 +372,13 @@ python generate_synthetic_hand_eye_data.py \
 - 最差样本；
 - 逐样本误差；
 - 参考固定变换（如 `T_base_board` 或 `T_end_board`）。
+
+数据检查脚本会根据 `--topology` 选择正确的相对运动构造方式：
+
+| 拓扑 | 检查时使用的机器人侧运动 | 检查目标 |
+|---|---|---|
+| `eye_in_hand` | `T_base_end` 的相对运动 | 判断末端运动与相机观测是否共同提供足够激励 |
+| `eye_to_hand` | `inv(T_base_end)` 的相对运动 | 判断固定相机拓扑下的 `AX=XB` 运动对是否充分 |
 
 ## 常见错误与排查建议
 

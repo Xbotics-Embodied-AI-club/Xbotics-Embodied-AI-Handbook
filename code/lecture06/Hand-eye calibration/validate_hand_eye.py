@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from common_transforms import (
+    build_pairing_report,
     invert_transform,
     load_pose_records,
     load_transform_from_file,
@@ -45,6 +46,7 @@ def main() -> None:
     transform_payload, T = load_transform_from_file(args.transform, matrix_key=args.transform_key)
     _, robot_records = load_pose_records(args.robot_poses, matrix_key=args.robot_matrix_key)
     _, camera_records = load_pose_records(args.camera_poses, matrix_key=args.camera_matrix_key)
+    pairing_report = build_pairing_report(robot_records, camera_records)
     sample_ids, robot_mats, camera_mats = pair_pose_records(robot_records, camera_records)
 
     topology = transform_payload.get("topology", "unknown")
@@ -66,6 +68,7 @@ def main() -> None:
         "transform_name": transform_payload.get("transform_name", "unknown"),
         "topology": topology,
         "sample_count": len(sample_ids),
+        "pairing": pairing_report,
         "validation_chain": chain,
         "derived_transform_name": derived_name,
         "residual_summary": constancy["summary"],
@@ -82,6 +85,10 @@ def main() -> None:
     print(f"  topology: {topology}")
     print(f"  chain: {chain}")
     print(f"  samples: {len(sample_ids)}")
+    if pairing_report["missing_in_camera"]:
+        print(f"  missing in camera: {pairing_report['missing_in_camera']}")
+    if pairing_report["missing_in_robot"]:
+        print(f"  missing in robot: {pairing_report['missing_in_robot']}")
     print(f"  mean translation residual: {report['residual_summary']['mean_translation_mm']:.3f} mm")
     print(f"  mean rotation residual: {report['residual_summary']['mean_rotation_deg']:.4f} deg")
     print(f"  worst translation sample: {report['worst_translation_sample']['id']}")

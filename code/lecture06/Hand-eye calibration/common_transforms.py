@@ -331,8 +331,29 @@ def pair_pose_records(
         camera_mats.append(camera_map[pose_id])
 
     if len(ids) < 3:
-        raise ValueError("配对后的有效样本数不足 3，无法做手眼标定。")
+        report = build_pairing_report(robot_records, camera_records)
+        raise ValueError(
+            "配对后的有效样本数不足 3，无法做手眼标定。"
+            f" paired={report['paired_count']}, "
+            f"missing_in_camera={report['missing_in_camera']}, "
+            f"missing_in_robot={report['missing_in_robot']}。"
+        )
     return ids, robot_mats, camera_mats
+
+
+def build_pairing_report(robot_records: Sequence[dict], camera_records: Sequence[dict]) -> dict:
+    """汇总机器人侧与相机侧样本配对情况。"""
+    robot_ids = {item["id"] for item in robot_records}
+    camera_ids = {item["id"] for item in camera_records}
+    paired_ids = sorted(robot_ids & camera_ids)
+    return {
+        "robot_count": int(len(robot_records)),
+        "camera_count": int(len(camera_records)),
+        "paired_count": int(len(paired_ids)),
+        "paired_ids": paired_ids,
+        "missing_in_camera": sorted(robot_ids - camera_ids),
+        "missing_in_robot": sorted(camera_ids - robot_ids),
+    }
 
 
 def build_relative_motion_pairs(
@@ -420,6 +441,39 @@ def find_weak_motion_pairs(
                 }
             )
     return flagged
+
+
+def diagnose_motion_dataset(
+    motion_summary: dict,
+    weak_motion_pair_count: int,
+    sample_count: int,
+    *,
+    min_rotation_deg: float = 5.0,
+    min_translation_mm: float = 5.0,
+) -> List[str]:
+    """根据样本数、相对运动范围和弱运动比例生成可读诊断建议。"""
+    pair_count = int(motion_summary.get("pair_count", 0))
+    warnings: List[str] = []
+
+    if sample_count < 8:
+        warnings.append("样本数偏少。教学演示可以运行，真实标定建议采集 15-30 组。")
+    if pair_count < 10:
+        warnings.append("相对运动对数量偏少，求解结果对单个异常样本会更敏感。")
+
+    if pair_count > 0 and weak_motion_pair_count / pair_count > 0.5:
+        warnings.append("超过一半相对运动对低于阈值，建议增加姿态变化更明显的样本。")
+
+    robot_rot_max = motion_summary["robot_rotation_deg"]["max"]
+    camera_rot_max = motion_summary["camera_rotation_deg"]["max"]
+    robot_trans_max = motion_summary["robot_translation_mm"]["max"]
+    camera_trans_max = motion_summary["camera_translation_mm"]["max"]
+
+    if robot_rot_max < 2.0 * min_rotation_deg or camera_rot_max < 2.0 * min_rotation_deg:
+        warnings.append("旋转激励不足：末端和标定板观测需要覆盖更明显的 roll/pitch/yaw 变化。")
+    if robot_trans_max < 2.0 * min_translation_mm or camera_trans_max < 2.0 * min_translation_mm:
+        warnings.append("平移激励不足：采样位置过于集中，建议覆盖更大的工作空间。")
+
+    return warnings
 
 
 def solve_hand_eye_park(motion_pairs: Sequence[dict]) -> Tuple[np.ndarray, dict]:

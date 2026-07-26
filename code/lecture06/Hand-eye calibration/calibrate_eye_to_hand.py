@@ -10,7 +10,9 @@ import cv2
 import numpy as np
 
 from common_transforms import (
+    build_pairing_report,
     build_relative_motion_pairs,
+    diagnose_motion_dataset,
     find_weak_motion_pairs,
     invert_transform,
     load_pose_records,
@@ -124,6 +126,7 @@ def main() -> None:
 
     _, robot_records = load_pose_records(args.robot_poses, matrix_key=args.robot_matrix_key)
     _, camera_records = load_pose_records(args.camera_poses, matrix_key=args.camera_matrix_key)
+    pairing_report = build_pairing_report(robot_records, camera_records)
     sample_ids, robot_mats, camera_mats = pair_pose_records(robot_records, camera_records)
 
     motion_pairs = build_motion_pairs_eye_to_hand(sample_ids, robot_mats, camera_mats)
@@ -133,6 +136,13 @@ def main() -> None:
         min_translation_mm=args.min_translation_mm,
     )
     motion_summary = summarize_motion_pairs(motion_pairs)
+    diagnostics = diagnose_motion_dataset(
+        motion_summary,
+        len(weak_pairs),
+        len(sample_ids),
+        min_rotation_deg=args.min_rotation_deg,
+        min_translation_mm=args.min_translation_mm,
+    )
 
     teaching_diagnostics = None
     if args.solver == "opencv":
@@ -149,12 +159,14 @@ def main() -> None:
         "robot_matrix_key": args.robot_matrix_key,
         "camera_matrix_key": args.camera_matrix_key,
         "kinematic_chain": "T_base_end · T_end_board = T_base_camera · T_cam_board",
+        "pairing": pairing_report,
         "motion_summary": motion_summary,
         "weak_motion_pair_count": len(weak_pairs),
         "weak_motion_threshold": {
             "min_rotation_deg": args.min_rotation_deg,
             "min_translation_mm": args.min_translation_mm,
         },
+        "diagnostics": diagnostics,
         "implied_T_end_board_reference": validation["reference_transform"],
     }
     if weak_pairs:
@@ -184,8 +196,10 @@ def main() -> None:
             "topology": "eye_to_hand",
             "solver": solver_name,
             "sample_ids": sample_ids,
+            "pairing": pairing_report,
             "motion_summary": motion_summary,
             "weak_motion_pairs": weak_pairs,
+            "diagnostics": diagnostics,
             "end_board_constancy": validation,
         }
         if teaching_diagnostics is not None:
@@ -197,6 +211,10 @@ def main() -> None:
     print(f"  samples: {len(sample_ids)}")
     print(f"  motion pairs: {len(motion_pairs)}")
     print(f"  weak motion pairs: {len(weak_pairs)}")
+    if diagnostics:
+        print("  diagnostics:")
+        for item in diagnostics:
+            print(f"    - {item}")
     print(f"  mean translation residual: {residual_summary['mean_translation_mm']:.3f} mm")
     print(f"  mean rotation residual: {residual_summary['mean_rotation_deg']:.4f} deg")
     print(f"  result saved to: {Path(args.output)}")
