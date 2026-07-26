@@ -109,7 +109,7 @@ def run_interactive_pipeline(source_type, output_dir, selector, segmenter,
 
 def parse_args():
     parser = argparse.ArgumentParser(description="交互式深度图/SAM2/点云提取统一入口")
-    default_demo_dir = os.path.join(os.path.dirname(__file__), "data", "clutter_depth_demo")
+    default_demo_dir = os.path.join(os.path.dirname(__file__), "data", "rgbd_object_demo")
 
     parser.add_argument("--source", choices=["file", "usb", "network"], default="file", help="输入源类型")
     parser.add_argument("--input-dir", default=default_demo_dir, help="文件输入源目录")

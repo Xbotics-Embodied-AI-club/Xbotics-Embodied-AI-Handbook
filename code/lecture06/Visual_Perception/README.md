@@ -57,7 +57,16 @@ PointCloud_Sandbox.py                  (独立运行 - 滤波参数探索)
 
 ### data/bunny/ —— 斯坦福兔子数据集（**纯输入**）
 
-原始扫描数据，来自 [Stanford Computer Graphics Laboratory](http://www-graphics.stanford.edu)。
+原始扫描数据来自 Stanford Computer Graphics Laboratory 的 Stanford 3D Scanning Repository：<https://graphics.stanford.edu/data/3Dscanrep/>。这是三维重建和点云处理领域的经典 Stanford Bunny 模型，常用于 Open3D / PCL / 图形学教学示例，并不是 OpenCV 专属数据。
+
+下载入口：
+
+```bash
+cd code/lecture06/Visual_Perception
+mkdir -p data
+curl -L -o data/bunny.tar.gz https://graphics.stanford.edu/pub/3Dscanrep/bunny.tar.gz
+tar -xzf data/bunny.tar.gz -C data
+```
 
 | 文件 | 类型 | 说明 |
 |------|------|------|
@@ -71,13 +80,24 @@ PointCloud_Sandbox.py                  (独立运行 - 滤波参数探索)
 | `data/bunny/reconstruction/bun_zipper_res2.ply` ~ `res4.ply` | 输入 | 降采样版重建网格（不同分辨率） |
 | `data/bunny/reconstruction/README` | 元数据 | 官方说明文档 |
 
-### data/clutter_depth_demo/ —— 杂乱桌面示例（**输入 + 输出混合**）
+### data/rgbd_object_demo/ —— UW RGB-D Object Dataset 示例（**输入 + 输出混合**）
 
-> ⚠️ 此目录为**程序合成**的演示数据，**不是从任何外部网站下载的**。
-> 它由项目作者预先制作，包含一个中心目标盒体、左侧杯状物、右侧书本、后方小盒子及桌面深度渐变。
-> 如需自己生成此类数据，可使用 Blender + Python 渲染深度图，或使用 RealSense 相机采集。
+> ⚠️ 此目录用于存放从公开数据集整理出的示例输入，通常不随 Git 提交二进制文件。
+> 推荐从 University of Washington RGB-D Object Dataset 下载 full 640×480 RGB-D 帧并转换成本目录格式。
+> 下载页：<https://rgbd-dataset.cs.washington.edu/dataset/rgbd-dataset_full/>。可选择 `coffee_mug_1.tar`、`food_box_1.tar`、`bowl_1.tar` 等对象实例包；解压后取同一帧的 RGB、`*_depth.png` 和 `*_depthmask.png` / `*_mask.png`，分别重命名为 `rgb.png`、`depth.png`、`mask.png`，再手写 `intrinsics.json`。
+> 也可以使用 `interactive_depth_pipeline.py` 的 USB / network 模式，或用 RealSense 等 RGB-D 相机采集自己的数据。
 
-用于演示"从杂乱场景中提取目标点云"的完整链路。
+最小下载示例：
+
+```bash
+cd code/lecture06/Visual_Perception
+mkdir -p data/raw_rgbd data/rgbd_object_demo
+curl -L -o data/raw_rgbd/coffee_mug_1.tar \
+  https://rgbd-dataset.cs.washington.edu/dataset/rgbd-dataset_full/coffee_mug_1.tar
+tar -xf data/raw_rgbd/coffee_mug_1.tar -C data/raw_rgbd
+```
+
+用于演示"从 RGB-D 深度图和目标掩膜中提取目标点云"的完整链路。
 
 #### 📥 输入数据
 
@@ -127,6 +147,20 @@ pip install numpy open3d Pillow opencv-python
 # SAM2 真实分割：pip install torch sam2
 ```
 
+如果默认镜像下载 `open3d` 失败，可以临时改用清华 PyPI 镜像：
+
+```bash
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple numpy open3d Pillow opencv-python
+# USB 相机模式：pip install -i https://pypi.tuna.tsinghua.edu.cn/simple pyrealsense2
+# SAM2 真实分割：pip install -i https://pypi.tuna.tsinghua.edu.cn/simple torch sam2
+```
+
+也可以把清华镜像设为当前 Python 环境的默认源：
+
+```bash
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
 ### 2. 运行 Open3D 点云预处理（教学示例 — 斯坦福兔子）
 
 ```bash
@@ -142,7 +176,7 @@ python DepthMask_PointCloud_Pipeline.py --no-vis
 ### 4. 运行交互式管道（单击/框选分割目标）
 
 ```bash
-python interactive_depth_pipeline.py --source file --input-dir data/clutter_depth_demo --output-dir data/clutter_depth_demo
+python interactive_depth_pipeline.py --source file --input-dir data/rgbd_object_demo --output-dir data/rgbd_object_demo
 ```
 
 ### 5. 运行交互式滤波沙盒
@@ -154,7 +188,7 @@ python PointCloud_Sandbox.py
 ### 6. 运行课堂 5 步法独立脚本
 
 ```bash
-python pipeline_from_syllabus.py --demo-dir data/clutter_depth_demo --no-vis
+python pipeline_from_syllabus.py --demo-dir data/rgbd_object_demo --no-vis
 ```
 
 不带 `--no-vis` 会在最终弹出 3D 窗口显示清洗后的目标点云。
@@ -165,7 +199,7 @@ python pipeline_from_syllabus.py --demo-dir data/clutter_depth_demo --no-vis
 
 ```bash
 python pipeline_from_syllabus.py \
-  --demo-dir data/clutter_depth_demo \
+  --demo-dir data/rgbd_object_demo \
   --no-vis \
   --skip-screenshots
 ```
@@ -174,8 +208,8 @@ python pipeline_from_syllabus.py \
 
 | 文件 | 用途 |
 |---|---|
-| `data/clutter_depth_demo/output/syllabus_target_clean.pcd` | 第 4 讲/第 6 讲后续位姿估计可读取的目标点云 |
-| `data/clutter_depth_demo/output/syllabus_pipeline_summary.json` | 输入路径、相机内参、滤波参数、像素统计、各阶段点数和 XYZ 范围 |
+| `data/rgbd_object_demo/output/syllabus_target_clean.pcd` | 第 4 讲/第 6 讲后续位姿估计可读取的目标点云 |
+| `data/rgbd_object_demo/output/syllabus_pipeline_summary.json` | 输入路径、相机内参、滤波参数、像素统计、各阶段点数和 XYZ 范围 |
 
 如果运行失败，优先根据报错检查三件事：`mask.png` 是否有前景、`depth.png` 在 mask 区域是否有有效深度、`intrinsics.json` 中的 `fx/fy/cx/cy/depth_scale` 是否与当前图像分辨率和单位一致。
 

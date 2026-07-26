@@ -46,3 +46,6 @@ _isaac_sim/
 
 # Xbotics-One 迁入的已发布权重（讲15 GRPO 结果，58MB，明确入库）
 !code/rl/2_grpo_posttraining/result/2_1_grpo_vlm_counting/adapter/adapter_model.safetensors
+
+code/lecture06/Visual_Perception/data
+code/lecture06/Hand-eye calibration/data

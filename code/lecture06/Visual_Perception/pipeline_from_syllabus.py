@@ -18,8 +18,8 @@
 #
 # 用法：
 #   python pipeline_from_syllabus.py
-#   python pipeline_from_syllabus.py --demo-dir data/clutter_depth_demo --no-vis
-#   python pipeline_from_syllabus.py --demo-dir data/clutter_depth_demo
+#   python pipeline_from_syllabus.py --demo-dir data/rgbd_object_demo --no-vis
+#   python pipeline_from_syllabus.py --demo-dir data/rgbd_object_demo
 #
 # 依赖：numpy, open3d, Pillow
 # ─────────────────────────────────────────────────────────────
@@ -811,7 +811,7 @@ def parse_args():
         description="课堂 5 步法：SAM 掩膜 → 深度图 → 干净目标点云"
     )
     default_demo = os.path.join(
-        os.path.dirname(__file__), "data", "clutter_depth_demo"
+        os.path.dirname(__file__), "data", "rgbd_object_demo"
     )
     parser.add_argument("--demo-dir", default=default_demo, help="示例数据目录")
     parser.add_argument("--z-min", type=float, default=0.20, help="直通滤波 Z 最小值（米）")

@@ -306,7 +306,7 @@ def run_depth_mask_pipeline(depth_array, mask_array, intrinsics, output_dir,
 
 def parse_args():
     parser = argparse.ArgumentParser(description="从深度图和掩膜生成目标干净点云")
-    default_demo_dir = os.path.join(os.path.dirname(__file__), "data", "clutter_depth_demo")
+    default_demo_dir = os.path.join(os.path.dirname(__file__), "data", "rgbd_object_demo")
 
     parser.add_argument("--demo-dir", default=default_demo_dir, help="示例数据目录")
     parser.add_argument("--z-min", type=float, default=0.20, help="直通滤波 Z 最小值（米）")

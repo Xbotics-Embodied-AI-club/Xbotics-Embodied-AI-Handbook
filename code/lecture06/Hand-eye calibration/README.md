@@ -22,6 +22,18 @@ $$
 - **最小 demo 脚本**：适合快速跑通求解与验证；
 - **教学支撑脚本**：适合展示 `AX=XB` 的逻辑、检查样本质量、补齐相机侧位姿生成环节。
 
+## 环境准备
+
+```bash
+pip install numpy opencv-python
+```
+
+如果默认镜像下载较慢或失败，可以临时使用清华 PyPI 镜像：
+
+```bash
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple numpy opencv-python
+```
+
 ## 目录说明
 
 | 文件 | 作用 |
@@ -34,6 +46,7 @@ $$
 | `inspect_hand_eye_dataset.py` | 数据集检查脚本，统计运动激励、弱样本、缺失样本 |
 | `solve_hand_eye_teaching.py` | 教学版透明求解器，显式展示 `AX=XB` 的求解逻辑 |
 | `generate_synthetic_hand_eye_data.py` | 合成样本生成器，便于课堂演示与回归测试 |
+| `pipeline_hand_eye_demo.py` | 一键教学流水线：生成合成样本、筛查、求解、验证并汇总输出 |
 
 ## 推荐实操流程
 
@@ -71,71 +84,72 @@ $$
 
 ## 最小可运行自检
 
-如果还没有真实机器人和相机数据，可以先用合成样本验证代码链路。下面命令不会依赖外部硬件，适合确认 Python 环境、矩阵方向和 JSON 输出是否正常。
+如果还没有真实机器人和相机数据，可以先用合成样本验证代码链路。下面命令不会依赖外部硬件，适合确认 Python 环境、矩阵方向和 JSON 输出是否正常。`pipeline_hand_eye_demo.py` 会依次完成：
+
+```text
+生成合成样本 → 样本配对与运动激励检查 → 求解固定外参 → 闭环一致性验证 → 输出 pipeline_summary.json
+```
 
 ### Eye-in-Hand 自检
 
 ```bash
 cd "code/lecture06/Hand-eye calibration"
 
-python generate_synthetic_hand_eye_data.py \
-  --topology eye_in_hand \
-  --output-dir synthetic/eye_in_hand_case \
-  --sample-count 16 \
-  --noise-translation-mm 0.5 \
-  --noise-rotation-deg 0.2
-
-python inspect_hand_eye_dataset.py \
-  --topology eye_in_hand \
-  --robot-poses synthetic/eye_in_hand_case/robot_poses.json \
-  --camera-poses synthetic/eye_in_hand_case/camera_poses.json \
-  --report synthetic/eye_in_hand_case/inspect_report.json
-
-python calibrate_eye_in_hand.py \
-  --robot-poses synthetic/eye_in_hand_case/robot_poses.json \
-  --camera-poses synthetic/eye_in_hand_case/camera_poses.json \
-  --output synthetic/eye_in_hand_case/eye_in_hand.json \
-  --report-output synthetic/eye_in_hand_case/eye_in_hand_report.json
-
-python validate_hand_eye.py \
-  --transform synthetic/eye_in_hand_case/eye_in_hand.json \
-  --robot-poses synthetic/eye_in_hand_case/robot_poses.json \
-  --camera-poses synthetic/eye_in_hand_case/camera_poses.json \
-  --report synthetic/eye_in_hand_case/validation_report.json
+python pipeline_hand_eye_demo.py --topology eye_in_hand
 ```
+
+默认输出目录为 `data/hand_eye_demo/eye_in_hand/`。核心结果是 `eye_in_hand.json`，其中的 `matrix` 字段就是 `T_end_camera`。
 
 ### Eye-to-Hand 自检
 
 ```bash
 cd "code/lecture06/Hand-eye calibration"
 
-python generate_synthetic_hand_eye_data.py \
-  --topology eye_to_hand \
-  --output-dir synthetic/eye_to_hand_case \
-  --sample-count 16 \
-  --noise-translation-mm 0.5 \
-  --noise-rotation-deg 0.2
-
-python inspect_hand_eye_dataset.py \
-  --topology eye_to_hand \
-  --robot-poses synthetic/eye_to_hand_case/robot_poses.json \
-  --camera-poses synthetic/eye_to_hand_case/camera_poses.json \
-  --report synthetic/eye_to_hand_case/inspect_report.json
-
-python calibrate_eye_to_hand.py \
-  --robot-poses synthetic/eye_to_hand_case/robot_poses.json \
-  --camera-poses synthetic/eye_to_hand_case/camera_poses.json \
-  --output synthetic/eye_to_hand_case/eye_to_hand.json \
-  --report-output synthetic/eye_to_hand_case/eye_to_hand_report.json
-
-python validate_hand_eye.py \
-  --transform synthetic/eye_to_hand_case/eye_to_hand.json \
-  --robot-poses synthetic/eye_to_hand_case/robot_poses.json \
-  --camera-poses synthetic/eye_to_hand_case/camera_poses.json \
-  --report synthetic/eye_to_hand_case/validation_report.json
+python pipeline_hand_eye_demo.py --topology eye_to_hand
 ```
 
-`inspect`、`calibrate` 和 `validate` 的 JSON 报告都会包含 `pairing` 字段，用于检查机器人侧和相机侧样本是否按 `id` 成功配对；同时包含 `diagnostics` 字段，用于提示样本数量不足、平移/旋转激励不足或弱运动对过多等问题。真实标定时，建议先让 `inspect` 报告没有明显警告，再执行求解。
+默认输出目录为 `data/hand_eye_demo/eye_to_hand/`。核心结果是 `eye_to_hand.json`，其中的 `matrix` 字段就是 `T_base_camera`。
+
+两个 demo 目录都会包含：
+
+| 文件 | 说明 |
+|---|---|
+| `robot_poses.json` | 合成机器人侧样本，字段为 `T_base_end` |
+| `camera_poses.json` | 合成相机侧样本，字段为 `T_cam_board` |
+| `ground_truth.json` | 合成数据使用的真实外参，仅用于教学自检 |
+| `inspect_report.json` | 样本配对、运动激励和弱运动对检查 |
+| `eye_in_hand.json` / `eye_to_hand.json` | 求解得到的手眼外参 |
+| `*_calibration_report.json` | 求解阶段详细报告 |
+| `validation_report.json` | 闭环一致性验证报告 |
+| `pipeline_summary.json` | 一键流水线摘要，包含残差和输出路径 |
+
+`inspect`、`calibrate` 和 `validate` 的 JSON 报告都会包含 `pairing` 字段，用于检查机器人侧和相机侧样本是否按 `id` 成功配对；同时包含 `diagnostics` 字段，用于提示样本数量不足、平移 / 旋转激励不足或弱运动对过多等问题。真实标定时，建议先让 `inspect` 报告没有明显警告，再执行求解。
+
+### 分步展开版
+
+一键脚本内部调用的仍是下面这些独立脚本。需要替换为真实数据时，可以保留 `inspect → calibrate → validate` 这个顺序，只把 `robot_poses.json` 和 `camera_poses.json` 换成实采文件。
+
+```bash
+cd "code/lecture06/Hand-eye calibration"
+
+python inspect_hand_eye_dataset.py \
+  --topology eye_in_hand \
+  --robot-poses data/hand_eye_demo/eye_in_hand/robot_poses.json \
+  --camera-poses data/hand_eye_demo/eye_in_hand/camera_poses.json \
+  --report data/hand_eye_demo/eye_in_hand/inspect_report.json
+
+python calibrate_eye_in_hand.py \
+  --robot-poses data/hand_eye_demo/eye_in_hand/robot_poses.json \
+  --camera-poses data/hand_eye_demo/eye_in_hand/camera_poses.json \
+  --output data/hand_eye_demo/eye_in_hand/eye_in_hand.json \
+  --report-output data/hand_eye_demo/eye_in_hand/eye_in_hand_calibration_report.json
+
+python validate_hand_eye.py \
+  --transform data/hand_eye_demo/eye_in_hand/eye_in_hand.json \
+  --robot-poses data/hand_eye_demo/eye_in_hand/robot_poses.json \
+  --camera-poses data/hand_eye_demo/eye_in_hand/camera_poses.json \
+  --report data/hand_eye_demo/eye_in_hand/validation_report.json
+```
 
 ## 输入数据格式
 
