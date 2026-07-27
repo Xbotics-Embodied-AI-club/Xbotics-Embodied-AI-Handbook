@@ -374,7 +374,7 @@ OpenVLA 的局限性也可以直接概括为四点：
 
 1. **时序建模能力有限**：原版 OpenVLA 只看单帧、只输出单步动作，不支持多帧历史和 action chunking。
 
-2. **控制频率有限**：7B 自回归解码带来的推理延迟较大，因此不适合高频闭环控制，也不直接支持双臂精细操作。
+2. **推理延迟大**：7B 自回归解码的单次推理延迟较高，重规划周期被拉长，因此不适合高频闭环控制，也不直接支持双臂精细操作。
 
 3. **存在灾难性遗忘**：只在机器人数据上微调会削弱原始 VLM 的语言与 VQA 能力。
 
@@ -392,10 +392,12 @@ OpenVLA 的局限性也可以直接概括为四点：
 
 | 问题 | 具体表现 |
 |------|----------|
-| 控制频率低 | 7B 自回归逐 token 解码，推理延迟大，难以支持 50Hz 高频控制 |
+| 推理延迟大 | 7B 模型逐 token 解码，单次推理延迟高、重规划周期长，难以支撑高频闭环 |
 | 动作离散化精度有限 | 256 bin 离散化引入量化误差，精细操作受限 |
 | 不支持 action chunking | 单步输出，无法一次规划多步连续动作 |
-| 多模态建模能力弱 | 自回归分类本质上是点预测，难以表达动作分布的多模态性 |
+| 部署时输出单一路径 | 用贪婪解码时输出退化成一条确定路径（自回归模型本身可以表示并采样多峰分布，见下方备注） |
+
+> 备注：**离散化会带来量化误差，逐 token 解码也会增加延迟**——这两条是实打实的代价。但"自回归分类是点预测"这个说法不准确：自回归分类定义的是一个条件概率分布，通过采样完全可以表达多模态。真正让输出变成单一路径的是**贪婪 / argmax 解码**这个部署选择，而不是自回归建模本身。
 
 上一讲我们介绍了 Flow Matching——一种比 Diffusion 更高效的连续生成方法，用确定性 ODE 替代随机 SDE，在常见设定下只需 5~10 步即可完成采样。$\pi_0$ 的核心思路就是：**把 Flow Matching 作为动作生成头，嫁接到预训练 VLM 上，同时引入专门的 Action Expert 来处理机器人特有的输入输出。**
 
@@ -404,7 +406,7 @@ OpenVLA 的局限性也可以直接概括为四点：
 $\pi_0$（读作 "pi-zero"）由 Physical Intelligence 提出，是一个通用机器人策略（generalist robot policy），也可以理解为一个机器人基础模型（robot foundation model）。它的设计目标是：
 
 1. **继承互联网规模的语义知识**：基于预训练 VLM（PaliGemma）初始化，获得物体识别、空间关系、语言理解等能力
-2. **支持高频精细控制**：通过 flow matching 生成连续 action chunk，支持 50Hz 控制频率
+2. **支持高频精细控制**：通过 flow matching 一次生成连续 action chunk，动作以最高 50 Hz 的频率**执行**（注意这是动作执行频率，不是模型每 20 ms 重新推理一次；四个频率概念的区分见 3.3.4）
 3. **跨机器人泛化**：单一模型同时支持单臂、双臂、移动操作等 7 种机器人构型
 4. **通过预训练/后训练范式获得鲁棒性**：类比 LLM 的 pre-training + post-training 流程
 
@@ -449,7 +451,7 @@ $$
 | $\mathbf{A}_t$ | 动作块（action chunk） | $H = 50$ 步 |
 | $\mathbf{a}_{t'}$ | 单步动作向量 | 最大 17 维 |
 
-关键设计：输出不是单步动作，而是一个包含 50 步未来动作的 action chunk。这使得模型可以一次规划约 1 秒的连续运动（50Hz 控制频率下），大幅减少推理调用次数。
+关键设计：输出不是单步动作，而是一个包含 50 步未来动作的 action chunk。这使得模型可以一次规划约 1 秒的连续运动（动作以 50 Hz 执行时），大幅减少推理调用次数。
 
 ### 3.2.3 Token 构成与路由
 
@@ -474,11 +476,13 @@ $\pi_0$ 使用分块因果注意力掩码（blockwise causal attention mask）�
 | 块 2 | $[\mathbf{q}_t]$ | — | 可以 attend 到块 1，不能 attend 到块 3 |
 | 块 3 | $[\mathbf{a}^\tau_t, \ldots, \mathbf{a}^\tau_{t+H-1}]$ | 全双向 | 可以 attend 到块 1、2 |
 
-这个设计有三个关键考量：
+这样分块带来三个效果（下面第 1、3 条是论文明确说明的动机，第 2 条属本书对实现的解读）：
 
 1. **块 1 不 attend 到块 2、3**：图像和语言 token 保持与 VLM 预训练时一致的注意力模式，最小化分布偏移
-2. **块 2 独立成块**：机器人状态 $\mathbf{q}_t$ 在 flow matching 的多步积分中不变，将其独立出来可以缓存其 key-value，避免重复计算
+2. **块 2 单独一块**：机器人状态 $\mathbf{q}_t$ 在 flow matching 的多步积分中不变，因此它和图像/语言一起构成"整段推理里不变的前缀"，可以缓存 key-value（3.2.5 会展开）。要说清的是，**KV 缓存成立的条件是"前缀内容在多步积分中不变"，而不是"状态必须单独成一块"**——把状态并进块 1 同样能缓存；单独成块主要是为了让状态既能看到图像/语言、又不被前缀双向影响
 3. **块 3 内部全双向**：所有动作 token 互相 attend，使得 action chunk 内部的动作可以相互协调
+
+> 备注：以上是本书按 3 个语义块给出的读法，方便理解可见性关系。真要照着实现，请直接对照官方代码里输入打包、`attention mask` 构造与 KV cache 三处的逻辑（LeRobot 的 `modeling_pi0.py`、openpi 的对应实现），逐 token 核对可见性矩阵——不同版本在块的划分粒度和掩码细节上可能与本节的简化描述不完全一致。
 
 上面的分块规则在实现里用一个很简洁的方式落地：给每个 token 标一个"组号"（沿序列对因果边界做累积和算出来——每遇到一个边界，组号加一），再规定 **token $i$ 能 attend token $j$，当且仅当 $j$ 的组号 $\le$ $i$ 的组号**。于是图像/语言（组 1）、机器人状态（组 2）、动作（组 3）就自动满足"动作能看前缀、状态只看自己、前缀看不到后面"的分块因果模式；再叠上 padding 掩码，就得到最终送进注意力的二维掩码矩阵。
 
@@ -490,7 +494,7 @@ $\pi_0$ 使用分块因果注意力掩码（blockwise causal attention mask）�
 
 自回归生成时，模型一个 token 一个 token 地往外吐。注意力里有个关键性质：因为有**因果掩码**，第 $i$ 个 token 的输出只依赖它自己的 query 和**前 $i$ 个 token 的 key / value**——后面还没生成的 token 不会影响它。也就是说，已经算过的那些 key / value，在后续每一步里都**原封不动**。既然不变，就没必要每生成一个新 token 都把整段历史重算一遍：把过去所有 token 的 key / value **缓存**起来，新 token 来了只算它自己这一列、再去 attend 缓存好的历史即可。这就是 KV 缓存——拿显存换计算，把自回归推理从"每步重算全程"降到"每步只算一个新 token"。
 
-回到 $\pi_0$：它的推理不是逐 token 自回归，而是 flow matching 的约 10 步 Euler 积分，但 KV 缓存的道理一样适用。前缀（图像、语言、机器人状态）在这 10 步里完全不变（这正是 3.2.4 把状态单独划成一块的原因），于是把**前缀的 key / value 只算一次、缓存起来**；之后每个去噪步只让小小的 Action Expert 处理动作 token、去 attend 缓存好的前缀 KV。结果是 3B 的 VLM 骨干整段推理只跑一次、300M 的 Action Expert 跑 10 次——这正是 $\pi_0$ 能把推理压到实时的关键。
+回到 $\pi_0$：它的推理不是逐 token 自回归，而是 flow matching 的约 10 步 Euler 积分，但 KV 缓存的道理一样适用。关键条件是**前缀（图像、语言、机器人状态）在这 10 步里完全不变**，于是把**前缀的 key / value 只算一次、缓存起来**；之后每个去噪步只让小小的 Action Expert 处理动作 token、去 attend 缓存好的前缀 KV。结果是 3B 的 VLM 骨干整段推理只跑一次、300M 的 Action Expert 跑 10 次——这正是 $\pi_0$ 能把推理压到实时的关键。
 
 ### 3.2.6 动作 Token 的编码：融合噪声动作与时间步
 
@@ -512,19 +516,21 @@ $$
 
 ### 3.2.7 Action Expert 的具体配置
 
-PaliGemma 基于 Gemma 2B 语言模型，其 Transformer 配置为：
+PaliGemma 基于 Gemma 2B 语言模型。下表两列分别是 VLM 骨干（`gemma_2b`）与 Action Expert（`gemma_300m`）的 Transformer 配置，数值取自官方实现的模型配置（LeRobot `lerobot/policies/pi0/modeling_pi0.py` 里的 `get_gemma_config`，与 openpi `gemma.py` 一致）：
 
-| 参数 | VLM 骨干（PaliGemma） | Action Expert |
+| 参数 | VLM 骨干（`gemma_2b`） | Action Expert（`gemma_300m`） |
 |------|----------------------|---------------|
 | width | 2048 | 1024 |
-| depth | 18 | 18 |
+| depth（层数） | 18 | 18 |
 | mlp_dim | 16,384 | 4,096 |
-| num_heads | 18 | 18 |
+| num_heads（注意力头数） | 8 | 8 |
 | num_kv_heads | 1 | 1 |
 | head_dim | 256 | 256 |
 | 参数量 | ~3B | ~300M |
 
-两个 expert 共享相同的 depth 和注意力结构（multi-query attention），但 Action Expert 的 width 和 mlp_dim 大幅缩小。这是因为 Action Expert 在推理时需要运行 10 次（每次 flow matching 积分步），缩小宽度可以显著降低推理延迟。
+注意 **depth 与 num_heads 是两个不同的量**：两者都是 18 层，但注意力头数是 8（$8 \times 256 = 2048$，正好等于骨干的 width；Action Expert 则用同样的 8 头 $\times$ 256 维投影到自己 1024 的 width 上）。`num_kv_heads = 1` 表示两者都用 multi-query attention。
+
+两个 expert 共享相同的 depth 和注意力结构，但 Action Expert 的 width 和 mlp_dim 大幅缩小。这是因为 Action Expert 在推理时需要运行 10 次（每次 flow matching 积分步），缩小宽度可以显著降低推理延迟。
 
 ## 3.3 Flow Matching 动作生成
 
@@ -538,11 +544,13 @@ $$
 
 其中上标 $\tau \in [0, 1]$ 表示 flow matching 时间步（不是机器人时间步），下标 $t$ 表示机器人时间步。
 
-使用线性高斯概率路径（也叫 optimal transport 路径）：
+使用线性高斯概率路径（论文中也称 optimal transport 路径；严格说只有端点按 OT 耦合配对时才是 OT 路径，见上一讲 5.3.1 的备注）：
 
 $$
-q(\mathbf{A}^\tau_t \mid \mathbf{A}_t) = \mathcal{N}(\tau \mathbf{A}_t,\; (1 - \tau) \mathbf{I})
+q(\mathbf{A}^\tau_t \mid \mathbf{A}_t) = \mathcal{N}\!\left(\tau \mathbf{A}_t,\; (1 - \tau)^2 \mathbf{I}\right)
 $$
+
+这里的方差写成 $(1-\tau)^2$ 才和下面的采样式自洽：若 $\epsilon \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$，则 $\mathbf{A}^\tau_t = \tau \mathbf{A}_t + (1-\tau)\epsilon$ 的条件协方差就是 $(1-\tau)^2 \mathbf{I}$。
 
 在实际训练中，具体操作为：
 
@@ -621,6 +629,17 @@ $\pi_0$ 使用 10 步积分（$\delta = 0.1$），从 $\tau = 0$ 积分到 $\tau
 - **50Hz 机器人**（其他平台）：执行 25 步后推理下一个 chunk（间隔 0.5 秒）
 
 论文尝试过时间集成（temporal ensembling，即对重叠 chunk 的动作做加权平均），但发现反而损害性能，因此采用开环执行——直接按顺序执行 chunk 中的动作，不做聚合。
+
+把上面两小节的数字放在一起，就能看清"50 Hz"到底指什么。谈 VLA 的实时性时，至少要把四个量分开，混在一起就会得出错误结论：
+
+| 量 | 含义 | $\pi_0$ 的对应值 |
+|---|---|---|
+| 动作执行频率（actuator rate） | 底层控制器多久消费一个动作 | 最高 50 Hz（即每 20 ms 出队一个动作） |
+| 动作块长度（action chunk length） | 一次推理生成多少步动作 | $H = 50$ 步（50 Hz 下约 1 秒） |
+| 模型推理延迟（inference latency） | 跑一次完整前向要多久 | 板载约 73 ms、离板约 86 ms（RTX 4090，见上表） |
+| 重规划周期（replan interval） | 多久重新感知并推理一次 | 20 Hz 平台约 0.8 s、50 Hz 平台约 0.5 s |
+
+所以"$\pi_0$ 支持 50 Hz 控制"这句话的准确含义是：**动作以 50 Hz 出队执行**，而大模型每 0.5 秒才重新看一眼、重新规划一次。它不等于每 20 ms 重新推理一次。后面 3.6.1 的横向对比、以及讲 13 讨论实时推理时，都沿用这套区分。
 
 ## 3.4 训练方案
 
@@ -711,8 +730,10 @@ $\pi_0$ 在 7 种不同的机器人构型上联合训练：
 | 动作表示 | 离散 token | 连续（diffusion） | 连续（CVAE） | 连续（diffusion） | 连续（flow matching） |
 | Action chunking | 不支持 | 支持 | 支持 | 支持 | 支持（$H=50$） |
 | VLM 预训练 | 是（Prismatic） | 否 | 否 | 否 | 是（PaliGemma） |
-| 控制频率 | ~5Hz | 低 | 中 | 中 | 最高 50Hz |
+| 动作执行频率（作者报告值） | 论文报告约 5 Hz | 论文未统一报告 | 依平台设定 | 依平台设定 | 最高 50 Hz |
 | 跨机器人 | 是 | 是 | 否 | 否 | 是（7 种构型） |
+
+> 备注（怎么读这张表）：**"动作执行频率"这一行不能当作速度优劣排序**。各论文的硬件、图像分辨率、动作块长度、控制接口和是否异步执行都不同，没有统一的测量口径；把它们排成"低 / 中 / 最高"会把不可比的数字读成高下之分。要严肃比较，应当逐模型列出：作者用的硬件、单次推理延迟、动作执行频率、重规划周期，以及该数字是不是作者实测（口径定义见 3.3.4）。本表只反映各作者在自己设置下报告的量级。
 
 ## 3.7 上手：跑一次 $\pi_0$ 推理
 
@@ -801,7 +822,7 @@ $$
 
 FAST（Frequency-space Action Sequence Tokenization）的核心思路是：**用基于压缩的 token 化方案替代逐维度分 bin，将高度冗余的动作信号压缩为少量高信息密度的 token。**
 
-类比自然语言处理：BPE（Byte Pair Encoding）将频繁出现的字符组合合并为新 token，从而缩小词表、提高信息密度。FAST 对动作信号做了类似的事情——先用 DCT 变换到频域去除冗余，再用 BPE 进一步压缩。
+类比自然语言处理：BPE（Byte Pair Encoding）从一个较小的初始符号集出发，不断把高频组合学成新 token、**扩充**可用 token 集合（最终词表大小是预先设定的），好处是让高频模式能用更短的 token 序列表示——收益在**缩短序列、提高压缩率**，不是"缩小词表"。FAST 对动作信号做了类似的事情——先用 DCT 变换到频域去除冗余，再用 BPE 进一步压缩。
 
 $$
 \underbrace{\text{Na\"ive: 逐维度分 bin}}_{\text{700 tokens/chunk (50Hz, 14-dim)}} \quad\longrightarrow\quad \underbrace{\text{FAST: DCT + BPE}}_{\text{~53 tokens/chunk}}
@@ -859,7 +880,7 @@ $$
 
 ### 4.2.5 BPE 压缩
 
-展平后的整数序列通常包含大量零值（对应被量化掉的高频分量）。BPE 编码器将频繁出现的整数组合合并为新 token，实现无损压缩：
+展平后的整数序列通常包含大量零值（对应被量化掉的高频分量）。BPE 编码器把频繁出现的整数组合学成新 token，用更短的序列无损地表示同样的内容：
 
 - 大量连续零值被压缩为少数 token
 - 跨动作维度的频繁系数组合被合并
@@ -1250,7 +1271,9 @@ VLA-0 用**受约束解码（grammar-constrained decoding）**解决：在生成
 
 直觉上，把动作塞进新造的 token（OpenVLA / $\pi_0$-FAST / VQ）或专用动作头，似乎更“专业”。但它们都有一个隐藏成本：**那些新 token 的 embedding、那个新动作头，都是随机初始化、从零学起的**，VLM 在预训练里积累的知识帮不上忙，得靠机器人数据硬训。
 
-VLA-0 反过来想：数字“128”“240”这些 token，VLM 在预训练里已经见过亿万次，对它们的语义和顺序关系早就很熟。**把动作落在模型已经懂的表示上，等于站在预训练的肩膀上**，自然更省数据、更稳。这也解释了为什么它不需要大规模机器人预训练就能打过那些需要预训练的方法。
+VLA-0 反过来想：数字“128”“240”这些 token，VLM 在预训练里已经见过无数次，词表和 embedding 都是现成的。**把动作落在模型已有的表示上，就不必从随机初始化开始学一批新的动作 token**——这是一种可能的解释，也是它不需要大规模机器人预训练也能打过部分需要预训练方法的候选原因之一。
+
+不过要留一句边界：从"预训练见过数字"到"机器人动作迁移得更好"这条因果链，并没有被单独的消融实验证明过。数字在动作序列里主要充当编码符号，未必在用它的自然语言语义；实际收益也可能同时来自受约束解码、离散化方案和整套训练配方。所以把它当作**假设**看，不要当作已证结论。
 
 ### 6.2.4 训练：就是一次普通的 SFT
 
@@ -1466,15 +1489,15 @@ $$
 \mathbf{A}_t^\tau = \tau \mathbf{A}_t + (1 - \tau) \epsilon
 $$
 
-模型学习预测向量场 $\mathbf{u}(\mathbf{A}_t^\tau \mid \mathbf{A}_t) = \epsilon - \mathbf{A}_t$，损失函数为：
+沿 $\tau$ 从 0 积到 1，这条路径的导数是 $\mathbf{A}_t - \epsilon$，所以模型要学的目标向量场是 $\mathbf{u}(\mathbf{A}_t^\tau \mid \mathbf{A}_t) = \mathbf{A}_t - \epsilon$（与 3.3.1 节 $\pi_0$ 的符号约定一致，都是"从噪声指向数据"），损失函数为：
 
 $$
-\mathcal{L}^\tau(\theta) = \mathbb{E}_{p(\mathbf{A}_t \mid \mathbf{o}_t), q(\mathbf{A}_t^\tau \mid \mathbf{A}_t)} \left[ \left\| \mathbf{v}_\theta(\mathbf{A}_t^\tau, \mathbf{o}_t) - (\epsilon - \mathbf{A}_t) \right\|^2 \right]
+\mathcal{L}^\tau(\theta) = \mathbb{E}_{p(\mathbf{A}_t \mid \mathbf{o}_t), q(\mathbf{A}_t^\tau \mid \mathbf{A}_t)} \left[ \left\| \mathbf{v}_\theta(\mathbf{A}_t^\tau, \mathbf{o}_t) - (\mathbf{A}_t - \epsilon) \right\|^2 \right]
 $$
 
-其中 $\mathbf{o}_t$ 是 VLM 第 $N$ 层输出的特征。推理时使用 10 步前向 Euler 积分生成动作。
+其中 $\mathbf{o}_t$ 是 VLM 第 $N$ 层输出的特征。推理时使用 10 步前向 Euler 积分生成动作——方向必须和训练时的向量场一致：$\tau$ 从 0 走到 1、速度指向数据，才能积分到动作而不是积回噪声。
 
-与回归损失（L1）相比，flow matching 在 LIBERO 上平均成功率高出 5%（80.25% vs 75.25%），说明 flow matching 对建模复杂多模态动作分布提供了更好的归纳偏置。
+在论文的这组消融里，flow matching 比 L1 回归在 LIBERO 上平均成功率高约 5 个百分点（80.25% vs 75.25%）；作者把它归因于生成式建模对多模态动作分布的表达能力。要注意单个消融只能说明该设置下成绩更高，优化、容量、损失尺度或超参差异都还没被排除，确切的因果机制仍需更多受控消融。
 
 #### （2）交替 Cross-Attention 和因果 Self-Attention
 
@@ -1570,7 +1593,8 @@ SmolVLA 借鉴 LLM 的训练范式，采用预训练 + 后训练的两阶段方�
 | VLM 状态 | 完全冻结 | 完全冻结 |
 | 训练对象 | 仅 Action Expert | 仅 Action Expert |
 | GPU | 4 块 GPU | 单块 GPU 即可 |
-| 总计算量 | ~30,000 GPU 小时 | — |
+
+> 备注：这里不给"总计算量"的数字。此前流传的"约 30,000 GPU 小时"与 SmolVLA 主打的"小模型、低成本"叙述、以及 4 卡跑 20 万步的常见墙钟量级严重不符（4 卡 30,000 GPU 小时意味着 7,500 小时墙钟，约十个月），极可能是单位或来源误抄。要引用算力，请回查论文附录或官方训练日志，并写成"GPU 型号 × 数量 × 墙钟小时"这种可核对的形式。
 
 关键设计：**VLM 在整个训练过程中完全冻结**，只训练 Action Expert。这与 $\pi_0$（微调 VLM 非语言部分）和 GR00T N1（微调视觉编码器和 DiT）不同，进一步降低了训练成本。
 
