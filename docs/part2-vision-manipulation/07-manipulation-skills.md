@@ -26,15 +26,29 @@ execute:
 
 - **方块任务**：把红色方块从 A 区抓起，放到 B 区；
 
-![方块任务现场：红色方块从 A 区放到 B 区](../../assets/figures/lecture07/fig-07-13-red-cube-task.png)
+- **瓶子任务**：保持瓶子竖直，从侧面水平夹住瓶身，再放进收纳盒。
+
+
+
+<table>
+<tr>
+<td width="50%" align="center">
+
+<img src="../../assets/figures/lecture07/fig-07-13-red-cube-task_.png" width="100%">
 
 图 7-0a 方块任务现场：夹爪对准红色方块，左侧红框为 A 区、右侧蓝框为 B 区
 
-- **瓶子任务**：保持瓶子竖直，从侧面水平夹住瓶身，再放进收纳盒。
+</td>
 
-![瓶子任务现场：侧向抓取后放入收纳盒](../../assets/figures/lecture07/fig-07-14-bottle-task.png)
+<td width="50%" align="center">
 
-图 7-0b 瓶子任务现场：桌面喷雾瓶与黑色收纳盒
+<img src="../../assets/figures/lecture07/fig-07-14-bottle-task_.png" width="100%">
+
+图 7-0b 瓶子任务现场：侧向抓取后放入收纳盒
+
+</td>
+</tr>
+</table>
 
 这一讲最终要完成的是：把一个目标物体位姿转换成预抓取、抓取、抬升、放置和退出位姿，用状态机把这些动作串起来，再根据夹爪、视觉和日志判断任务为什么成功或失败。
 
