@@ -26,13 +26,13 @@ execute:
 
 - **方块任务**：把红色方块从 A 区抓起，放到 B 区；
 
-![方块任务现场：红色方块从 A 区放到 B 区](part2_picture/Lecture7_picture/fig-07-13-red-cube-task.png)
+![方块任务现场：红色方块从 A 区放到 B 区](../../assets/figures/lecture07/fig-07-13-red-cube-task.png)
 
 图 7-0a 方块任务现场：夹爪对准红色方块，左侧红框为 A 区、右侧蓝框为 B 区
 
 - **瓶子任务**：保持瓶子竖直，从侧面水平夹住瓶身，再放进收纳盒。
 
-![瓶子任务现场：侧向抓取后放入收纳盒](part2_picture/Lecture7_picture/fig-07-14-bottle-task.png)
+![瓶子任务现场：侧向抓取后放入收纳盒](../../assets/figures/lecture07/fig-07-14-bottle-task.png)
 
 图 7-0b 瓶子任务现场：桌面喷雾瓶与黑色收纳盒
 
@@ -54,7 +54,7 @@ execute:
 
 因此，抓取不是“移动到一个点”，而是一个小型任务流程：先到安全位置，再靠近物体；夹住以后先抬一点验证；确认稳定后再搬运；放下以后还要退开，让相机看清结果。
 
-![从目标物体位姿到操作闭环](part2_picture/Lecture7_picture/fig-07-1-pose-to-skill-pipeline.png)
+![从目标物体位姿到操作闭环](../../assets/figures/lecture07/fig-07-1-pose-to-skill-pipeline.png)
 
 图 7-1 从目标物体位姿到操作闭环
 
@@ -99,7 +99,7 @@ execute:
 用 `object_pose_base` 表示目标物体在机器人基座坐标系中的位姿。它由三维位置和四元数姿态组成：
 
 $$
-\text{object\_pose\_base}=[x,\;y,\;z,\;q_x,\;q_y,\;q_z,\;q_w]
+object\_pose\_base=[x,\;y,\;z,\;q_x,\;q_y,\;q_z,\;q_w]
 $$
 
 | 符号 | 含义 |
@@ -114,7 +114,7 @@ $$
 
 抓取候选可以理解为一副虚拟夹爪：把它摆到物体附近，就能直观看出真实夹爪应该以什么位置和方向靠近。
 
-![六维抓取候选的任务化表示](part2_picture/Lecture7_picture/fig-07-2-6d-grasp-candidate.png)
+![六维抓取候选的任务化表示](../../assets/figures/lecture07/fig-07-2-6d-grasp-candidate.png)
 
 图 7-2 六维抓取候选的任务化表示
 
@@ -157,17 +157,17 @@ $$
 
 ### 预抓取位姿：给接近动作留出一段安全距离
 
-先定义三个量：$\mathbf{p}_g$ 是抓取位置，$\mathbf{a}$ 是从预抓取位置指向抓取位置的单位接近向量，$d_{pre}$ 是预抓取距离。预抓取位置 $\mathbf{p}_{pre}$ 为：
+先定义三个量：$p_g$ 是抓取位置，$a$ 是从预抓取位置指向抓取位置的单位接近向量，$d_{pre}$ 是预抓取距离。预抓取位置 $p_{pre}$ 为：
 
 $$
 \mathbf{p}_{pre}=\mathbf{p}_g-d_{pre}\mathbf{a}
 $$
 
-方块的 $\mathbf{a}$ 竖直向下，所以预抓取位姿在方块正上方；瓶子的 $\mathbf{a}$ 水平指向瓶身，所以预抓取位姿在瓶子侧面。
+方块的 $a$ 竖直向下，所以预抓取位姿在方块正上方；瓶子的 $a$ 水平指向瓶身，所以预抓取位姿在瓶子侧面。
 
 ### 抬升位姿：先证明“抓住了”，再开始搬运
 
-先定义 $h_{lift}$ 为抬升高度，$\mathbf{e}_z$ 为基座坐标系中竖直向上的单位向量。抬升位置为：
+先定义 $h_{lift}$ 为抬升高度，$e_z$ 为基座坐标系中竖直向上的单位向量。抬升位置为：
 
 $$
 \mathbf{p}_{lift}=\mathbf{p}_g+h_{lift}\mathbf{e}_z
@@ -179,11 +179,11 @@ $$
 
 放置位姿不是“夹爪已经离开”的位置。此时方块应当已经落在 B 区桌面上，瓶子应当已经进入收纳盒并获得底部支撑，但夹爪仍然保持闭合。确认物体受到支撑后，夹爪才打开，然后移动到退出位姿。
 
-![方块任务的五个关键位姿](part2_picture/Lecture7_picture/fig-07-3-cube-key-poses.png)
+![方块任务的五个关键位姿](../../assets/figures/lecture07/fig-07-3-cube-key-poses.png)
 
 图 7-3 方块任务的预抓取、抓取、抬升、放置与退出位姿
 
-![瓶子任务的五个关键位姿](part2_picture/Lecture7_picture/fig-07-4-bottle-side-grasp.png)
+![瓶子任务的五个关键位姿](../../assets/figures/lecture07/fig-07-4-bottle-side-grasp.png)
 
 图 7-4 竖直瓶子的水平抓取、抬升、入盒与退出
 
@@ -191,7 +191,7 @@ $$
 
 抓取候选生成以后，先排除一眼就不合理的方案。这里不求逆运动学，也不规划完整轨迹，只检查物体、夹爪和场景之间的几何关系。
 
-首先看夹爪宽度。定义 $w_{object}$ 为物体在夹持方向上的宽度，$w_{min}$ 和 $w_{max}$ 分别为夹爪能够稳定夹持的最小、最大宽度。候选至少应满足：
+首先看夹爪宽度。定义 $w_{object}$ 为物体在夹持方向上的宽度， $w_{min}$ 和 $w_{max}$ 分别为夹爪能够稳定夹持的最小、最大宽度。候选至少应满足：
 
 $$
 w_{min}\leq w_{object}\leq w_{max}
@@ -217,7 +217,7 @@ $$
 
 > **状态机不是动作播放列表。它是“做一步、看结果、再决定下一步”的执行规则。**
 
-![位姿驱动抓取—放置状态机](part2_picture/Lecture7_picture/fig-07-5-pick-place-state-machine.png)
+![位姿驱动抓取—放置状态机](../../assets/figures/lecture07/fig-07-5-pick-place-state-machine.png)
 
 图 7-5 位姿驱动抓取—放置状态机及失败诊断路径
 
@@ -248,7 +248,7 @@ $$
 
 预抓取位姿允许机械臂从当前姿态进行较大范围运动。此时夹爪还没有进入物体附近，因此可以使用正常速度的轨迹控制或运动规划。
 
-到位判断不能只看“命令发出去了”。先定义位置误差 $e_p$、姿态误差 $e_R$，以及各自允许上限 $\varepsilon_p$、$\varepsilon_R$。只有同时满足
+到位判断不能只看“命令发出去了”。先定义位置误差 $e_p$、姿态误差 $e_R$，以及各自允许上限 $\varepsilon_p$、 $\varepsilon_R$。只有同时满足
 
 $$
 e_p\leq\varepsilon_p,\qquad e_R\leq\varepsilon_R
@@ -329,7 +329,7 @@ $$
 
 成功检测必须跟着任务阶段走。抓取后看有没有形成夹持，抬升后看物体是否离桌，释放后看物体是否稳定留在目标区域。
 
-![抓取、抬升与放置的分阶段检测链路](part2_picture/Lecture7_picture/fig-07-6-success-checks.png)
+![抓取、抬升与放置的分阶段检测链路](../../assets/figures/lecture07/fig-07-6-success-checks.png)
 
 图 7-6 抓取、抬升与放置的分阶段成功检测链路
 
@@ -384,7 +384,7 @@ $$
 
 更有效的做法是先找**最早出现异常的状态**。后面看到的现象往往只是前面问题的结果。方块在抬升时掉落，原因可能是抓取点偏离重心；瓶子在收纳盒外倾倒，也可能是搬运途中已经下滑，而不是放置位姿本身错误。
 
-![按失败阶段组织的原因定位与恢复路径](part2_picture/Lecture7_picture/fig-07-7-failure-recovery.png)
+![按失败阶段组织的原因定位与恢复路径](../../assets/figures/lecture07/fig-07-7-failure-recovery.png)
 
 图 7-7 按失败阶段组织的失败定位与恢复路径
 
@@ -456,13 +456,13 @@ $$
 
 实战从规则方块开始。红色方块初始位于 A 区，机械臂采用自上而下的竖直抓取，将方块抬离桌面后搬运至 B 区。该任务用于验证动作位姿、状态机顺序、夹爪闭合和区域检测是否正确。
 
-![](part2_picture/Lecture7_picture/fig-07-8-cube-key-poses-demo.png)
+![](../../assets/figures/lecture07/fig-07-8-cube-key-poses-demo.png)
 
 **图 7-9 方块从 A 区搬运至 B 区的五个关键位姿**
 
 瓶子任务保持瓶体竖直，夹爪从侧面水平接近并夹持瓶身中部。机械臂将瓶子垂直抬升，移动至收纳盒上方，下降后释放。该任务增加了侧向接近、易滑落物体和容器边缘碰撞等工程问题。
 
-![](part2_picture/Lecture7_picture/fig-07-9-bottle-demo.png)
+![](../../assets/figures/lecture07/fig-07-9-bottle-demo.png)
 
 **图 7-10 竖直瓶子的水平抓取与入盒流程**
 
@@ -479,7 +479,7 @@ $$
 
 无硬件实验采用两级替代方案。教学模拟后端不依赖机器人软件，可直接验证任务配置、状态机、检测、恢复和日志是否正确。ManiSkill 后端进一步提供动力学、碰撞、相机观测和视频录制，用于观察动作在仿真环境中的实际结果。
 
-![](part2_picture/Lecture7_picture/fig-07-10-software-architecture.png)
+![](../../assets/figures/lecture07/fig-07-10-software-architecture.png)
 
 **图 7-8 真机、仿真与教学模拟共享的实验软件架构**
 
@@ -1032,7 +1032,7 @@ print(env.action_space)
 
 实验结果需要同时保留空间、时间和任务三个层面的证据。空间层面显示目标物体位姿、六个动作位姿和机械臂末端轨迹；时间层面显示状态机进入与退出时刻、夹爪命令和检测结果；任务层面统计成功率、耗时、重试次数和失败类型。
 
-![](part2_picture/Lecture7_picture/fig-07-11-log-to-report.png)
+![](../../assets/figures/lecture07/fig-07-11-log-to-report.png)
 
 **图 7-11 从运行日志到实验报告和数据回流的处理链路**
 
@@ -1159,7 +1159,7 @@ AI 适合帮助梳理概念、检查代码和提出可能原因，但它看不�
 
 答案现在很清楚。物体位姿只是空间起点，真正的操作技能还需要抓取关系、动作位姿、执行顺序、成功检测和失败处理。方块从 A 区到 B 区、瓶子进入收纳盒，表面上是两个任务，背后用的是同一条闭环。
 
-![从目标位姿到真实操作闭环](part2_picture/Lecture7_picture/fig-07-12-closed-loop-summary.png)
+![从目标位姿到真实操作闭环](../../assets/figures/lecture07/fig-07-12-closed-loop-summary.png)
 
 图 7-12 从目标位姿到真实操作闭环
 
