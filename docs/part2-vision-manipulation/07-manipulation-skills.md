@@ -36,7 +36,7 @@ execute:
 
 <img src="../../assets/figures/lecture07/fig-07-13-red-cube-task_.png" width="100%">
 
-图 7-0a 方块任务现场：夹爪对准红色方块，左侧红框为 A 区、右侧蓝框为 B 区
+图 7-0a 方块任务：夹爪对准红色方块，左侧红框为 A 区、右侧蓝框为 B 区
 
 </td>
 
@@ -44,7 +44,7 @@ execute:
 
 <img src="../../assets/figures/lecture07/fig-07-14-bottle-task_.png" width="100%">
 
-图 7-0b 瓶子任务现场：侧向抓取后放入收纳盒
+图 7-0b 瓶子任务：侧向抓取后放入收纳盒
 
 </td>
 </tr>
@@ -68,7 +68,7 @@ execute:
 
 因此，抓取不是“移动到一个点”，而是一个小型任务流程：先到安全位置，再靠近物体；夹住以后先抬一点验证；确认稳定后再搬运；放下以后还要退开，让相机看清结果。
 
-![从目标物体位姿到操作闭环](../../assets/figures/lecture07/fig-07-1-pose-to-skill-pipeline.png)
+![从目标物体位姿到操作闭环](../../assets/figures/lecture07/fig-07-1-pose-to-skill-pipeline_song.png)
 
 图 7-1 从目标物体位姿到操作闭环
 
@@ -128,7 +128,7 @@ execute:
 
 抓取候选可以理解为一副虚拟夹爪：把它摆到物体附近，就能直观看出真实夹爪应该以什么位置和方向靠近。
 
-![六维抓取候选的任务化表示](../../assets/figures/lecture07/fig-07-2-6d-grasp-candidate.png)
+![六维抓取候选的任务化表示](../../assets/figures/lecture07/fig-07-2-6d-grasp-candidate_song.png)
 
 图 7-2 六维抓取候选的任务化表示
 
@@ -184,7 +184,7 @@ G=\{\mathbf{t},\mathbf{R},w,d,s\}
 先定义 $h_{lift}$ 为抬升高度， $e_z$ 为基座坐标系中竖直向上的单位向量。抬升位置为：
 
 ```math
-\mathbf{p}_{lift}=\mathbf{p}_g+h_{lift}\mathbf{e}_z
+\mathbf{p}_{lift}=\mathbf{p}_{pre}+h_{lift}\mathbf{e}_z
 ```
 
 方块和瓶子虽然抓取方向不同，但抬升都沿竖直方向进行。原因很简单：先把物体从桌面和周围障碍物中“拔出来”，再做大范围水平搬运，碰撞风险更低。
@@ -231,7 +231,7 @@ $$
 
 > **状态机不是动作播放列表。它是“做一步、看结果、再决定下一步”的执行规则。**
 
-![位姿驱动抓取—放置状态机](../../assets/figures/lecture07/fig-07-5-pick-place-state-machine.png)
+![位姿驱动抓取—放置状态机](../../assets/figures/lecture07/fig-07-5-pick-place-state-machine_song.png)
 
 图 7-5 位姿驱动抓取—放置状态机及失败诊断路径
 
@@ -343,7 +343,7 @@ $$
 
 成功检测必须跟着任务阶段走。抓取后看有没有形成夹持，抬升后看物体是否离桌，释放后看物体是否稳定留在目标区域。
 
-![抓取、抬升与放置的分阶段检测链路](../../assets/figures/lecture07/fig-07-6-success-checks.png)
+![抓取、抬升与放置的分阶段检测链路](../../assets/figures/lecture07/fig-07-6-success-checks_song.png)
 
 图 7-6 抓取、抬升与放置的分阶段成功检测链路
 
@@ -398,7 +398,7 @@ $$
 
 更有效的做法是先找**最早出现异常的状态**。后面看到的现象往往只是前面问题的结果。方块在抬升时掉落，原因可能是抓取点偏离重心；瓶子在收纳盒外倾倒，也可能是搬运途中已经下滑，而不是放置位姿本身错误。
 
-![按失败阶段组织的原因定位与恢复路径](../../assets/figures/lecture07/fig-07-7-failure-recovery.png)
+![按失败阶段组织的原因定位与恢复路径](../../assets/figures/lecture07/fig-07-7-failure-recovery_song.png)
 
 图 7-7 按失败阶段组织的失败定位与恢复路径
 
@@ -472,13 +472,13 @@ $$
 
 ![](../../assets/figures/lecture07/fig-07-8-cube-key-poses-demo.png)
 
-**图 7-9 方块从 A 区搬运至 B 区的五个关键位姿**
+**图 7-8 方块从 A 区搬运至 B 区的五个关键位姿**
 
 瓶子任务保持瓶体竖直，夹爪从侧面水平接近并夹持瓶身中部。机械臂将瓶子垂直抬升，移动至收纳盒上方，下降后释放。该任务增加了侧向接近、易滑落物体和容器边缘碰撞等工程问题。
 
 ![](../../assets/figures/lecture07/fig-07-9-bottle-demo.png)
 
-**图 7-10 竖直瓶子的水平抓取与入盒流程**
+**图 7-9 竖直瓶子的水平抓取与入盒流程**
 
 **表 7-23 两个实战任务的输入、动作与成功条件**
 
@@ -493,9 +493,9 @@ $$
 
 无硬件实验采用两级替代方案。教学模拟后端不依赖机器人软件，可直接验证任务配置、状态机、检测、恢复和日志是否正确。ManiSkill 后端进一步提供动力学、碰撞、相机观测和视频录制，用于观察动作在仿真环境中的实际结果。
 
-![](../../assets/figures/lecture07/fig-07-10-software-architecture.png)
+![](../../assets/figures/lecture07/fig-07-10-software-architecture_song.png)
 
-**图 7-8 真机、仿真与教学模拟共享的实验软件架构**
+**图 7-10 真机、仿真与教学模拟共享的实验软件架构**
 
 项目按职责拆分为若干 Python 模块。状态机只调用统一的后端接口，不直接操作串口、仿真器或规划器。这样可以在不修改任务逻辑的前提下切换运行平台，也便于单独测试每个模块。
 
@@ -1046,7 +1046,7 @@ print(env.action_space)
 
 实验结果需要同时保留空间、时间和任务三个层面的证据。空间层面显示目标物体位姿、六个动作位姿和机械臂末端轨迹；时间层面显示状态机进入与退出时刻、夹爪命令和检测结果；任务层面统计成功率、耗时、重试次数和失败类型。
 
-![](../../assets/figures/lecture07/fig-07-11-log-to-report.png)
+![](../../assets/figures/lecture07/fig-07-11-log-to-report_song.png)
 
 **图 7-11 从运行日志到实验报告和数据回流的处理链路**
 
@@ -1173,7 +1173,7 @@ AI 适合帮助梳理概念、检查代码和提出可能原因，但它看不�
 
 答案现在很清楚。物体位姿只是空间起点，真正的操作技能还需要抓取关系、动作位姿、执行顺序、成功检测和失败处理。方块从 A 区到 B 区、瓶子进入收纳盒，表面上是两个任务，背后用的是同一条闭环。
 
-![从目标位姿到真实操作闭环](../../assets/figures/lecture07/fig-07-12-closed-loop-summary.png)
+![从目标位姿到真实操作闭环](../../assets/figures/lecture07/fig-07-12-closed-loop-summary_song.png)
 
 图 7-12 从目标位姿到真实操作闭环
 
