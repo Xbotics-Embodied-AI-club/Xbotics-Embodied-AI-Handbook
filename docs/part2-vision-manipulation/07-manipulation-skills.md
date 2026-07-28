@@ -99,7 +99,7 @@ execute:
 用 `object_pose_base` 表示目标物体在机器人基座坐标系中的位姿。它由三维位置和四元数姿态组成：
 
 $$
-object\_pose\_base=[x, y, z, q_x, q_y, q_z, q_w]
+\mathrm{object\_pose\_base}=[x,y,z,q_x,q_y,q_z,q_w]
 $$
 
 | 符号 | 含义 |
@@ -120,9 +120,9 @@ $$
 
 参考 GraspNet 的六维抓取格式，本讲把一次抓取写成以下几个量：
 
-$$
-G= \{ \mathbf{t}, \mathbf{R}, w, d, s \}
-$$
+```math
+G=\{\mathbf{t},\mathbf{R},w,d,s\}
+```
 
 | 符号 | 含义 | 在程序中的作用 |
 |---|---|---|
