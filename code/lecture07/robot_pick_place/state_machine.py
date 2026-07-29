@@ -95,12 +95,7 @@ class PickPlaceStateMachine:
         ):
             return self._fail(FailureCode.LIFT_FAILED, "lift check failed")
 
-        self._enter(State.MOVE_PRE_PLACE)
-        result = self.backend.move_pose(targets.pre_place, self.task.fast_speed)
-        if not result.success:
-            return self._fail(FailureCode.MOTION_FAILED, result.reason)
-
-        self._enter(State.LOWER_PLACE)
+        self._enter(State.MOVE_PLACE)
         result = self.backend.move_pose(targets.place, self.task.slow_speed)
         if not result.success:
             return self._fail(FailureCode.PLACE_FAILED, result.reason)

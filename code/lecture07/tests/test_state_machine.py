@@ -49,6 +49,28 @@ class StateMachineTest(unittest.TestCase):
     def test_bottle_task_succeeds(self) -> None:
         success, records = self._run_task("bottle")
         self.assertTrue(success)
+        entered_states = [
+            record.get("state")
+            for record in records
+            if record.get("event") == "enter"
+        ]
+        self.assertEqual(
+            entered_states,
+            [
+                "INIT",
+                "MOVE_PRE_GRASP",
+                "APPROACH",
+                "CLOSE_GRIPPER",
+                "VERIFY_GRASP",
+                "LIFT",
+                "VERIFY_LIFT",
+                "MOVE_PLACE",
+                "OPEN_GRIPPER",
+                "VERIFY_PLACE",
+                "RETREAT",
+                "DONE",
+            ],
+        )
         self.assertTrue(any(record.get("state") == "VERIFY_PLACE" for record in records))
 
     def test_permanent_failure_enters_safe_exit(self) -> None:

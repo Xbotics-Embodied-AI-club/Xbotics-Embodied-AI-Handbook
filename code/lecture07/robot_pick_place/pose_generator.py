@@ -13,7 +13,7 @@ def _normalize(vector: tuple[float, float, float]) -> tuple[float, float, float]
 
 
 def generate_targets(task: TaskConfig) -> ActionTargets:
-    """Generate the six key poses from the object and place poses."""
+    """Generate the five key poses from the object and place poses."""
 
     ax, ay, az = _normalize(task.approach_direction)
     ox, oy, oz = task.grasp_offset
@@ -44,14 +44,12 @@ def generate_targets(task: TaskConfig) -> ActionTargets:
         qz,
         qw,
     )
-    pre_place = place.shifted(0.0, 0.0, task.place_clearance)
     retreat = place.shifted(0.0, 0.0, task.retreat_height)
 
     return ActionTargets(
         pre_grasp=pre_grasp,
         grasp=grasp,
         lift=lift,
-        pre_place=pre_place,
         place=place,
         retreat=retreat,
     )

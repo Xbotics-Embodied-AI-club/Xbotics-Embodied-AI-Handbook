@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import unittest
+from dataclasses import fields
 
 from robot_pick_place.config import bottle_task, cube_task
+from robot_pick_place.models import ActionTargets
 from robot_pick_place.pose_generator import generate_targets
 
 
 class PoseGeneratorTest(unittest.TestCase):
+    def test_action_targets_contains_five_key_poses(self) -> None:
+        self.assertEqual(
+            [field.name for field in fields(ActionTargets)],
+            ["pre_grasp", "grasp", "lift", "place", "retreat"],
+        )
+
     def test_cube_pre_grasp_is_above_grasp(self) -> None:
         task = cube_task()
         targets = generate_targets(task)

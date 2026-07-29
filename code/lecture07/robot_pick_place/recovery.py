@@ -34,7 +34,7 @@ def adjust_task(
     if failure is FailureCode.PLACE_FAILED:
         return replace(
             task,
-            place_clearance=task.place_clearance + 0.02,
+            place_pose=task.place_pose.shifted(0.0, 0.0, 0.01),
             retreat_height=task.retreat_height + 0.02,
         )
 

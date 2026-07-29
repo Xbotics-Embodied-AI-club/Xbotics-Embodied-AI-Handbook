@@ -45,7 +45,6 @@ class ActionTargets:
     pre_grasp: Pose
     grasp: Pose
     lift: Pose
-    pre_place: Pose
     place: Pose
     retreat: Pose
 
@@ -60,7 +59,6 @@ class TaskConfig:
     grasp_offset: tuple[float, float, float]
     pre_grasp_distance: float
     lift_height: float
-    place_clearance: float
     retreat_height: float
     gripper_open_width: float
     gripper_close_width: float
@@ -99,8 +97,7 @@ class State(Enum):
     VERIFY_GRASP = auto()
     LIFT = auto()
     VERIFY_LIFT = auto()
-    MOVE_PRE_PLACE = auto()
-    LOWER_PLACE = auto()
+    MOVE_PLACE = auto()
     OPEN_GRIPPER = auto()
     VERIFY_PLACE = auto()
     RETREAT = auto()
