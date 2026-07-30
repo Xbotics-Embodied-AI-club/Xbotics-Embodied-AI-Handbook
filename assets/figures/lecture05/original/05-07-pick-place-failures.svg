@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#1F6FEB"/>
+    </marker>
+    <marker id="arrow-dark" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#55738E"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#123B64" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      text { font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; fill: #172B3A; }
+      .title { font-size: 42px; font-weight: 700; letter-spacing: 1px; }
+      .subtitle { font-size: 21px; fill: #5B6B7A; }
+      .h { font-size: 27px; font-weight: 700; }
+      .m { font-size: 23px; font-weight: 600; }
+      .b { font-size: 20px; }
+      .s { font-size: 17px; fill: #5B6B7A; }
+      .mono { font-family: "SFMono-Regular", Consolas, monospace; font-size: 18px; }
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="18" height="900" fill="#1F6FEB"/>
+  <text x="70" y="72" class="title">Pick-place：四种看似相近、机制不同的失败</text>
+  <text x="72" y="108" class="subtitle">先识别症状，再定位契约断点；不要把“接触数量”当作稳定抓取</text>
+  <line x1="70" y1="130" x2="1530" y2="130" stroke="#A9BED1" stroke-width="2"/><rect x="70" y="190" width="320" height="500" rx="26" fill="#F6FAFF" stroke="#1F6FEB" stroke-width="3" filter="url(#shadow)"/><circle cx="128" cy="248" r="34" fill="#1F6FEB"/><text x="128" y="257" class="m" text-anchor="middle" style="fill:#FFFFFF">01</text><text x="180" y="258" class="h">抓空</text><rect x="184" y="390" width="92" height="92" rx="12" fill="#EAF3FF" stroke="#123B64" stroke-width="4"/><rect x="118" y="348" width="38" height="150" rx="12" fill="#FFFFFF" stroke="#55738E" stroke-width="6"/><rect x="304" y="348" width="38" height="150" rx="12" fill="#FFFFFF" stroke="#55738E" stroke-width="6"/><line x1="162" y1="440" x2="178" y2="440" stroke="#C94B4B" stroke-width="7" stroke-dasharray="8 8"/><line x1="282" y1="440" x2="298" y2="440" stroke="#C94B4B" stroke-width="7" stroke-dasharray="8 8"/><text x="102" y="590" class="b" text-anchor="start"><tspan x="102" dy="0">双指未形成对向接触</tspan><tspan x="102" dy="35">先查预抓取位姿与几何</tspan></text><rect x="450" y="190" width="320" height="500" rx="26" fill="#FFFFFF" stroke="#55738E" stroke-width="3" filter="url(#shadow)"/><circle cx="508" cy="248" r="34" fill="#123B64"/><text x="508" y="257" class="m" text-anchor="middle" style="fill:#FFFFFF">02</text><text x="560" y="258" class="h">抬升滑脱</text><rect x="564" y="390" width="92" height="92" rx="12" fill="#EAF3FF" stroke="#123B64" stroke-width="4"/><rect x="498" y="348" width="38" height="150" rx="12" fill="#FFFFFF" stroke="#55738E" stroke-width="6"/><rect x="684" y="348" width="38" height="150" rx="12" fill="#FFFFFF" stroke="#55738E" stroke-width="6"/><line x1="610" y1="498" x2="610" y2="575" stroke="#55738E" stroke-width="5" stroke-dasharray="12 10" marker-end="url(#arrow-dark)"/><text x="482" y="590" class="b" text-anchor="start"><tspan x="482" dy="0">接触后物体未随夹爪</tspan><tspan x="482" dy="35">查摩擦、夹持与加速度</tspan></text><rect x="830" y="190" width="320" height="500" rx="26" fill="#F6FAFF" stroke="#1F6FEB" stroke-width="3" filter="url(#shadow)"/><circle cx="888" cy="248" r="34" fill="#1F6FEB"/><text x="888" y="257" class="m" text-anchor="middle" style="fill:#FFFFFF">03</text><text x="940" y="258" class="h">接触弹飞</text><rect x="944" y="390" width="92" height="92" rx="12" fill="#EAF3FF" stroke="#123B64" stroke-width="4"/><rect x="878" y="348" width="38" height="150" rx="12" fill="#FFFFFF" stroke="#55738E" stroke-width="6"/><rect x="1064" y="348" width="38" height="150" rx="12" fill="#FFFFFF" stroke="#55738E" stroke-width="6"/><path d="M985 375 l-28 -30 M995 375 l28 -30 M952 390 l-28 -5 M1028 390 l28 -5" stroke="#C94B4B" stroke-width="7"/><text x="862" y="590" class="b" text-anchor="start"><tspan x="862" dy="0">闭合瞬间速度突增</tspan><tspan x="862" dy="35">查闭合速度与接触参数</tspan></text><rect x="1210" y="190" width="320" height="500" rx="26" fill="#FFFFFF" stroke="#55738E" stroke-width="3" filter="url(#shadow)"/><circle cx="1268" cy="248" r="34" fill="#123B64"/><text x="1268" y="257" class="m" text-anchor="middle" style="fill:#FFFFFF">04</text><text x="1320" y="258" class="h">放置滑动</text><rect x="1324" y="390" width="92" height="92" rx="12" fill="#EAF3FF" stroke="#123B64" stroke-width="4"/><rect x="1258" y="348" width="38" height="150" rx="12" fill="#FFFFFF" stroke="#55738E" stroke-width="6"/><rect x="1444" y="348" width="38" height="150" rx="12" fill="#FFFFFF" stroke="#55738E" stroke-width="6"/><line x1="1255" y1="510" x2="1490" y2="510" stroke="#55738E" stroke-width="7"/><path d="M1385 455 C1420 450,1460 460,1482 490" fill="none" stroke="#C94B4B" stroke-width="6" marker-end="url(#arrow-dark)"/><text x="1242" y="590" class="b" text-anchor="start"><tspan x="1242" dy="0">释放后仍有平动速度</tspan><tspan x="1242" dy="35">查释放高度、速度与桌面</tspan></text><rect x="390" y="750" width="820" height="48" rx="24" fill="#EAF3FF" stroke="#1F6FEB" stroke-width="2"/><text x="800" y="782" class="b" font-weight="700" text-anchor="middle">可信抓取证据 = 双指身份 + 接触方向/力 + 夹爪状态 + 物体随动</text></svg>

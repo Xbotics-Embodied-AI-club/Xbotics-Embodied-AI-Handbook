@@ -27,14 +27,14 @@ python simulation/agent_skills.py
 
 ## 真机路径
 
-见 `hardware/README.md`（待补充）。
+见 `hardware/README.md`（待补充，需根据 SO101 / xLeRobot / G1 现场硬件选择其一）。
 
 ## 状态
 
-- [ ] 仿真 Demo 可运行
+- [x] 仿真 Demo 可运行
 - [ ] 真机 Demo 可运行
-- [ ] 与文稿实验步骤一致
-- [ ] 常见失败已写入文稿
+- [x] 与文稿实验步骤一致
+- [x] 常见失败已写入文稿
 
 ## 贡献
 

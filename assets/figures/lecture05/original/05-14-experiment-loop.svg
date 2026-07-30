@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#1F6FEB"/>
+    </marker>
+    <marker id="arrow-dark" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#55738E"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#123B64" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      text { font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; fill: #172B3A; }
+      .title { font-size: 42px; font-weight: 700; letter-spacing: 1px; }
+      .subtitle { font-size: 21px; fill: #5B6B7A; }
+      .h { font-size: 27px; font-weight: 700; }
+      .m { font-size: 23px; font-weight: 600; }
+      .b { font-size: 20px; }
+      .s { font-size: 17px; fill: #5B6B7A; }
+      .mono { font-family: "SFMono-Regular", Consolas, monospace; font-size: 18px; }
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="18" height="900" fill="#1F6FEB"/>
+  <text x="70" y="72" class="title">把失败变成下一次实验</text>
+  <text x="72" y="108" class="subtitle">证据来自日志、轨迹和重复实验；AI 只负责提出候选假设</text>
+  <line x1="70" y1="130" x2="1530" y2="130" stroke="#A9BED1" stroke-width="2"/><rect x="45" y="325" width="210" height="185" rx="22" fill="#F6FAFF" stroke="#1F6FEB" stroke-width="3" filter="url(#shadow)"/><text x="150" y="370" class="s" text-anchor="middle">01</text><text x="150" y="413" class="m" text-anchor="middle">确定基线</text><text x="150" y="457" class="s" text-anchor="middle">版本 · seed · 初态</text><line x1="263" y1="417" x2="292" y2="417" stroke="#1F6FEB" stroke-width="4" marker-end="url(#arrow-blue)"/><rect x="300" y="325" width="210" height="185" rx="22" fill="#FFFFFF" stroke="#55738E" stroke-width="3" filter="url(#shadow)"/><text x="405" y="370" class="s" text-anchor="middle">02</text><text x="405" y="413" class="m" text-anchor="middle">只改一项</text><text x="405" y="457" class="s" text-anchor="middle">明确自变量</text><line x1="518" y1="417" x2="547" y2="417" stroke="#1F6FEB" stroke-width="4" marker-end="url(#arrow-blue)"/><rect x="555" y="325" width="210" height="185" rx="22" fill="#F6FAFF" stroke="#1F6FEB" stroke-width="3" filter="url(#shadow)"/><text x="660" y="370" class="s" text-anchor="middle">03</text><text x="660" y="413" class="m" text-anchor="middle">运行前预测</text><text x="660" y="457" class="s" text-anchor="middle">写下机制假设</text><line x1="773" y1="417" x2="802" y2="417" stroke="#1F6FEB" stroke-width="4" marker-end="url(#arrow-blue)"/><rect x="810" y="325" width="210" height="185" rx="22" fill="#FFFFFF" stroke="#55738E" stroke-width="3" filter="url(#shadow)"/><text x="915" y="370" class="s" text-anchor="middle">04</text><text x="915" y="413" class="m" text-anchor="middle">记录指标</text><text x="915" y="457" class="s" text-anchor="middle">轨迹 · 误差 · 接触</text><line x1="1028" y1="417" x2="1057" y2="417" stroke="#1F6FEB" stroke-width="4" marker-end="url(#arrow-blue)"/><rect x="1065" y="325" width="210" height="185" rx="22" fill="#F6FAFF" stroke="#1F6FEB" stroke-width="3" filter="url(#shadow)"/><text x="1170" y="370" class="s" text-anchor="middle">05</text><text x="1170" y="413" class="m" text-anchor="middle">判断证据</text><text x="1170" y="457" class="s" text-anchor="middle">支持 / 否定 / 不充分</text><line x1="1283" y1="417" x2="1312" y2="417" stroke="#1F6FEB" stroke-width="4" marker-end="url(#arrow-blue)"/><rect x="1320" y="325" width="210" height="185" rx="22" fill="#FFFFFF" stroke="#55738E" stroke-width="3" filter="url(#shadow)"/><text x="1425" y="370" class="s" text-anchor="middle">06</text><text x="1425" y="413" class="m" text-anchor="middle">决定下一步</text><text x="1425" y="457" class="s" text-anchor="middle">复现或新实验</text><path d="M1435 535 C1435 710, 150 710, 150 535" fill="none" stroke="#55738E" stroke-width="4" stroke-dasharray="13 10" marker-end="url(#arrow-dark)"/><text x="800" y="690" class="b" text-anchor="middle">现象 → 最早异常 → 候选原因 → 单变量验证 → 改进</text><rect x="365" y="180" width="870" height="48" rx="24" fill="#EAF3FF" stroke="#1F6FEB" stroke-width="2"/><text x="800" y="212" class="b" font-weight="700" text-anchor="middle">最小复现记录：软件/资产版本 + seed + 两个时钟 + 初始状态 + 指标</text></svg>

@@ -96,7 +96,7 @@ python simulation/minimal_reach.py
 |------|------|------|------|
 | 导言 | 部分定位与阶段项目 | [📖](docs/part1-system-basics/00-part-overview.md) | — |
 | 第 1 讲 | 具身智能导论 | [📖 @丛林 @木木](docs/part1-system-basics/01-introduction.md) | [💻](code/lecture01/) |
-| 第 2 讲 | 机器人系统架构（ROS2 / LeRobot） | [📖 @丛林](docs/part1-system-basics/02-ros2-architecture.md) | [💻](code/lecture02/) |
+| 第 2 讲 | 机器人系统架构（硬件 / 软件 / ROS2） | [📖 @丛林](docs/part1-system-basics/02-ros2-architecture.md) | [💻](code/lecture02/) |
 | 第 3 讲 | 机器人本体与控制基础 | [📖 @羿茗](docs/part1-system-basics/03-robot-body-control.md) | [💻](code/lecture03/) |
 | 第 4 讲 | 传感器、坐标系与相机模型 | [📖 @锦丰](docs/part1-system-basics/04-sensors-coordinates.md) | [💻](code/lecture04/) |
 

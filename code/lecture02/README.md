@@ -1,10 +1,10 @@
-# Lecture 02 — ROS2 与 LeRobot 闭环
+# Lecture 02 — 机器人系统架构：硬件、软件与 ROS2
 
 > 对应文稿：见 `docs/` 中第 2 讲
 
 ## 本讲 Demo
 
-ROS2 节点：状态读取、目标发布、episode 记录
+理解机器人软硬件组成与接口，并将状态读取、目标发布、动作生成、控制执行和 episode 记录组织成 ROS2 闭环。
 
 ## 目录结构
 
@@ -16,14 +16,18 @@ lecture02/
 └── simulation/         # 无硬件可运行路径
 ```
 
-## 快速开始（仿真）
+## 当前代码状态
 
-```bash
-cd code/lecture02
-python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python simulation/mock_ros2_loop.py
-```
+正文描述了包含六个节点的 `robot_demo` 教学 Package，但当前目录尚未提交对应 Package 和 `simulation/mock_ros2_loop.py`。因此暂时没有可直接复制运行的快速开始命令；课堂使用前需要先补齐并在指定 ROS2 环境中复验。
+
+计划中的最小节点包括：
+
+- `robot_state_node`
+- `target_publisher`
+- `policy_node`
+- `controller_node`
+- `task_status_node`
+- `episode_recorder`
 
 ## 真机路径
 
