@@ -26,7 +26,11 @@ def summarize_task(task_dir: Path) -> dict[str, object]:
 
 def main() -> None:
     root = Path("runs")
-    summaries = [summarize_task(path) for path in sorted(root.iterdir()) if path.is_dir()]
+    summaries = [
+        summarize_task(path)
+        for path in sorted(root.iterdir())
+        if path.is_dir() and (path / "events.jsonl").is_file()
+    ]
     output = root / "summary.csv"
     if not summaries:
         raise SystemExit("no task directories found under runs/")

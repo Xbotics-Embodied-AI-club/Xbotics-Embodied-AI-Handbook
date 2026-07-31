@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from time import monotonic
 from typing import Any
 
 import numpy as np
@@ -10,11 +9,11 @@ from ..models import MotionResult, Observation, Pose, TaskConfig
 from .base import RobotBackend
 
 
-class ManiSkillBackend(RobotBackend):
-    """Adapter for a single CPU ManiSkill environment.
+class MuJoCoBackend(RobotBackend):
+    """Adapter for a single MuJoCo environment.
 
     pose_to_actions converts one absolute target pose into a short sequence
-    of actions compatible with the selected ManiSkill controller.
+    of actions compatible with the selected MuJoCo controller.
     extract_observation converts the environment observation into the common
     Observation data class used by the state machine.
     """

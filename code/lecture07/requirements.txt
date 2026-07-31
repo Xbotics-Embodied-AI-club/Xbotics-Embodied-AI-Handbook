@@ -1,3 +1,3 @@
 # Core mock demo uses only the Python standard library.
-# Install optional ManiSkill dependencies through:
-#   python -m pip install -e '.[maniskill]'
+# Install optional MuJoCo dependencies through:
+#   python -m pip install -e '.[mujoco]'

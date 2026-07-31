@@ -6,3 +6,4 @@ dist/
 *.egg-info/
 runs/*
 !runs/.gitkeep
+MUJOCO_LOG.TXT

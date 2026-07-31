@@ -10,7 +10,7 @@
 |------|------|------|
 | `MockBackend` | `simulation/`（默认） | 无外部依赖，必跑 |
 | `SO101Backend` | `hardware/` | 真机适配模板 |
-| `ManiSkillBackend` | `simulation/` | 仿真适配模板 |
+| `MuJoCoBackend` | `simulation/` | 仿真适配模板 |
 
 ## 目录结构
 
@@ -24,7 +24,9 @@ lecture07/
 ├── examples/                  # inspect_targets / inject_failure
 ├── tests/
 ├── hardware/                  # 真机说明与 SO-101 入口
-└── simulation/                # 无硬件入口（Mock）
+└── simulation/                # Mock 入口与 MuJoCo 仿真
+    ├── assets/models/         # 任务物体 mesh（box / bottle）
+    └── mujoco_tasks/          # cube/bottle 任务、IK 键盘遥操
 ```
 
 ## 快速开始（仿真 / Mock，无硬件必做）
@@ -44,6 +46,21 @@ python -m examples.inspect_targets
 python -m examples.inject_failure
 python -m unittest discover -s tests -v
 ```
+
+## MuJoCo 资产场景（可选）
+
+场景定义在 `simulation/mujoco_tasks/envs/scene.py`，加载
+`code/platform/so101_sim/.../so101.urdf`，并在白色桌面上绘制 8 cm × 8 cm 的红色 A 区与蓝色 B 区方框。
+
+```bash
+pip install -e ".[mujoco]"
+python simulation/mujoco_tasks/try_ik.py --task cube
+python simulation/mujoco_tasks/try_ik.py --task bottle
+python simulation/mujoco_tasks/try_ik.py --task cube --show-grasp
+```
+
+该入口使用 CPU 仿真与 MuJoCo 原生 viewer。Windows、Linux 和 macOS 均可运行；
+无显示器环境可设置 `MUJOCO_GL=egl` 使用离屏渲染。
 
 运行结果写入 `runs/`：每次任务一个目录，`events.jsonl` 记录状态进入、检测、失败码与重试；`analyze_runs.py` 汇总为 `runs/summary.csv`。
 
