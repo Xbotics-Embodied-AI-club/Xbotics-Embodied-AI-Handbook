@@ -49,7 +49,7 @@ lectures:
   - { id: 14, slug: rl-intro, title: 强化学习入门, path: docs/part4-reinforcement-learning/14-强化学习入门.md, code: code/rl/1_rl_basics, part: 4 }
   - { id: 15, slug: grpo-posttraining, title: GRPO 后训练, path: docs/part4-reinforcement-learning/15-GRPO后训练.md, code: code/rl/2_grpo_posttraining, part: 4 }
   - { id: 16, slug: offpolicy-real-rl, title: Off-policy 真机强化学习, path: docs/part4-reinforcement-learning/16-真机强化学习.md, code: code/rl/3_offpolicy, part: 4 }
-  - { id: 17, slug: robot-agent, title: Robot Agent 与技能调用, path: docs/part6-agent-world-model/17-robot-agent.md, code: code/lecture17, part: 6 }
+  - { id: 17, slug: embodied-agent, title: Embodied Agent, path: docs/part6-agent-world-model/17-embodied-agent.md, code: code/lecture17, part: 6 }
   - { id: 18, slug: vln-theory, title: VLN 理论基础, path: docs/part5-vln/18-vln-theory.md, code: code/lecture18, part: 5 }
   - { id: 19, slug: vln-practice, title: VLN 实操与评测, path: docs/part5-vln/19-vln-practice.md, code: code/lecture19, part: 5 }
   - { id: 20, slug: world-model, title: 世界模型与数据飞轮, path: docs/part6-agent-world-model/20-world-model.md, code: code/lecture20, part: 6 }

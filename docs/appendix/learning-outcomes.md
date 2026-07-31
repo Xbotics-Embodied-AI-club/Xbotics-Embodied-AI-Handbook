@@ -13,7 +13,7 @@
 9. 训练 BC / ACT / Diffusion Policy
 10. 理解 RL、后训练和 recovery policy
 11. 构造 VLA 训练样本并分析真机部署问题
-12. 设计 Robot Agent 技能调用与任务规划流程
+12. 设计 Embodied Agent 技能调用与任务规划流程
 13. 理解 VLN 原理，完成仿真 VLN 评测（success / SPL）
 14. 理解世界模型预测与数据飞轮闭环
 15. 梳理具身前沿方向并完成 **移动 + 操作** 综合答辩

@@ -153,7 +153,7 @@ python simulation/minimal_reach.py
 | 讲次 | 标题 | 文稿 | 代码 |
 |------|------|------|------|
 | 导言 | 部分定位 | [📖](docs/part6-agent-world-model/00-part-overview.md) | — |
-| 第 17 讲 | Robot Agent 与技能调用 | [📖](docs/part6-agent-world-model/17-robot-agent.md) | [💻](code/lecture17/) |
+| 第 17 讲 | Embodied Agent | [📖](docs/part6-agent-world-model/17-embodied-agent.md) | [💻](code/lecture17/) |
 | 第 20 讲 | 世界模型与数据飞轮 | [📖](docs/part6-agent-world-model/20-world-model.md) | [💻](code/lecture20/) |
 | 第 21 讲 | 前沿进展与综合答辩 | [📖](docs/part6-agent-world-model/21-frontier-progress.md) | [💻](code/lecture21/) |
 
@@ -174,7 +174,7 @@ python simulation/minimal_reach.py
 具身智能导论 → 系统架构 → 本体与动作空间 → 传感器与坐标系
 → 仿真导论 → 感知与位姿估计 → 操作技能 → 端到端导论
 → 数据采集 → 模仿学习 → Diffusion Policy → VLA 理论 → VLA 实操
-→ RL 基础 → RL 运控(G1) → RL 后训练 → Robot Agent
+→ RL 基础 → RL 运控(G1) → RL 后训练 → Embodied Agent
 → VLN 理论 → VLN 实操 → 世界模型 → 前沿进展与综合答辩
 ```
 

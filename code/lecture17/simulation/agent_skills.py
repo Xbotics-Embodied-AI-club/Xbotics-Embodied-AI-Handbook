@@ -1,4 +1,4 @@
-"""Minimal Robot Agent skill loop for Lecture 17.
+"""Minimal Embodied Agent skill loop for Lecture 17.
 
 The script keeps the interfaces intentionally simple: an agent plan is a list of
 named skills, each skill returns an observation, and the agent replans when an
