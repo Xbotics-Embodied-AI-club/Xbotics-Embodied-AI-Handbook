@@ -2,7 +2,7 @@
 
 ## 部分定位
 
-第六部分是原「具身前沿」大章中除 VLN 以外的内容：**Robot Agent**（任务规划与 skill 调度）、**世界模型**（预测与数据飞轮）、**前沿进展**（方向梳理 + 全课综合答辩）。
+第六部分是原「具身前沿」大章中除 VLN 以外的内容：**Embodied Agent**（任务规划与 Skill 调度）、**世界模型**（预测与数据飞轮）、**前沿进展**（方向梳理 + 全课综合答辩）。
 
 VLN 已独立为 **第五部分**（第 18–19 讲）。
 
@@ -10,15 +10,15 @@ VLN 已独立为 **第五部分**（第 18–19 讲）。
 
 | 讲次 | 主题 | 协同 |
 |------|------|------|
-| 第 17 讲 | Robot Agent、任务规划与技能调用 | 富平（Agent） |
+| 第 17 讲 | Embodied Agent | 富平（Agent） |
 | 第 20 讲 | 世界模型 —— 预测、规划与数据飞轮 | 煜恒（世界模型） |
 | 第 21 讲 | 具身智能前沿进展 —— 综合闭环与答辩 | 雨浩组 |
 
 **负责人**：雨浩（主责）
 
-## 第 17 讲大纲 - Robot Agent
+## 第 17 讲大纲：Embodied Agent
 
-理解 Robot Agent 尝试解决的问题，理解 Robot Agent 的通用框架：上层 VLM/LLM 规划器、中间安全边界和状态维护、底层电机执行器。
+理解 Embodied Agent 尝试解决的问题，理解 Embodied Agent 的通用框架：上层 VLM/LLM 规划器、中间安全边界和状态维护、底层电机执行器。
 
 ### 17.1 Agent 介绍
 
@@ -83,13 +83,13 @@ OpenClaw、Hermes、LangGraph、AutoGen、CrewAI、LlamaIndex Agents 这类不�
 OpenClaw 可以作为“工具、技能、插件、权限、沙箱、多 Agent 协调”的 runtime 示例；其文档明确区分 tools、skills、plugins。
 Hermes 需要分两层讲：**Hermes 模型** 和 **Hermes Agent**。Nous 的 Hermes 3 强调长上下文、多轮对话和 agentic function-calling；Hermes Agent 文档则列出 memory system、skills system、MCP integration、tools、messaging gateway、security 等运行时能力。
 
-### 17.2 Robot Agent 核心体现
+### 17.2 Embodied Agent 核心体现
 
 - VLA 在长程任务语言理解上的局限
-- Robot Agent 尝试解决的问题，相关论文介绍
-- Robot Agent 自身的局限性
+- Embodied Agent 尝试解决的问题，相关论文介绍
+- Embodied Agent 自身的局限性
 
-### 17.3 Robot Agent 框架及核心组件介绍
+### 17.3 Embodied Agent 框架及核心组件介绍
 
 - MCP
 - Skill
@@ -98,10 +98,10 @@ Hermes 需要分两层讲：**Hermes 模型** 和 **Hermes Agent**。Nous 的 He
 - 运动空间限制
 - 急停防护
 
-### 17.4 Robot Agent 仿真与实机效果
+### 17.4 Embodied Agent 仿真与实机效果
 
-- Robot Agent 仿真环境代码讲解与部署流程
-- Robot Agent 实机展示与部署流程
+- Embodied Agent 仿真环境代码讲解与部署流程
+- Embodied Agent 实机展示与部署流程
 
 ## 第 20 讲大纲 - 世界模型
 

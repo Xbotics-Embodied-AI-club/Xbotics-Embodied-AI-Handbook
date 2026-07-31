@@ -29,7 +29,7 @@
 → 仿真导论 → 机器人感知与位姿估计 → 视觉操作策略 → 端到端学习导论
 → 数据采集 → 模仿学习训练 → 生成式动作策略 → VLA 理论 → VLA 实操
 → 强化学习基础 → 强化学习运控 → 强化学习后训练
-→ Robot Agent（Part 6）→ VLN 理论 → VLN 实操（Part 5）
+→ Embodied Agent（Part 6）→ VLN 理论 → VLN 实操（Part 5）
 → 世界模型（Part 6）→ 前沿进展与综合答辩（Part 6）
 ```
 

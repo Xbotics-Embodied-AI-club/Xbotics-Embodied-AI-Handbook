@@ -1,6 +1,6 @@
-# Lecture 17 — Robot Agent
+# Lecture 17 — Embodied Agent
 
-> 对应文稿：见 `docs/` 中第 17 讲
+> 对应文稿：[`docs/part6-agent-world-model/17-embodied-agent.md`](../../docs/part6-agent-world-model/17-embodied-agent.md)
 
 ## 本讲 Demo
 

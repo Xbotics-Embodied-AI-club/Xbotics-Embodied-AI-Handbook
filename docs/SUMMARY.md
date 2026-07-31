@@ -65,7 +65,7 @@
 > 讲次顺序：建议 L17 → L18–L19（Part 5）→ L20 → L21
 
 - [部分导言](part6-agent-world-model/00-part-overview.md)
-- [第 17 讲：Robot Agent、任务规划与技能调用](part6-agent-world-model/17-robot-agent.md)
+- [第 17 讲：Embodied Agent](part6-agent-world-model/17-embodied-agent.md)
 - [第 20 讲：世界模型 —— 预测、规划与数据飞轮](part6-agent-world-model/20-world-model.md)
 - [第 21 讲：具身智能前沿进展 —— 综合闭环与答辩](part6-agent-world-model/21-frontier-progress.md)
 
