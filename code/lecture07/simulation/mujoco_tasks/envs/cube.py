@@ -15,19 +15,20 @@ ZONE_THICK = 0.001
 
 CUBE_SIZE = 0.05
 CUBE_HALF = CUBE_SIZE / 2
-CUBE_X = 0.22
+CUBE_SCENE_X = 0.22
+CUBE_X = CUBE_SCENE_X
 CUBE_Y = (ZONE_RED_Y + ZONE_BLUE_Y) / 2
 ZONE_Z = TABLE_TOP_Z + ZONE_THICK
 
 ZONE_GEOMS_XML = f"""
-    <geom name="zone_a_front" type="box" pos="{TABLE_X} {ZONE_RED_Y - ZONE_HALF:.3f} {ZONE_Z}" size="{ZONE_HALF} {ZONE_LINE} {ZONE_THICK}" material="zone_red" contype="0" conaffinity="0"/>
-    <geom name="zone_a_back"  type="box" pos="{TABLE_X} {ZONE_RED_Y + ZONE_HALF:.3f} {ZONE_Z}" size="{ZONE_HALF} {ZONE_LINE} {ZONE_THICK}" material="zone_red" contype="0" conaffinity="0"/>
-    <geom name="zone_a_left"  type="box" pos="{TABLE_X - ZONE_HALF:.3f} {ZONE_RED_Y} {ZONE_Z}" size="{ZONE_LINE} {ZONE_HALF} {ZONE_THICK}" material="zone_red" contype="0" conaffinity="0"/>
-    <geom name="zone_a_right" type="box" pos="{TABLE_X + ZONE_HALF:.3f} {ZONE_RED_Y} {ZONE_Z}" size="{ZONE_LINE} {ZONE_HALF} {ZONE_THICK}" material="zone_red" contype="0" conaffinity="0"/>
-    <geom name="zone_b_front" type="box" pos="{TABLE_X} {ZONE_BLUE_Y - ZONE_HALF:.3f} {ZONE_Z}" size="{ZONE_HALF} {ZONE_LINE} {ZONE_THICK}" material="zone_blue" contype="0" conaffinity="0"/>
-    <geom name="zone_b_back"  type="box" pos="{TABLE_X} {ZONE_BLUE_Y + ZONE_HALF:.3f} {ZONE_Z}" size="{ZONE_HALF} {ZONE_LINE} {ZONE_THICK}" material="zone_blue" contype="0" conaffinity="0"/>
-    <geom name="zone_b_left"  type="box" pos="{TABLE_X - ZONE_HALF:.3f} {ZONE_BLUE_Y} {ZONE_Z}" size="{ZONE_LINE} {ZONE_HALF} {ZONE_THICK}" material="zone_blue" contype="0" conaffinity="0"/>
-    <geom name="zone_b_right" type="box" pos="{TABLE_X + ZONE_HALF:.3f} {ZONE_BLUE_Y} {ZONE_Z}" size="{ZONE_LINE} {ZONE_HALF} {ZONE_THICK}" material="zone_blue" contype="0" conaffinity="0"/>"""
+    <geom name="zone_a_front" type="box" pos="{CUBE_SCENE_X} {ZONE_RED_Y - ZONE_HALF:.3f} {ZONE_Z}" size="{ZONE_HALF} {ZONE_LINE} {ZONE_THICK}" material="zone_red" contype="0" conaffinity="0"/>
+    <geom name="zone_a_back"  type="box" pos="{CUBE_SCENE_X} {ZONE_RED_Y + ZONE_HALF:.3f} {ZONE_Z}" size="{ZONE_HALF} {ZONE_LINE} {ZONE_THICK}" material="zone_red" contype="0" conaffinity="0"/>
+    <geom name="zone_a_left"  type="box" pos="{CUBE_SCENE_X - ZONE_HALF:.3f} {ZONE_RED_Y} {ZONE_Z}" size="{ZONE_LINE} {ZONE_HALF} {ZONE_THICK}" material="zone_red" contype="0" conaffinity="0"/>
+    <geom name="zone_a_right" type="box" pos="{CUBE_SCENE_X + ZONE_HALF:.3f} {ZONE_RED_Y} {ZONE_Z}" size="{ZONE_LINE} {ZONE_HALF} {ZONE_THICK}" material="zone_red" contype="0" conaffinity="0"/>
+    <geom name="zone_b_front" type="box" pos="{CUBE_SCENE_X} {ZONE_BLUE_Y - ZONE_HALF:.3f} {ZONE_Z}" size="{ZONE_HALF} {ZONE_LINE} {ZONE_THICK}" material="zone_blue" contype="0" conaffinity="0"/>
+    <geom name="zone_b_back"  type="box" pos="{CUBE_SCENE_X} {ZONE_BLUE_Y + ZONE_HALF:.3f} {ZONE_Z}" size="{ZONE_HALF} {ZONE_LINE} {ZONE_THICK}" material="zone_blue" contype="0" conaffinity="0"/>
+    <geom name="zone_b_left"  type="box" pos="{CUBE_SCENE_X - ZONE_HALF:.3f} {ZONE_BLUE_Y} {ZONE_Z}" size="{ZONE_LINE} {ZONE_HALF} {ZONE_THICK}" material="zone_blue" contype="0" conaffinity="0"/>
+    <geom name="zone_b_right" type="box" pos="{CUBE_SCENE_X + ZONE_HALF:.3f} {ZONE_BLUE_Y} {ZONE_Z}" size="{ZONE_LINE} {ZONE_HALF} {ZONE_THICK}" material="zone_blue" contype="0" conaffinity="0"/>"""
 
 SCENE_MATERIALS_XML = """
     <material name="white_table" rgba="0.96 0.96 0.96 1"/>

@@ -1,6 +1,6 @@
 # MuJoCo Tasks — Lecture 07
 
-SO-101 机械臂在 MuJoCo 中的任务场景、差分 IK 遥操作，以及 GraspNet 风格的 6D 抓取可视化。
+SO-101 机械臂在 MuJoCo 中的任务场景、差分 IK 运动、双指 pick-place 状态机，以及 GraspNet 风格的 6D 抓取可视化。
 
 ## 快速开始
 
@@ -8,17 +8,31 @@ SO-101 机械臂在 MuJoCo 中的任务场景、差分 IK 遥操作，以及 Gra
 
 ```bash
 pip install -e ".[mujoco]"
-python simulation/mujoco_tasks/try_ik.py --show-grasp --task bottle
+python simulation/mujoco_pick_place.py --task cube
+python simulation/mujoco_pick_place.py --task bottle
 ```
 
-切换任务只需改 `--task`：
+常用参数：
+
+| 参数 | 说明 |
+|------|------|
+| `--task {cube,bottle}` | cube 为 90° 翻转双指夹取；bottle 为水平径向抓取放入盒子 |
+| `--viewer null` | 无窗口离屏运行 |
+| `--show-poses` | 场景中绘制 5 个动作位姿（pre_grasp/grasp/lift/place/retreat） |
+| `--show-grasp` / `--no-show-grasp` | 夹爪末端 GraspNet 可视化（默认开） |
+| `--grasp-roll` | cube 夹爪额外 roll（默认 90°） |
+| `--video runs/x.mp4` | 录制运行视频 |
+
+状态机逻辑在 `fsm_backend.py`：关节空间规划 + 增量 IK 兜底，双指接触后 sticky 附着，
+放置时保持物体高度护栏，失败自动恢复，任务结束回到 home。5 个动作位姿配置在 `pose_targets.py`。
+
+## 键盘 IK 遥操作
+
+`try_ik.py` 用于调试模型、碰撞体与任务布局（差分 IK + 键盘控制，不跑状态机）：
 
 ```bash
-python simulation/mujoco_tasks/try_ik.py --show-grasp --task cube
-python simulation/mujoco_tasks/try_ik.py --show-grasp --task bottle
+python simulation/mujoco_tasks/try_ik.py --task cube --show-grasp
 ```
-
-`--show-grasp` 会在腕部坐标系上显示一条红色演示抓取（平行夹爪四块 box + RGB 坐标轴），用于对照 GraspNet 的 6D grasp 表示，并尝试用 IK 将末端移向该抓取位姿。
 
 ## 键盘操作
 
@@ -38,7 +52,9 @@ Windows 上按住平移键会每 0.10 秒持续累积目标；可用 `--position
 
 ```
 mujoco_tasks/
-├── try_ik.py              # 入口：键盘 IK 遥操作 + 可选抓取可视化
+├── fsm_backend.py         # MuJoCo FSM 后端（pick-place 闭环）
+├── pose_targets.py        # 场景级任务配置与 5 个动作位姿
+├── try_ik.py              # 键盘 IK 遥操作入口
 ├── envs/                  # 场景与任务定义
 │   ├── scene.py           # 程序化构建 MuJoCo 场景（桌面、机器人、任务物体）
 │   ├── gym_env.py         # Gymnasium 环境封装
@@ -52,35 +68,28 @@ mujoco_tasks/
 │   ├── sticky_grasp.py    # 接触检测 + 粘住辅助（见下文）
 │   └── control.py         # 控制辅助
 └── viz/                   # 可视化
-    ├── grasp_viz.py       # GraspNet 风格 3D 抓取可视化
+    ├── pose_viz.py        # 5 位姿 + GraspNet 夹爪 + RGB 坐标轴
+    ├── grasp_viz.py       # GraspNet 风格 3D 抓取可视化（基础组件）
     └── scene_viz.py       # 场景相机配置
 ```
 
 任务物体的 mesh 与贴图位于 `simulation/assets/models/`（`box.obj`、`bottle.obj` 等）。场景在 `envs/scene.py` 中通过 MjSpec API 程序化构建，不依赖单独的 XML 场景文件。
 
-## GraspNet 风格抓取可视化
+## 位姿可视化
 
-`viz/grasp_viz.py` 在腕部 `so101_gripper_link` 上挂载演示抓取，随机械臂一起运动。坐标系约定：
+`--show-poses` 时在场景中绘制 5 个动作位姿：每个位姿一个 GraspNet 风格平行夹爪
+（四块 box）+ RGB 坐标轴（X=红、Y=绿、Z=蓝），运行到的位姿不透明高亮，其余透明。
+`--show-grasp` 在夹爪末端实时显示 GraspNet 抓取表示。坐标系约定：
 
 - 抓取旋转矩阵与腕部 roll 坐标系一致
 - **Z（蓝）** = 腕部 roll 轴；**X、Z** 张成夹取平面，**Y** 为平面法向
 - 接近物体方向为 **-Z**
 
-启用方式：`--show-grasp`。home 位姿下显示一条 `score=1.0` 的演示抓取，便于与 IK 目标对照。
-
 ## 简化抓取：接触粘住（Sticky Grasp）
 
-为降低仿真复杂度，本模块**未实现**基于摩擦与接触力的完整物理抓取，而是采用 `motion/sticky_grasp.py` 中的辅助逻辑：
+双指**真实闭合接触**抓取：左右夹爪碰撞体同时接触任务物体后，物体运动学绑定到末端随夹爪移动，夹爪张开即释放。逻辑见 `motion/sticky_grasp.py`，默认开启（`--no-sticky-grasp` 可关闭）。
 
-1. 检测左右夹爪碰撞体是否**同时**与任务物体发生接触，并满足最小穿透深度
-2. 条件满足后，将物体**运动学绑定**到末端，随夹爪一起移动
-3. 夹爪张开超过阈值时**自动释放**
-
-默认开启（`--sticky-grasp`，可用 `--no-sticky-grasp` 关闭）。粘住/释放时终端会打印 `STICKY_GRASP_ATTACH` / `STICKY_GRASP_RELEASE` 事件。
-
-这使键盘遥操作能完成“抓起—移动—放下”的完整流程，而无需调参摩擦系数或依赖稳定的接触力仿真。完整 pick-place 状态机见上级目录的 `simulation/pick_place_fsm.py`。
-
-## 其他常用参数
+## try_ik.py 参数
 
 | 参数 | 说明 |
 |------|------|

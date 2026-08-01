@@ -37,6 +37,12 @@ BOX_WIDTH = 0.115
 BOX_HEIGHT = 0.028
 BOX_X = TABLE_X
 BOX_Y = 0.12
+# The box.obj mesh is a hollow tray (four thin walls + a bottom plate).  MuJoCo
+# meshes collide as a single convex hull, which would fill the interior, so the
+# collision is built from thin box geoms instead and the mesh stays visual-only.
+BOX_WALL_THICKNESS = 0.003
+BOX_BOTTOM_THICKNESS = 0.003
+BOX_COLLISION_RGBA = (0.65, 0.55, 0.45, 0.0)
 
 SCENE_MATERIALS_XML = """
     <material name="white_table" rgba="0.96 0.96 0.96 1"/>"""
@@ -108,6 +114,64 @@ def add_task_objects(spec: mujoco.MjSpec) -> None:
         mass=0.0,
     )
     box_geom.friction = [1.0, 0.05, 0.001]
+    box_geom.contype = 0
+    box_geom.conaffinity = 0
+
+    _add_box_collision_geoms(spec)
+
+
+def _add_box_collision_geoms(scene_spec: mujoco.MjSpec) -> None:
+    """Add hollow-tray collision geoms (bottom + four thin walls) for the box."""
+
+    x0 = BOX_X - BOX_LENGTH / 2
+    x1 = BOX_X + BOX_LENGTH / 2
+    y0 = BOX_Y - BOX_WIDTH / 2
+    y1 = BOX_Y + BOX_WIDTH / 2
+    z0 = TABLE_TOP_Z
+    z1 = TABLE_TOP_Z + BOX_HEIGHT
+    wall_half = BOX_WALL_THICKNESS / 2
+
+    def add(name: str, pos: list[float], half: list[float]) -> None:
+        geom = scene_spec.worldbody.add_geom(
+            name=name,
+            type=mujoco.mjtGeom.mjGEOM_BOX,
+            pos=pos,
+            size=half,
+            rgba=list(BOX_COLLISION_RGBA),
+        )
+        geom.mass = 0.0
+        configure_stable_contact(geom)
+        geom.friction = [1.2, 0.06, 0.001]
+
+    add(
+        "box_bottom",
+        [BOX_X, BOX_Y, z0 + BOX_BOTTOM_THICKNESS / 2],
+        [
+            BOX_LENGTH / 2 - wall_half,
+            BOX_WIDTH / 2 - wall_half,
+            BOX_BOTTOM_THICKNESS / 2,
+        ],
+    )
+    add(
+        "box_wall_front",
+        [BOX_X, y0 + wall_half, z0 + BOX_HEIGHT / 2],
+        [BOX_LENGTH / 2 - wall_half, wall_half, BOX_HEIGHT / 2],
+    )
+    add(
+        "box_wall_back",
+        [BOX_X, y1 - wall_half, z0 + BOX_HEIGHT / 2],
+        [BOX_LENGTH / 2 - wall_half, wall_half, BOX_HEIGHT / 2],
+    )
+    add(
+        "box_wall_left",
+        [x0 + wall_half, BOX_Y, z0 + BOX_HEIGHT / 2],
+        [wall_half, BOX_WIDTH / 2 - wall_half, BOX_HEIGHT / 2],
+    )
+    add(
+        "box_wall_right",
+        [x1 - wall_half, BOX_Y, z0 + BOX_HEIGHT / 2],
+        [wall_half, BOX_WIDTH / 2 - wall_half, BOX_HEIGHT / 2],
+    )
 
 
 def place_bottle_on_table(model: mujoco.MjModel, data: mujoco.MjData) -> None:

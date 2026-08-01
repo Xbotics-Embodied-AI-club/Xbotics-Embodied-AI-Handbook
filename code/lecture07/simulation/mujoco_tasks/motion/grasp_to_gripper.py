@@ -63,6 +63,39 @@ def grasp_to_eef_pose(grasp: GraspPose) -> tuple[np.ndarray, np.ndarray]:
     return position, _rotation_to_quat(rotation_eef)
 
 
+def eef_pose_to_grasp(
+    eef_pos: np.ndarray,
+    eef_quat: np.ndarray,
+    *,
+    width: float = 0.05,
+    depth: float = 0.02,
+    height: float = 0.004,
+    score: float = 1.0,
+) -> GraspPose:
+    """Invert ``grasp_to_eef_pose``: an EEF pose back to a GraspNet grasp."""
+
+    from .grasp_pose import GraspPose
+
+    eef_pos = np.asarray(eef_pos, dtype=np.float64).reshape(3)
+    rotation_eef = _rotation_to_mat(eef_quat)
+    rotation_grasp = rotation_eef @ GRASP_TO_EEF_ROTATION.T
+    translation = eef_pos + rotation_grasp @ EEF_TO_GRASP_CENTER_IN_GRASP
+    return GraspPose(
+        score=score,
+        width=float(width),
+        height=float(height),
+        depth=float(depth),
+        rotation_matrix=rotation_grasp,
+        translation=translation,
+    )
+
+
+def _rotation_to_mat(quat: np.ndarray) -> np.ndarray:
+    matrix = np.empty(9, dtype=np.float64)
+    mujoco.mju_quat2Mat(matrix, np.asarray(quat, dtype=np.float64).reshape(4))
+    return matrix.reshape(3, 3)
+
+
 def grasp_width_to_gripper_qpos(
     width: float,
     *,

@@ -51,7 +51,8 @@ def _grasp_viz_scene_xml() -> str:
   <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
   <visual>
     <headlight diffuse="0.55 0.55 0.55" ambient="0.25 0.25 0.25"/>
-    <global azimuth="{VIEW_AZIMUTH:.0f}" elevation="{VIEW_ELEVATION:.0f}"/>
+    <global azimuth="{VIEW_AZIMUTH:.0f}" elevation="{VIEW_ELEVATION:.0f}"
+            offwidth="1280" offheight="720"/>
   </visual>
   <asset>
     <material name="white_table" rgba="0.96 0.96 0.96 1"/>
@@ -153,7 +154,8 @@ def _scene_xml(task: str) -> str:
   <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
   <visual>
     <headlight diffuse="0.55 0.55 0.55" ambient="0.25 0.25 0.25"/>
-    <global azimuth="{VIEW_AZIMUTH:.0f}" elevation="{VIEW_ELEVATION:.0f}"/>
+    <global azimuth="{VIEW_AZIMUTH:.0f}" elevation="{VIEW_ELEVATION:.0f}"
+            offwidth="1280" offheight="720"/>
   </visual>
   <asset>{materials}
   </asset>
@@ -233,10 +235,15 @@ def build_model(
     *,
     show_grasp: bool = False,
     show_grasp_axes: bool = True,
+    show_poses: bool = False,
 ) -> mujoco.MjModel:
     """Compose the Lecture 07 scene for the cube or bottle MuJoCo task."""
 
     scene_spec = compile_scene_spec(task)
+    if show_poses:
+        from mujoco_tasks.viz.pose_viz import add_pose_markers
+
+        add_pose_markers(scene_spec, task)
     if show_grasp:
         _attach_home_grasp_visualization(scene_spec, show_grasp_axes=show_grasp_axes)
     return _finalize_model(scene_spec.compile(), task)

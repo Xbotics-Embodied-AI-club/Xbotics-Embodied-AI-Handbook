@@ -10,7 +10,7 @@
 |------|------|------|
 | `MockBackend` | `simulation/`（默认） | 无外部依赖，必跑 |
 | `SO101Backend` | `hardware/` | 真机适配模板 |
-| `MuJoCoBackend` | `simulation/` | 仿真适配模板 |
+| `MuJoCoBackend` | `simulation/` | 完整 MuJoCo pick-place 仿真（cube + bottle） |
 
 ## 目录结构
 
@@ -25,8 +25,14 @@ lecture07/
 ├── tests/
 ├── hardware/                  # 真机说明与 SO-101 入口
 └── simulation/                # Mock 入口与 MuJoCo 仿真
+    ├── mujoco_pick_place.py   # MuJoCo 完整 pick-place 状态机入口
+    ├── pick_place_fsm.py      # Mock 后端入口（无硬件）
     ├── assets/models/         # 任务物体 mesh（box / bottle）
-    └── mujoco_tasks/          # cube/bottle 任务、IK 键盘遥操
+    └── mujoco_tasks/          # 场景 / IK / FSM 后端 / 位姿可视化
+        ├── fsm_backend.py     # MuJoCo FSM 后端（规划 + 增量 IK）
+        ├── pose_targets.py    # 场景级任务配置与 5 个动作位姿
+        ├── try_ik.py          # 键盘 IK 遥操作
+        └── viz/pose_viz.py    # 5 位姿 + GraspNet 可视化
 ```
 
 ## 快速开始（仿真 / Mock，无硬件必做）
@@ -54,20 +60,26 @@ python -m unittest discover -s tests -v
 
 ```bash
 pip install -e ".[mujoco]"
-python simulation/mujoco_tasks/try_ik.py --task cube
-python simulation/mujoco_tasks/try_ik.py --task bottle
-python simulation/mujoco_tasks/try_ik.py --task cube --show-grasp
+# 完整 pick-place 状态机：cube（90° 翻转双指夹取）/ bottle（水平径向抓取入盒）
+python simulation/mujoco_pick_place.py --task cube
+python simulation/mujoco_pick_place.py --task bottle
+# 场景中绘制 5 个动作位姿（pre_grasp/grasp/lift/place/retreat）
+python simulation/mujoco_pick_place.py --task bottle --show-poses
+# 无窗口离屏运行并录制视频
+python simulation/mujoco_pick_place.py --task bottle --viewer null --video runs/bottle.mp4
 ```
 
-该入口使用 CPU 仿真与 MuJoCo 原生 viewer。Windows、Linux 和 macOS 均可运行；
+FSM 运行闭环：移动到 pre_grasp → 接近 → 双指闭合抓取 → 抬升 → 转运 → 放置 → retreat → 回 home，
+失败自动恢复（`RECOVER`），状态与事件写入 `runs/` 下的 `events.jsonl`。
+使用 CPU 仿真与 MuJoCo 原生 viewer。Windows、Linux 和 macOS 均可运行；
 无显示器环境可设置 `MUJOCO_GL=egl` 使用离屏渲染。
 
 运行结果写入 `runs/`：每次任务一个目录，`events.jsonl` 记录状态进入、检测、失败码与重试；`analyze_runs.py` 汇总为 `runs/summary.csv`。
 
-等价入口：
+键盘 IK 遥操作入口（调试模型 / IK / 碰撞体用）：
 
 ```bash
-python -m robot_pick_place.run_demo --task cube
+python simulation/mujoco_tasks/try_ik.py --task cube --show-grasp
 ```
 
 ## 真机路径（SO-101）
@@ -77,6 +89,7 @@ python -m robot_pick_place.run_demo --task cube
 ## 状态
 
 - [x] 仿真 Demo 可运行（Mock）
+- [x] MuJoCo 仿真 Demo 可运行（cube 翻转夹取 + bottle 水平抓取入盒）
 - [ ] 真机 Demo 可运行（适配模板已提供，需本机标定）
 - [x] 与文稿实验步骤一致
 - [x] 常见失败已写入文稿
