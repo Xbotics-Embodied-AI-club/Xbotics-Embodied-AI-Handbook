@@ -143,8 +143,8 @@ python simulation/minimal_reach.py
 | 讲次 | 标题 | 文稿 | 代码 |
 |------|------|------|------|
 | 导言 | 部分定位 | [📖](docs/part5-vln/00-part-overview.md) | — |
-| 第 18 讲 | VLN 理论基础 | [📖](docs/part5-vln/18-vln-theory.md) | [💻](code/lecture18/) |
-| 第 19 讲 | VLN 实操与评测 | [📖](docs/part5-vln/19-vln-practice.md) | [💻](code/lecture19/) |
+| 第 18 讲 | 视觉语言导航：任务与基准 | [📖](docs/part5-vln/18-vln-theory.md) | [💻](code/lecture18/) |
+| 第 19 讲 | 视觉语言导航：方法与实践 | [📖](docs/part5-vln/19-vln-practice.md) | [💻](code/lecture19/) |
 
 ### 第六部分 · Agent、世界模型与前沿进展（第 17、20–21 讲）
 
