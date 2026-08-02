@@ -1,7 +1,8 @@
 # 全书目录（21 讲 · 六大部分）
 
 > **课程规模**：共 **21 讲**（非原十八讲）。Part 5 为 VLN（L18–L19），Part 6 为 Agent / 世界模型 / 前沿（L17、L20–L21）。  
-> 团队分工 · 时间安排 · 写作风格：见 [README](../README.md)  
+> 团队分工 · 时间安排：见 [README](../README.md)  
+> 写作风格（完整约定）：[`docs/style-guide.md`](style-guide.md)  
 > 进度跟踪：[`meta/status.md`](../meta/status.md)（每周三 21:00 更新）
 
 ## 前言
@@ -73,6 +74,7 @@
 
 ## 附录
 
+- [全书风格指南](style-guide.md)
 - [硬件与仿真环境配置](appendix/hardware-setup.md)
 - [教程实施原则](appendix/teaching-principles.md)
 - [最终学习成果](appendix/learning-outcomes.md)
