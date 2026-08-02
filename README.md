@@ -154,7 +154,7 @@ python simulation/minimal_reach.py
 |------|------|------|------|
 | 导言 | 部分定位 | [📖](docs/part6-agent-world-model/00-part-overview.md) | — |
 | 第 17 讲 | Embodied Agent | [📖](docs/part6-agent-world-model/17-embodied-agent.md) | [💻](code/lecture17/) |
-| 第 20 讲 | 世界模型与数据飞轮 | [📖](docs/part6-agent-world-model/20-world-model.md) | [💻](code/lecture20/) |
+| 第 20 讲 | 世界模型与数据飞轮 | [📖](docs/part6-agent-world-model/20-world-model.md) | [💻](code/lecture20/) · [Fast-WAM](https://github.com/yuantianyuan01/FastWAM) |
 | 第 21 讲 | 前沿进展与综合答辩 | [📖](docs/part6-agent-world-model/21-frontier-progress.md) | [💻](code/lecture21/) |
 
 > **学习顺序**：L17 Agent → L18–L19 VLN（Part 5）→ L20 世界模型 → L21 综合答辩

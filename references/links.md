@@ -187,9 +187,25 @@ OpenVLA-OFT、LIBERO — https://github.com/moojink/openvla-oft ，https://githu
 
 | 项目 | URL |
 |------|-----|
+| World Models for Robot Learning: A Comprehensive Survey | https://arxiv.org/abs/2605.00080 |
+| Auto-Encoding Variational Bayes | https://arxiv.org/abs/1312.6114 |
+| DINOv2 | https://arxiv.org/abs/2304.07193 |
+| DINOv3 | https://arxiv.org/abs/2508.10104 |
+| DINO-WM | https://dino-wm.github.io/ |
 | DreamerV3 | https://github.com/danijar/dreamerv3 |
 | DreamerV3 PyTorch | https://github.com/burchim/DreamerV3-PyTorch |
-| LeRobot | https://github.com/huggingface/lerobot |
+| AVDC | https://arxiv.org/abs/2310.08576 |
+| VidMan | https://arxiv.org/abs/2411.09153 |
+| WorldVLA | https://arxiv.org/abs/2506.21539 |
+| Vidar | https://arxiv.org/abs/2507.12898 |
+| VLA-JEPA | https://arxiv.org/abs/2602.10098 |
+| JEPA-VLA | https://arxiv.org/abs/2602.11832 |
+| DreamZero | https://arxiv.org/abs/2602.15922 |
+| Ctrl-World | https://ctrl-world.github.io/ |
+| TesserAct | https://tesseractworld.github.io/ |
+| Fast-WAM 论文 | https://arxiv.org/abs/2603.16666 |
+| Fast-WAM 项目页 | https://yuantianyuan01.github.io/FastWAM/ |
+| Fast-WAM 官方仓库 | https://github.com/yuantianyuan01/FastWAM |
 
 ## Lecture 21 — 前沿进展 {#lecture-21}
 
