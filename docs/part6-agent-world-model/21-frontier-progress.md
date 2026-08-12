@@ -649,5 +649,5 @@ UMI 就是介于人类视频和机器人遥操作之间的一层：人手持带�
 [24] Cho, D. et al. EgoAVFlow: Robot Policy Learning with Active Vision from Human Egocentric Videos via 3D Flow. arXiv:2602.22461, 2026.  
 [25] Punamiya, R. et al. EgoVerse: An Egocentric Human Dataset for Robot Learning from Around the World. arXiv:2604.07607, 2026.  
 [26] Chi, C. et al. Universal Manipulation Interface: In-The-Wild Robot Teaching Without In-The-Wild Robots. arXiv:2402.10329, 2024.  
-[27] Xbotics 第 17 讲《Embodied Agent》。  
+[27] Xbotics 第 19 讲《Embodied Agent》。  
 [28] Xbotics 第 20 讲《世界模型——预测、规划与数据飞轮》。

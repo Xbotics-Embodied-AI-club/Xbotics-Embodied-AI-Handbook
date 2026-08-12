@@ -58,7 +58,7 @@
 
 | 维度 | 样章 | 学什么 |
 |------|------|--------|
-| **结构外壳** | [`17-embodied-agent.md`](part6-agent-world-model/17-embodied-agent.md) | 有清晰的 `N.1` 目标、Demo、作业、关联代码 |
+| **结构外壳** | [`19-embodied-agent.md`](part6-agent-world-model/19-embodied-agent.md) | 有清晰的 `N.1` 目标、Demo、作业、关联代码 |
 | **叙事讲清楚** | Part 3–4（如第 8、10、14 讲） | 设问开场、概念讲透、跨讲引用、实验闭环；**不必十个一级节** |
 | **配图 caption** | [`01-introduction.md`](part1-system-basics/01-introduction.md) | `![…](path)` + 下一行 `*图 N-M 说明*` |
 | **双路径 Demo** | [`02-ros2-architecture.md`](part1-system-basics/02-ros2-architecture.md) | 有硬件 / 无硬件分写清楚 |
