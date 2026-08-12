@@ -1,7 +1,5 @@
 # 第 20 讲：世界模型
 
-> **所属部分**：第六部分 · Agent、世界模型与前沿进展
-> **Part 负责人**：雨浩 · 协同：煜恒（世界模型）
 > **实验代码**：[Fast-WAM 官方仓库](https://github.com/yuantianyuan01/FastWAM)
 > **参考资料**：[`references/links.md`](../../references/links.md#lecture-20)
 
