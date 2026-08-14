@@ -35,7 +35,9 @@
 
 > 仓库名 [Xbotics-Embodied-AI-Handbook](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-AI-Handbook)；课程已从原「十八讲」扩展为 **二十一讲**（新增 VLN×2，世界模型与前沿进展分讲）。
 
-![具身智能学习路线示意](https://github.com/user-attachments/assets/054c89b9-d114-4477-b751-a01f2e7a6376)
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/054c89b9-d114-4477-b751-a01f2e7a6376" alt="具身智能学习路线示意">
+</p>
 
 > 上图与 [Embodied-Guide](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide) 共用社区视觉素材；各讲专用配图见 [`assets/figures/`](assets/figures/)。
 
