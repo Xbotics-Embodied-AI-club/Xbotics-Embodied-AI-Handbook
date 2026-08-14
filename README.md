@@ -39,6 +39,13 @@
 
 > 上图与 [Embodied-Guide](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide) 共用社区视觉素材；各讲专用配图见 [`assets/figures/`](assets/figures/)。
 
+<p align="center">
+  <img src="assets/community/f405a1ce69f585d62c6b61bb66765c1d.png" alt="欢迎加入内测交流群" width="360">
+</p>
+<p align="center">
+  <em>欢迎加入内测交流群 · 扫码关注官方公众号</em>
+</p>
+
 <span id="quick-start"></span>
 
 ## 快速开始
