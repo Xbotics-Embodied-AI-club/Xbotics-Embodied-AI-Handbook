@@ -18,7 +18,9 @@ Harness 让模型能够持续、可检查、受约束地工作；
 Embodied Agent 再把这套任务执行能力接到机器人身体和真实环境上。
 ```
 
-![冰箱取水任务中的理解、行动、调整与验收](../../assets/figures/lecture19/fig-17-fridge-water-storyboard.png)
+![冰箱取水任务中的理解、行动、调整与验收](../../assets/figures/lecture19/fig-19-fridge-water-storyboard.png){width=68%}
+
+*冰箱取水任务中的理解、行动、调整与验收：长程任务除了移动和抓取，还需要理解目标、拆解步骤、调用能力并根据结果不断调整。*
 
 ---
 
@@ -34,7 +36,9 @@ Embodied Agent 再把这套任务执行能力接到机器人身体和真实环�
 
 Agent 面对的则是一个需要持续推进的目标。例如，“查找最近的具身智能论文并整理成中文摘要”至少需要搜索、筛选、读取、写作和验收。**LLM-based Agent** 会让模型在应用程序提供的能力范围内选择下一步，并根据执行结果继续调整。
 
-![Chatbot 与 Agent 的区别](../../assets/figures/lecture19/fig-17-chatbot-vs-agent.png)
+![Chatbot 与 Agent 的区别](../../assets/figures/lecture19/fig-19-chatbot-vs-agent.png){width=68%}
+
+*Chatbot 与 Agent 的区别：Chatbot 只回答问题，Agent 会使用工具推进任务并自动接回执行结果。*
 
 两者的区别不是有没有对话界面，而是谁拥有执行循环：
 
@@ -58,7 +62,9 @@ Agent 面对的则是一个需要持续推进的目标。例如，“查找最�
 
 Lilian Weng 在 2023 年的 *LLM Powered Autonomous Agents* 中给出了一张很有代表性的 Agent 系统图：Agent 位于中心，通过 **Planning、Memory、Tools 和 Action** 形成从思考、保存状态到使用外部能力和影响环境的完整链路。
 
-![Agent 系统总览](../../assets/figures/lecture19/fig-17-weng-agent-overview.png)
+![Agent 系统总览](../../assets/figures/lecture19/fig-19-weng-agent-overview.png){width=68%}
+
+*Agent 系统总览：Agent 位于中心，通过 Planning、Memory、Tools 与 Action 形成从思考到影响环境的完整链路。*
 
 > 图源：Lilian Weng，*LLM Powered Autonomous Agents*，2023。图中 Agent 与 Memory、Planning、Tools 和 Action 直接相连；Memory 又分为短期与长期记忆，Planning 包含反思、自我批评、思维链和子目标分解，Tools 则连接搜索、代码解释器等外部能力。
 
@@ -88,7 +94,9 @@ Observe：夹爪闭合，但杯子仍在桌面
 Update：记录抓取失败，改为重新定位后再抓
 ```
 
-![搜索论文任务中的最小 Agent Loop](../../assets/figures/lecture19/fig-17-minimal-agent-loop-search.png)
+![搜索论文任务中的最小 Agent Loop](../../assets/figures/lecture19/fig-19-minimal-agent-loop-search.png){width=68%}
+
+*搜索论文任务中的最小 Agent Loop：搜索、筛选、读取、写作与验收构成一个不断思考、行动、观察和更新状态的循环。*
 
 把 `search_web` 换成 `navigate_to("厨房")`，把 `read_file` 换成 `grasp("杯子")`，循环结构并没有改变；变化的是 Tool 的另一端从数字系统变成了机器人和环境。
 
@@ -174,7 +182,9 @@ Structured Output、Tool Calling、Memory、Skill 和 Harness 可以同时存在
 → Runtime、Harness 与 Evaluator
 ```
 
-![Agent 能力从对话到可靠执行的递进关系](../../assets/figures/lecture19/fig-17-agent-capability-layers.png)
+![Agent 能力从对话到可靠执行的递进关系](../../assets/figures/lecture19/fig-19-agent-capability-layers.png){width=68%}
+
+*Agent 能力从对话到可靠执行的递进关系：从 Structured Output 到 Harness，各组件分别补齐输出、行动、状态、能力连接与系统运行问题。*
 
 #### 19.2.3.1 Structured Output：让程序读懂模型输出
 
@@ -228,7 +238,9 @@ Structured Output 表达的是数据；**Function Calling（函数调用机制�
 
 **ReAct**（Reasoning + Acting，推理与行动）展示了 Thought、Action 和 Observation 交替影响后续决策的方式，是 Agent Loop 的代表性工作。
 
-![ReAct 的推理、行动与观察循环](../../assets/figures/lecture19/fig-17-react-loop.png)
+![ReAct 的推理、行动与观察循环](../../assets/figures/lecture19/fig-19-react-loop.png){width=68%}
+
+*ReAct 的推理、行动与观察循环：Thought、Action 与 Observation 交替出现，使每一步行动都能影响后续决策。*
 
 记录 Tool 请求、Action 和 Observation 可以提高系统的可追踪性，帮助定位失败发生在哪一步；模型生成的推理文字并不等于可靠、完整的内部解释。ReAct 原始实验位于文本环境，把它迁移到机器人时，还必须加入物理结果验证和安全检查。
 
@@ -238,7 +250,9 @@ Structured Output 表达的是数据；**Function Calling（函数调用机制�
 
 Tool 调用次数增加以后，把全部历史都塞进模型并不能保证任务稳定。**Context Engineering（上下文工程）**关注每一轮应该把什么交给模型；**State（状态）**保存任务当前的确定事实；**Memory（记忆）**保存可以在之后取回的经历与知识。
 
-![模型 Context、稳定任务状态与外部存储的关系](../../assets/figures/lecture19/fig-17-context-state-workspace.png)
+![模型 Context、稳定任务状态与外部存储的关系](../../assets/figures/lecture19/fig-19-context-state-workspace.png){width=68%}
+
+*模型 Context、稳定任务状态与外部存储的关系：Context 决定这一轮看什么，State 保存确定事实，Memory 保存可回收的经历与知识。*
 
 三者的职责不同：
 
@@ -262,11 +276,15 @@ RAG（Retrieval-Augmented Generation，检索增强生成）是从外部资料�
 
 Embodied Agent 还特别依赖 **Spatial Memory（空间记忆）**，例如物体位置、房间关系、可达区域和曾经失败的观察角度。所有 Memory 都需要生命周期：信息何时写入、怎样检索、何时更新或失效。错误状态如果长期保留，反而会误导 Agent。
 
-![Agent 的五类 Memory 及 Embodied Agent 的空间记忆](../../assets/figures/lecture19/fig-17-agent-memory-types.png)
+![Agent 的五类 Memory 及 Embodied Agent 的空间记忆](../../assets/figures/lecture19/fig-19-agent-memory-types.png){width=68%}
+
+*Agent 的五类 Memory 及 Embodied Agent 的空间记忆：不同记忆按用途区分，且都需要写入、检索、更新和失效的生命周期。*
 
 Generative Agents 使用 Memory Stream、Reflection 和 Planning 组织虚拟角色的经历；Mem0 等工程方案则把长期记忆保存在当前对话之外。无论采用哪种方式，保存日志都不等于形成有效 Memory。只有经过筛选、更新并能在正确时机取回的信息，才会帮助后续决策。
 
-![Generative Agents 中 Memory、Reflection 与 Planning 的关系](../../assets/figures/lecture19/fig-17-generative-agents-memory.png)
+![Generative Agents 中 Memory、Reflection 与 Planning 的关系](../../assets/figures/lecture19/fig-19-generative-agents-memory.png){width=68%}
+
+*Generative Agents 中 Memory、Reflection 与 Planning 的关系：只有经过筛选并能在正确时机取回的信息，才会帮助后续决策。*
 
 以“上次从正面抓取水瓶失败”为例，系统可以保存不同层次的信息：
 
@@ -309,7 +327,9 @@ Function Calling：模型怎样表达“我想调用某个函数”
 MCP：Host 怎样发现、连接并管理外部上下文和能力
 ```
 
-![Function Calling 与 MCP 的职责边界](../../assets/figures/lecture19/fig-17-function-calling-vs-mcp.png)
+![Function Calling 与 MCP 的职责边界](../../assets/figures/lecture19/fig-19-function-calling-vs-mcp.png){width=68%}
+
+*Function Calling 与 MCP 的职责边界：Function Calling 表达“调用哪个函数”，MCP 规范 Host 怎样发现、连接并管理外部能力。*
 
 二者组合时，一次调用可能经过下面的链路：
 
@@ -336,7 +356,9 @@ Skill：grasp
 
 LLM Agent 社区也会把一组可复用的指令、脚本和资料称为 Agent Skill，例如以 `SKILL.md` 为中心的目录。它通过加载操作说明影响 Agent 行为，与机器人领域“可执行行为单元”的含义不同。除非特别说明，下文的 Skill 均指可执行的机器人行为单元。
 
-![Tool、Skill 与 Harness 的分工](../../assets/figures/lecture19/fig-17-tool-skill-harness.png)
+![Tool、Skill 与 Harness 的分工](../../assets/figures/lecture19/fig-19-tool-skill-harness.png){width=68%}
+
+*Tool、Skill 与 Harness 的分工：Tool 是可执行操作，机器人 Skill 是带合同的行为单元，Harness 负责运行、检查与约束。*
 
 #### 19.2.3.5 Runtime、Harness 与 Evaluator：让系统持续、可检查地运行
 
@@ -409,13 +431,17 @@ Evaluator 检查：相机是否确认杯子位于目标区域？
 
 这正是 Embodied Agent 要解决的问题。它沿用数字 Agent 的 Planning、Memory、Tools 和 Agent Loop，但必须增加连接认知与身体的系统结构。
 
-![Embodied Agent 的四层通用架构](../../assets/figures/lecture19/fig-17-embodied-agent-four-layer-architecture.png)
+![Embodied Agent 的四层通用架构](../../assets/figures/lecture19/fig-19-embodied-agent-four-layer-architecture.png){width=68%}
+
+*Embodied Agent 的四层通用架构：Agent/Cognition、Harness/Runtime、Skill/Model 与 Robot Runtime/Controller 分别回答不同层次的问题。*
 
 ### 19.3.1 为什么不能让 LLM 直接控制机器人？
 
 假设 LLM 直接输出“把机械臂向前移动 20 厘米”。执行前至少还有几个问题没有回答：目标是否仍在原位？前方有没有人？机械臂能否到达？移动后怎样确认没有碰倒水瓶？
 
-![LLM 不能绕过执行与安全层直接控制电机](../../assets/figures/lecture19/fig-17-llm-not-direct-motor-control.png)
+![LLM 不能绕过执行与安全层直接控制电机](../../assets/figures/lecture19/fig-19-llm-not-direct-motor-control.png){width=68%}
+
+*LLM 不能绕过执行与安全层直接控制电机：模型输出必须经过 Harness、Skill 与控制器这些确定性的执行边界才能到达执行器。*
 
 LLM 适合理解目标和选择下一步，却不适合承担毫秒级控制、确定性安全检查和物理结果验证。因此，一个 Embodied Agent 通常采用四层架构：
 
@@ -437,11 +463,15 @@ LLM 适合理解目标和选择下一步，却不适合承担毫秒级控制、�
 
 例如，慢系统决定“先拿水，再去客厅”；快系统在抓取过程中持续调整轨迹、限制速度并检查夹爪状态。这里的“快”描述决策时间尺度，不代表某个 VLA 模型的推理延迟一定很短。
 
-![慢系统与快系统通过意图和反馈循环协作](../../assets/figures/lecture19/fig-17-slow-fast-systems.png)
+![慢系统与快系统通过意图和反馈循环协作](../../assets/figures/lecture19/fig-19-slow-fast-systems.png){width=68%}
+
+*慢系统与快系统通过意图和反馈循环协作：慢系统决定“做什么”，快系统在更短时间尺度内持续调整动作。*
 
 两个系统要持续协作，必须共享当前状态。机器人至少需要维护三类信息：
 
-![任务状态、机器人状态与环境状态](../../assets/figures/lecture19/fig-17-three-types-of-state.png)
+![任务状态、机器人状态与环境状态](../../assets/figures/lecture19/fig-19-three-types-of-state.png){width=68%}
+
+*任务状态、机器人状态与环境状态：三类状态分别回答任务进度、身体能力和周围世界的问题，并需要随执行持续更新。*
 
 | 状态 | 要回答的问题 | 冰箱取水示例 |
 |---|---|---|
@@ -523,13 +553,17 @@ VLA 很适合承担其中需要视觉理解和灵巧动作的部分，传统运�
 
 机器人执行后，信息沿相反方向返回：原始传感器数据被整理为 Observation，Skill 返回执行结果，系统从 Observation 中提取与成功条件相关的 Evidence，Evaluator 再判断任务是否完成。
 
-![传感器数据逐层变成可验收的 Evidence](../../assets/figures/lecture19/fig-17-sensor-to-evidence.png)
+![传感器数据逐层变成可验收的 Evidence](../../assets/figures/lecture19/fig-19-sensor-to-evidence.png){width=68%}
+
+*传感器数据逐层变成可验收的 Evidence：原始传感器数据被整理为 Observation，再提取出与成功条件直接相关的 Evidence。*
 
 这四个概念不能混为一谈。相机拍到水瓶属于 Observation；`grasp` 没有报错只表示 Skill 正常结束；相机和夹爪传感器共同确认“水瓶被机器人持有”才属于 Evidence。
 
 当 Agent Loop 开始控制机器人时，还需要加入物理结果验证和状态更新，因此可以展开为六步：
 
-![包含验证与状态更新的 Embodied Agent Loop](../../assets/figures/lecture19/fig-17-embodied-agent-loop.png)
+![包含验证与状态更新的 Embodied Agent Loop](../../assets/figures/lecture19/fig-19-embodied-agent-loop.png){width=68%}
+
+*包含验证与状态更新的 Embodied Agent Loop：Observe、Think、Plan、Act、Verify、Update 六步把物理结果验证和状态更新纳入循环。*
 
 ```text
 Observe：读取任务状态、机器人状态和环境状态
@@ -586,7 +620,9 @@ Harness：权限、参数、超时、重试预算和人工审批
 硬件：急停、限位开关和物理保护装置
 ```
 
-![Harness、控制器与硬件构成的三重安全边界](../../assets/figures/lecture19/fig-17-three-safety-boundaries.png)
+![Harness、控制器与硬件构成的三重安全边界](../../assets/figures/lecture19/fig-19-three-safety-boundaries.png){width=68%}
+
+*Harness、控制器与硬件构成的三重安全边界：安全不是一句语言要求，而是分布在 Harness、控制器和硬件三处确定性检查。*
 
 例如，在 Skill 请求被接受前，Harness 可以检查机器人是否在线、电量是否足够、所需资源是否空闲；动作到达驱动器前，控制器还要检查急停、碰撞标志、动作维度和数值边界。
 
@@ -628,7 +664,9 @@ LLM 提议动作
 
 这些名称属于本章示例程序，不是实现 Embodied Agent 时必须采用的标准命名。
 
-![示例代码中目标逐层变成机器人动作](../../assets/figures/lecture19/fig-17-goal-to-robot-action.png)
+![示例代码中目标逐层变成机器人动作](../../assets/figures/lecture19/fig-19-goal-to-robot-action.png){width=68%}
+
+*示例代码中目标逐层变成机器人动作：任务目标经过 Skill 请求、验证与调度，逐层变成可执行的机器人动作。*
 
 代码位于：
 
@@ -644,7 +682,9 @@ python3 code/lecture19/simulation/task_contract_demo.py
 
 程序会依次运行四个场景。先不要急着阅读全部代码，从第一个对象开始。
 
-![示例程序中的合同、闸门、结果、证据与评测对象](../../assets/figures/lecture19/fig-17-demo-object-map.png)
+![示例程序中的合同、闸门、结果、证据与评测对象](../../assets/figures/lecture19/fig-19-demo-object-map.png){width=68%}
+
+*示例程序中的合同、闸门、结果、证据与评测对象：TaskContract、SkillGateway、SkillResult、Evidence 与 Evaluator 划出了示例程序的职责边界。*
 
 ### 19.4.1 第一步：阅读 TaskContract 与 SkillContract
 
@@ -726,7 +766,9 @@ SkillGateway：允许=是，原因=通过（accepted）
 
 ### 19.4.3 第三步：比较“Skill 成功”和“任务完成”
 
-![Skill 正常结束与任务真正完成的区别](../../assets/figures/lecture19/fig-17-skill-success-vs-task-complete.png)
+![Skill 正常结束与任务真正完成的区别](../../assets/figures/lecture19/fig-19-skill-success-vs-task-complete.png){width=68%}
+
+*Skill 正常结束与任务真正完成的区别：Skill 返回成功不等于任务完成，还必须有满足成功条件的新鲜 Evidence。*
 
 只运行第一个场景：
 
@@ -811,7 +853,9 @@ python3 code/lecture19/simulation/task_contract_demo.py budget
 
 失败恢复的目标不是“永不停止”，而是在可控成本内重试，在证据长期没有增加时及时停机或求助。
 
-![继续、重试、重规划、求助与安全停止的分支](../../assets/figures/lecture19/fig-17-stop-and-recovery-paths.png)
+![继续、重试、重规划、求助与安全停止的分支](../../assets/figures/lecture19/fig-19-stop-and-recovery-paths.png){width=68%}
+
+*继续、重试、重规划、求助与安全停止的分支：失败恢复在可控成本内重试，并在证据长期不增长时及时停机或求助。*
 
 ### 19.4.5 第五步：增加一个失败场景
 
@@ -872,7 +916,9 @@ TaskContract
 
 Hi Robot 使用两个不同频率运行的模型：高层 VLM 读取相机画面、开放式指令和用户反馈，输出一个较简单的语言子命令；低层 VLA 再把子命令变成机器人 Action。
 
-![Hi Robot 的分层 VLA 架构](../../assets/figures/lecture19/fig-17-hi-robot-architecture.png)
+![Hi Robot 的分层 VLA 架构](../../assets/figures/lecture19/fig-19-hi-robot-architecture.png){width=68%}
+
+*Hi Robot 的分层 VLA 架构：高层 VLM 把开放式指令转成当前子命令，低层 VLA 再把子命令变成连续动作。*
 
 > 图源：*Hi Robot: Open-Ended Instruction Following with Hierarchical Vision-Language-Action Models*，Figure 2，2025。
 
@@ -888,7 +934,9 @@ Hi Robot 的高层 VLM 不是直接接入的通用 Chatbot。研究者使用机�
 
 *What Matters in Orchestrating Robot Policies* 对 Hi-VLA 系统进行了系统消融，比较高层 VLM、低层 VLA、Observation 表示、Memory 和控制权切换方式。结果说明，把一个强 VLM 放在一个强 VLA 上面，并不自动得到可靠系统。
 
-![Hi-VLA 的高层与低层循环](../../assets/figures/lecture19/fig-17-hi-vla-system.png)
+![Hi-VLA 的高层与低层循环](../../assets/figures/lecture19/fig-19-hi-vla-system.png){width=68%}
+
+*Hi-VLA 的高层与低层循环：高层 VLM 利用 Memory 改写子目标，低层 VLA 执行到满足结束条件后再把控制权交回高层。*
 
 > 图源：*What Matters in Orchestrating Robot Policies*，Figure 1，2026。
 
@@ -932,7 +980,9 @@ Harness VLA 采用了更受约束的接口。高层 Planner 不直接生成关�
 
 VLA 调用失败时，Planner 不必放弃整个任务。它可以读取新的 Observation，重新定位物体，调整机器人到更合适的预接触位置，然后再次调用 `vla_act`。系统还把成功的 Primitive 序列保存为 Task Specific Memory，把跨任务可复用的成功规则和失败模式保存为 Global Memory。
 
-![Harness VLA 系统总览](../../assets/figures/lecture19/fig-17-harness-vla-system-overview.png)
+![Harness VLA 系统总览](../../assets/figures/lecture19/fig-19-harness-vla-system-overview.png){width=68%}
+
+*Harness VLA 系统总览：Agentic Planner 从固定 Primitive Library 选择结构化调用，两类 Memory 分别保存任务级与跨任务经验。*
 
 > 图源：*Harness VLA: Steering Frozen VLAs into Reliable Manipulation Primitives via Memory-Guided Agents*，Figure 1，2026。
 
@@ -952,7 +1002,9 @@ Harness VLA 的主要实验在仿真 benchmark 中完成，因此它支持的是
 π0.7：结合历史、子任务和子目标图像输出动作
 ```
 
-![π0.7 架构总览](../../assets/figures/lecture19/fig-17-pi07-architecture-overview.png)
+![π0.7 架构总览](../../assets/figures/lecture19/fig-19-pi07-architecture-overview.png){width=68%}
+
+*π0.7 架构总览：历史、语义子任务、Metadata 与 Subgoal Images 共同进入 VLA，再由 Action Expert 输出动作。*
 
 > 图源：*π₀.₇: a Steerable Generalist Robotic Foundation Model with Emergent Capabilities*，Figure 2，2026。
 
@@ -982,7 +1034,9 @@ Harness VLA 的主要实验在仿真 benchmark 中完成，因此它支持的是
 系统 0：全身运动控制——稳定、精确地生成身体运动
 ```
 
-![COSA 的系统 2、系统 1 与系统 0 技术栈](../../assets/figures/lecture19/fig-17-cosa-system-stack.jpg)
+![COSA 的系统 2、系统 1 与系统 0 技术栈](../../assets/figures/lecture19/fig-19-cosa-system-stack.jpg){width=68%}
+
+*COSA 的系统 2、系统 1 与系统 0 技术栈：认知、VLA 与全身运动被组织成相互反馈的三个层次。*
 
 > 图源：逐际动力 COSA 公开资料。以下内容来自企业公开演示和负责人访谈，主要用于观察产业系统的架构选择，不等同于独立实验评测。
 
@@ -1068,7 +1122,7 @@ Agent 能看到哪些 Skill？
 本仓库提供两个不需要大模型 API、也不需要机器人硬件的最小示例。先运行架构实验，观察 TaskContract、Gateway、Evidence 和 Evaluator：
 
 ```bash
-cd code/lecture17
+cd code/lecture19
 python simulation/task_contract_demo.py
 ```
 
@@ -1143,8 +1197,41 @@ observe: ok - water bottle secured after adjusted grasp
 
 ## 19.11 参考资料
 
-本讲涉及的论文、博客、开源项目和产业系统链接，统一维护在 [Lecture 17 — Embodied Agent](../../references/links.md#lecture-17)。
+本讲涉及的论文、博客、开源项目和产业系统链接，统一维护在 [Lecture 19 — Embodied Agent](../../references/links.md#lecture-19)。
 
 ## 关联代码
 
 - [`code/lecture19/`](../../code/lecture19/)
+
+
+## 配图
+
+| 文件名 | 内容 |
+|--------|------|
+| `fig-19-fridge-water-storyboard.png` | 长程任务除了移动和抓取，还需要理解目标、拆解步骤、调用能力并根据结果不断调整 |
+| `fig-19-chatbot-vs-agent.png` | Chatbot 只回答问题，Agent 会使用工具推进任务并自动接回执行结果 |
+| `fig-19-weng-agent-overview.png` | Agent 位于中心，通过 Planning、Memory、Tools 与 Action 形成从思考到影响环境的完整链路 |
+| `fig-19-minimal-agent-loop-search.png` | 搜索、筛选、读取、写作与验收构成一个不断思考、行动、观察和更新状态的循环 |
+| `fig-19-agent-capability-layers.png` | 从 Structured Output 到 Harness，各组件分别补齐输出、行动、状态、能力连接与系统运行问题 |
+| `fig-19-react-loop.png` | Thought、Action 与 Observation 交替出现，使每一步行动都能影响后续决策 |
+| `fig-19-context-state-workspace.png` | Context 决定这一轮看什么，State 保存确定事实，Memory 保存可回收的经历与知识 |
+| `fig-19-agent-memory-types.png` | 不同记忆按用途区分，且都需要写入、检索、更新和失效的生命周期 |
+| `fig-19-generative-agents-memory.png` | 只有经过筛选并能在正确时机取回的信息，才会帮助后续决策 |
+| `fig-19-function-calling-vs-mcp.png` | Function Calling 表达“调用哪个函数”，MCP 规范 Host 怎样发现、连接并管理外部能力 |
+| `fig-19-tool-skill-harness.png` | Tool 是可执行操作，机器人 Skill 是带合同的行为单元，Harness 负责运行、检查与约束 |
+| `fig-19-embodied-agent-four-layer-architecture.png` | Agent/Cognition、Harness/Runtime、Skill/Model 与 Robot Runtime/Controller 分别回答不同层次的问题 |
+| `fig-19-llm-not-direct-motor-control.png` | 模型输出必须经过 Harness、Skill 与控制器这些确定性的执行边界才能到达执行器 |
+| `fig-19-slow-fast-systems.png` | 慢系统决定“做什么”，快系统在更短时间尺度内持续调整动作 |
+| `fig-19-three-types-of-state.png` | 三类状态分别回答任务进度、身体能力和周围世界的问题，并需要随执行持续更新 |
+| `fig-19-sensor-to-evidence.png` | 原始传感器数据被整理为 Observation，再提取出与成功条件直接相关的 Evidence |
+| `fig-19-embodied-agent-loop.png` | Observe、Think、Plan、Act、Verify、Update 六步把物理结果验证和状态更新纳入循环 |
+| `fig-19-three-safety-boundaries.png` | 安全不是一句语言要求，而是分布在 Harness、控制器和硬件三处确定性检查 |
+| `fig-19-goal-to-robot-action.png` | 任务目标经过 Skill 请求、验证与调度，逐层变成可执行的机器人动作 |
+| `fig-19-demo-object-map.png` | TaskContract、SkillGateway、SkillResult、Evidence 与 Evaluator 划出了示例程序的职责边界 |
+| `fig-19-skill-success-vs-task-complete.png` | Skill 返回成功不等于任务完成，还必须有满足成功条件的新鲜 Evidence |
+| `fig-19-stop-and-recovery-paths.png` | 失败恢复在可控成本内重试，并在证据长期不增长时及时停机或求助 |
+| `fig-19-hi-robot-architecture.png` | 高层 VLM 把开放式指令转成当前子命令，低层 VLA 再把子命令变成连续动作 |
+| `fig-19-hi-vla-system.png` | 高层 VLM 利用 Memory 改写子目标，低层 VLA 执行到满足结束条件后再把控制权交回高层 |
+| `fig-19-harness-vla-system-overview.png` | Agentic Planner 从固定 Primitive Library 选择结构化调用，两类 Memory 分别保存任务级与跨任务经验 |
+| `fig-19-pi07-architecture-overview.png` | 历史、语义子任务、Metadata 与 Subgoal Images 共同进入 VLA，再由 Action Expert 输出动作 |
+| `fig-19-cosa-system-stack.jpg` | 认知、VLA 与全身运动被组织成相互反馈的三个层次 |

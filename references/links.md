@@ -139,7 +139,23 @@ OpenVLA-OFT、LIBERO — https://github.com/moojink/openvla-oft ，https://githu
 | MuJoCo Playground | https://github.com/google-deepmind/mujoco_playground |
 | unitree_rl_mjlab | https://github.com/unitreerobotics/unitree_rl_mjlab |
 
-## Lecture 17 — Embodied Agent {#lecture-17}
+## Lecture 17 — VLN 理论 {#lecture-17}
+
+| 项目 | URL |
+|------|-----|
+| Habitat-Lab | https://github.com/facebookresearch/habitat-lab |
+| Habitat-Sim | https://github.com/facebookresearch/habitat-sim |
+| VLN-CE | https://github.com/jacobkrantz/VLN-CE |
+| Matterport3D | https://niessner.github.io/Matterport/ |
+
+## Lecture 18 — VLN 实操 {#lecture-18}
+
+| 项目 | URL |
+|------|-----|
+| AllenAct | https://github.com/allenai/allenact |
+| Habitat-Lab VLN baselines | https://github.com/facebookresearch/habitat-lab/tree/main/habitat-baselines |
+
+## Lecture 19 — Embodied Agent {#lecture-19}
 
 | 项目 | URL |
 |------|-----|
@@ -166,22 +182,6 @@ OpenVLA-OFT、LIBERO — https://github.com/moojink/openvla-oft ，https://githu
 | Hey Robot | https://github.com/Xbotics-Embodied-AI-club/Xbotics-Hey-Robot |
 | PhyAgentOS | https://github.com/PhyAgentOS/PhyAgentOS |
 | Dimos | https://github.com/dimensionalOS/dimos |
-
-## Lecture 18 — VLN 理论 {#lecture-18}
-
-| 项目 | URL |
-|------|-----|
-| Habitat-Lab | https://github.com/facebookresearch/habitat-lab |
-| Habitat-Sim | https://github.com/facebookresearch/habitat-sim |
-| VLN-CE | https://github.com/jacobkrantz/VLN-CE |
-| Matterport3D | https://niessner.github.io/Matterport/ |
-
-## Lecture 19 — VLN 实操 {#lecture-19}
-
-| 项目 | URL |
-|------|-----|
-| AllenAct | https://github.com/allenai/allenact |
-| Habitat-Lab VLN baselines | https://github.com/facebookresearch/habitat-lab/tree/main/habitat-baselines |
 
 ## Lecture 20 — 世界模型 {#lecture-20}
 
