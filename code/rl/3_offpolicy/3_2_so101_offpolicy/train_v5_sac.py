@@ -47,7 +47,6 @@ Critic（学整个回报分布而不是一个期望值）配视觉编码器，�
 """
 
 import os
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -57,8 +56,7 @@ import torch.nn.functional as F
 import lightning as L
 from torch.utils.data import DataLoader, IterableDataset
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import so101_sim  # noqa: E402  统一环境：lerobot 评测与 RL 训练共用同一份定义
+import so101_sim  # 统一环境：lerobot 评测与 RL 训练共用同一份定义
 
 
 class RunningNorm(nn.Module):
@@ -259,29 +257,36 @@ class ReplayBuffer:
 
 
 class SO101SACData(L.LightningDataModule):
-    """持有环境和回放池；每轮先采样、再把 minibatch 交给 Trainer（state 版，无 rgb）。"""
+    """持有环境和回放池；每轮先采样、再把 minibatch 交给 Trainer（state 版，无 rgb）。
 
-    def __init__(self, env, model, buffer, steps_per_iter, updates_per_iter, batch_size, learning_starts):
+    `env` 是 ManiSkill 标准 `ManiSkillVectorEnv`：不像旧版 `TrainEnv` 那样自己缓存
+    `self.obs`，这里改由本类持有 `self.state`，每次 `step` 后手动滚动到下一步。
+    """
+
+    def __init__(self, env, model, buffer, action_dim, steps_per_iter, updates_per_iter,
+                batch_size, learning_starts):
         super().__init__()
         self.env, self.model, self.buffer = env, model, buffer
+        self.action_dim = action_dim
         self.steps_per_iter, self.updates_per_iter = steps_per_iter, updates_per_iter
         self.batch_size, self.learning_starts = batch_size, learning_starts
         self.last_success = 0.0
         self.last_reward = 0.0
+        self.state, _ = env.reset()
 
     def _collect(self, use_policy):
-        state = self.env.obs["state"]
+        state = self.state
         self.model.obs_norm.update(state)  # 用原始 state 更新归一化统计，每步一次
         if use_policy:
             action = self.model.sample_action(state)
         else:  # 预热：均匀随机动作把池子填起来
-            low, high = self.env.single_action_space.low, self.env.single_action_space.high
-            low = torch.as_tensor(low, device=self.env.device)
-            high = torch.as_tensor(high, device=self.env.device)
-            action = low + (high - low) * torch.rand(self.env.num_envs, self.env.action_dim, device=self.env.device)
-        next_obs, reward, _, _, success = self.env.step(action)
-        self.buffer.add(state, action, reward, next_obs["state"])
-        return success.float().mean().item(), reward.float().mean().item()
+            low = torch.as_tensor(self.env.single_action_space.low, device=self.env.device)
+            high = torch.as_tensor(self.env.single_action_space.high, device=self.env.device)
+            action = low + (high - low) * torch.rand(self.env.num_envs, self.action_dim, device=self.env.device)
+        next_state, reward, _, _, info = self.env.step(action)
+        self.buffer.add(state, action, reward, next_state)
+        self.state = next_state
+        return info["success"].float().mean().item(), reward.float().mean().item()
 
     def train_dataloader(self):
         def gen():
@@ -322,13 +327,14 @@ class SuccessLogger(L.Callback):
 def run_training(task, num_envs, max_iterations, updates_per_iter, batch_size,
                  buffer_capacity, learning_starts, device, seed=1):
     torch.manual_seed(seed)
-    env = so101_sim.make_train_env(task, num_envs=num_envs, obs_mode="state", device=device)
-    env.reset()
+    env = so101_sim.state_rl_env(task, num_envs=num_envs)
+    state_dim = env.single_observation_space.shape[-1]
+    action_dim = env.single_action_space.shape[-1]
     low = torch.as_tensor(env.single_action_space.low, device=device)
     high = torch.as_tensor(env.single_action_space.high, device=device)
-    model = SAC(env.state_dim, env.action_dim, low, high).to(device)
-    buffer = ReplayBuffer(buffer_capacity, env.state_dim, env.action_dim, device)
-    data = SO101SACData(env, model, buffer, steps_per_iter=1, updates_per_iter=updates_per_iter,
+    model = SAC(state_dim, action_dim, low, high).to(device)
+    buffer = ReplayBuffer(buffer_capacity, state_dim, action_dim, device)
+    data = SO101SACData(env, model, buffer, action_dim, steps_per_iter=1, updates_per_iter=updates_per_iter,
                         batch_size=batch_size, learning_starts=learning_starts)
 
     ckpt_dir = Path(os.environ["DATASETS_ROOT"]) / "models" / "trained" / "so101_sim_offpolicy" / task
@@ -344,7 +350,7 @@ def run_training(task, num_envs, max_iterations, updates_per_iter, batch_size,
 
 
 # 改这里选任务与训练时长，然后 `python train_v5_sac.py`。
-TASK = "SO101ReachCube-v1"
+TASK = "SO101PickPlaceCube40-v1"
 
 if __name__ == "__main__":
     # 与 v3 DDPG / v4 TD3 完全相同的共享预算，只差算法，三级可公平对照：

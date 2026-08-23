@@ -12,6 +12,8 @@ from pathlib import Path
 
 import h5py
 
+# 默认 20，对应普通任务的 control_freq。`*Slow-v1` 任务是 30Hz（为对齐真机），
+# 转它们的轨迹必须显式传 fps=30——标签和环境不一致会让回放倍速失真。
 FPS = 20
 IMAGE_SIZE = "128"
 
@@ -24,15 +26,20 @@ def _alias_qpos(h5_path: Path) -> None:
                 agent["qpos"] = agent["noisy_qpos"][:]
 
 
-def to_lerobot(h5_path: Path, out_dir: Path, task_name: str) -> Path:
+def to_lerobot(h5_path: Path, out_dir: Path, task_name: str,
+               image_size: str = IMAGE_SIZE, fps: int = FPS) -> Path:
+    """转格式。`image_size` 传 "WxH"（如 KIT 双相机的 "640x480"）或单个数字（正方形）。
+
+    `fps` 必须等于采这批轨迹的环境的 control_freq。
+    """
     _alias_qpos(h5_path)
     subprocess.run(
         [
             sys.executable, "-m", "mani_skill.trajectory.convert_to_lerobot",
             f"--traj-path={h5_path}",
             f"--output-dir={out_dir}",
-            f"--fps={FPS}",
-            f"--image-size={IMAGE_SIZE}",
+            f"--fps={fps}",
+            f"--image-size={image_size}",
             f"--task-name={task_name}",
         ],
         check=True,
@@ -41,8 +48,9 @@ def to_lerobot(h5_path: Path, out_dir: Path, task_name: str) -> Path:
     return out_dir
 
 
-TASK = "SO101ReachCube-v1"
+TASK = "SO101PickPlaceCube40-v1"
 
 if __name__ == "__main__":
     work = Path(os.environ["DATASETS_ROOT"]) / "so101_sim" / "_gen" / TASK
-    to_lerobot(work / "rollout.h5", work / "dataset", task_name="reach the red cube")
+    to_lerobot(work / "rollout.h5", work / "dataset",
+              task_name="pick up the red cube and place it in the bin")

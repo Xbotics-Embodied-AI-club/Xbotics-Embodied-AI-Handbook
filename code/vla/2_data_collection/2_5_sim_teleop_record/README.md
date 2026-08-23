@@ -36,11 +36,12 @@ uv run python vla/2_data_collection/2_5_sim_teleop_record/teleop_record.py
 - `RUN = "selfcheck"` —— 无人值守：用内置的确定性动作序列跑通「采集 → 转换 → 加载」整条链，
   再用 `LeRobotDataset` 加载并打印 episodes / frames / features 验证格式。没有键盘 / 显示器也能跑。
 
-想换任务（8 个 SO-101 任务之一）改脚本里的 `TASK`；想调遥操快慢改 `STEP`。
+想换场景（3 个 SO-101 场景之一）改脚本里的 `TASK`；想调遥操快慢改 `STEP`。
 
 ## 输出
 
 数据集落 `DATASETS_ROOT/so101_sim/_teleop/<TASK>/dataset`（自检落 `_teleop_selfcheck/`），不入代码仓。
 目录即标准 `LeRobotDataset`（`data/` parquet + `videos/` mp4 + `meta/` info/stats/episodes），
 逐字段与 `rl/3_offpolicy` 的 `datagen/` 产出、与实物线一致：`action` f32×6、`observation.state` f32×6、
-`observation.images.base_camera` 128×128 视频，`fps=20`。
+`observation.images.top` 与 `observation.images.wrist` 各一路 128×128 视频（三个场景都是双相机，
+对齐真机），`fps=20`。

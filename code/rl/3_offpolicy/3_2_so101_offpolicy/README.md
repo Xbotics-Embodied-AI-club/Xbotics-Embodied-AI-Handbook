@@ -1,4 +1,4 @@
-# 3_2 SO101 连续控制：DDPG → TD3 → SAC → squint 分布式 SAC
+# 3_2 SO101 连续控制：DDPG → TD3 → SAC → 视觉分布式 SAC
 
 组3 讲16 的连续控制阶梯，承接 3_1 的值学习地基（CartPole 上的 Q-learning/DQN 都是
 离散动作，对每个动作打分再 argmax）。SO101 机械臂的动作是连续的，argmax 没法穷举了，
@@ -9,25 +9,28 @@
 | v3 DDPG | `train_v3_ddpg.py` | 确定性策略梯度：Actor 直接吐动作，沿 Q 的梯度往上爬 |
 | v4 TD3 | `train_v4_td3.py` | 治 DDPG 的 Q 高估：双 Q 取 min + 延迟策略更新 + 目标策略平滑 |
 | v5 SAC | `train_v5_sac.py` | 治 DDPG/TD3 的探索不足：随机策略 + 最大熵 + 自动温度，成功率从 0 → 0.99 |
-| v6 squint | `train_v6_squint.py` | 治 SAC 标量 Q 样本效率有限：Critic 换成 C51 分布式 + 输入换成 16px 视觉，success≈0.99 但更快更稳 |
+| v6 视觉分布式 SAC | `train_v6_squint.py` | 治 SAC 标量 Q 样本效率有限：Critic 换成 C51 分布式 + 输入换成 16px 视觉，success≈0.99 但更快更稳 |
 
 四个文件**各自自包含**（本级的网络 `nn.Module` + `LightningModule` 更新 + 回放池 +
 `trainer.fit` 都在同一个文件里，无共享 `model.py`），阶梯对照的重点就在每一级"改了
 什么"，diff 直接体现在文件里，不用来回跳文件找。SO101 环境不在本模块定义，统一从
-`platform/so101_sim`（`so101_sim.make_train_env`）消费——只写/走算法侧。
+`platform/so101_sim` 消费（`state_rl_env`/`visual_rl_env`）——只写/走算法侧。
 
 ```bash
-cd experiments
+cd code
 python rl/3_offpolicy/3_2_so101_offpolicy/train_v3_ddpg.py    # 依次跑通 v3→v4→v5→v6
 python rl/3_offpolicy/3_2_so101_offpolicy/train_v6_squint.py  # 改内联 TASK 换任务
 ```
 
-v3/v4/v5 从关节状态（`obs_mode="state"`）学 `SO101ReachCube-v1`，公平预算 500 iter
-对照：DDPG 全程震荡（mean_reward≈0.28，success_once 始终 0）、TD3 治住震荡但仍是
-0（mean_reward≈0.52）、SAC 换随机策略 + 最大熵后 success_once 从 iter~480 起稳定
-落在 0.93～0.99——是这条阶梯上第一次真正意义的"解决"，也印证了探索不足才是
-DDPG/TD3 学不动的病根。v6 换视觉输入 + C51 分布式 Critic，success≈0.99，且能顺手
-产 VLA 课要的数据。
+v3/v4/v5 从关节状态（`obs_mode="state"`）学习，公平预算 500 iter 对照：DDPG 全程震荡
+（mean_reward≈0.28，success_once 始终 0）、TD3 治住震荡但仍是 0（mean_reward≈0.52）、
+SAC 换随机策略 + 最大熵后 success_once 从 iter~480 起稳定落在 0.93～0.99——是这条阶梯
+上第一次真正意义的"解决"，也印证了探索不足才是 DDPG/TD3 学不动的病根。v6 换视觉输入 +
+C51 分布式 Critic，success≈0.99，且能顺手产 VLA 课要的数据。
+
+> 上面这组对照数据是在已下线的单相机 `SO101ReachCube-v1` 任务上跑出来的，四个文件现在
+> 的 `TASK` 已改指向 `platform/so101_sim` 现存的 KIT 分发场景（`SO101PickPlaceCube40-v1`
+> 等）；重跑不会复现这组数值，本模块的算法阶梯待重新整训（见文末说明）。
 
 ## v6 顺带产出的 VLA 数据：`datagen/`
 
@@ -45,7 +48,7 @@ v6 训好的策略不只是教学终点，rollout 出的成功轨迹换个外观
 | `datagen/gen_dataset.py` | 一条命令串起 rollout → replay → to_lerobot |
 
 ```bash
-cd experiments
+cd code
 python rl/3_offpolicy/3_2_so101_offpolicy/train_v6_squint.py       # 先训 v6，产 sac_ckpt.pt
 python rl/3_offpolicy/3_2_so101_offpolicy/datagen/gen_dataset.py   # 再产数据集（改内联 TASK；外观在 datagen/replay.py）
 ```
@@ -54,7 +57,16 @@ python rl/3_offpolicy/3_2_so101_offpolicy/datagen/gen_dataset.py   # 再产数�
 
 ## 结果
 
-- v3/v4/v5/v6 四级同 `SO101ReachCube-v1` 阶梯对照见上；v6 squint 从零训到
-  `success_once ≈ 0.99`。
+- v3/v4/v5/v6 四级同 `SO101ReachCube-v1` 阶梯对照见上；v6 从零训到
+  `success_once ≈ 0.99`（该任务已下线，历史结果不会重跑复现，见上方说明）。
 - `datagen/` 全链产出 64 集 / 3200 帧 / 128px LeRobotDataset（lerobot 0.5.1 加载通过）；
   黑臂白底换色目视核验通过。
+
+## 待重新整训
+
+`so101_sim` 重构后三个分发场景改为 KIT 双相机（`SO101PickPlaceCube40-v1` 等），
+上面记录的阶梯对照结果全部来自已下线的单相机 `SO101ReachCube-v1`。四个训练脚本已
+机械收敛到新接口（`state_rl_env`/`visual_rl_env`，`TASK = "SO101PickPlaceCube40-v1"`），
+但尚未在新场景上重新跑出对照数据——v6 的 `ColorJitterWrapper` 对双相机 6 通道观测的
+处理方式与单相机时不同，重训前需要确认整条视觉管线在新场景下的行为。本模块的算法
+阶梯待与真机 HIL-SERL（`3_3`）一起重新整训。

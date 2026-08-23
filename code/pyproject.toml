@@ -64,11 +64,11 @@ gpu_x86 = [
     "tyro",
     "mediapy",
     # SO101 仿真闭环：mani_skill（GPU 并行仿真+无头 RGB，带入 sapien/mplib/pytorch-kinematics）
-    # + so101_sim（我们的环境包，editable，见 [tool.uv.sources]；含 vendor squint 8 任务）。
-    # 供 lerobot-eval --env.type=so101_sim 与 rl/3_offpolicy/3_1 数据生成。
+    # + so101_sim（我们的环境包，editable，见 [tool.uv.sources]；三个 KIT 分发场景）。
+    # 供 lerobot-eval --env.type=so101_sim 与 rl/3_offpolicy 数据生成。
     "mani-skill==3.0.1",
     "so101_sim",
-    # squint SAC 训练器（rl/3_offpolicy/3_1 数据生产线薄包它出专家）依赖；
+    # SAC 训练器（rl/3_offpolicy 数据生产线薄包它出专家）依赖；
     # 实测与 torch2.8+cu128 共存，钉版防 uv 拉新版崩（tensordict CudaGraphModule / torchrl ReplayBuffer）。
     "torchrl==0.13.2",
     "tensordict==0.13.0",
@@ -85,6 +85,8 @@ gpu_x86 = [
     "imageio==2.34.1",
     "joblib",
     "trimesh",
+    # STEP(.STEP/.stp) 读取后端（OpenCASCADE 的纯 wheel 绑定，供 trimesh 加载 assets/objects 的 CAD 件）。
+    "cascadio",
     "chumpy",
     "smplx",
     "wis3d",

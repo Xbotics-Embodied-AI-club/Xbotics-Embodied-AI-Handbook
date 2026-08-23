@@ -17,11 +17,11 @@ import numpy as np  # noqa: F401  C 扩展 ABI 顺序：numpy 在 torch 前
 import torch
 import gymnasium as gym
 
-import so101_sim  # 注册任务 + 把 vendored squint 放上 sys.path（DownsampleObsWrapper 用得到）
+import so101_sim  # 注册任务
 from mani_skill.utils.wrappers.record import RecordEpisode
 from mani_skill.utils.wrappers.flatten import FlattenRGBDObservationWrapper
 from mani_skill.vector.wrappers.gymnasium import ManiSkillVectorEnv
-from utils import DownsampleObsWrapper
+from so101_sim.wrappers import DownsampleObsWrapper
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from train_v6_squint import CNNEncoder, Actor  # noqa: E402  数据生产线加载教学 v6 训好的策略
@@ -29,7 +29,7 @@ from train_v6_squint import CNNEncoder, Actor  # noqa: E402  数据生产线加�
 NUM_ENVS = 16
 IMAGE_SIZE = 16      # 策略输入分辨率（与训练一致）
 RENDER_SIZE = 128    # h5 里存的全分辨率
-EPISODE_STEPS = 50
+EPISODE_STEPS = 400  # 与三个分发场景注册的 max_episode_steps 一致：抓起来再放进料盒要这么多步
 
 
 def rollout(task: str, ckpt_path: Path, n_episodes: int, out_dir: Path, device: str = "cuda") -> Path:
@@ -78,7 +78,7 @@ def rollout(task: str, ckpt_path: Path, n_episodes: int, out_dir: Path, device: 
 
 
 # 独立跑：改这里的任务与集数。
-TASK = "SO101ReachCube-v1"
+TASK = "SO101PickPlaceCube40-v1"
 N_EPISODES = 64
 
 if __name__ == "__main__":

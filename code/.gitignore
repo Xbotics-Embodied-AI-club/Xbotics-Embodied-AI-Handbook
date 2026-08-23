@@ -16,6 +16,11 @@ platform/rdk/rdk_LeRobot_tools/
 .result/
 output/
 recordings/
+
+# 任务绑定的临时工作目录：探针脚本、调试日志、中间产物。
+# 不分发给学员，也不进 git（AGENTS.md：学生可见代码目录禁止脚手架痕迹）。
+# 注意："不入库"不等于"可随手删"：任何回归门依赖的东西（如物理基线）必须连同生成
+# 脚本一起放进有版本控制的目录（如 tests/data/），不能只活在 scratch/ 里。
 scratch/
 __pycache__/
 *.pyc

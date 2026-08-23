@@ -14,9 +14,9 @@ from rollout import rollout
 from replay import replay, APPEARANCE
 from to_lerobot import to_lerobot
 
-TASK = "SO101ReachCube-v1"
+TASK = "SO101PickPlaceCube40-v1"
 N_EPISODES = 64
-TASK_DESCRIPTION = "reach the red cube"
+TASK_DESCRIPTION = "pick up the red cube and place it in the bin"
 
 datasets_root = Path(os.environ["DATASETS_ROOT"])
 ckpt = datasets_root / "models" / "trained" / "so101_sim_sac" / TASK / "sac_ckpt.pt"  # train_v6_squint.py 的产物

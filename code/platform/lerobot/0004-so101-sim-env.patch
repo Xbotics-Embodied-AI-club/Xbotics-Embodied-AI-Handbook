@@ -2,23 +2,24 @@ diff --git a/src/lerobot/envs/configs.py b/src/lerobot/envs/configs.py
 index 9c1c083..f2b7c7f 100644
 --- a/src/lerobot/envs/configs.py
 +++ b/src/lerobot/envs/configs.py
-@@ -388,6 +388,71 @@ class MetaworldEnv(EnvConfig):
+@@ -388,6 +388,75 @@ class MetaworldEnv(EnvConfig):
          }
- 
- 
+
+
 +@EnvConfig.register_subclass("so101_sim")
 +@dataclass
 +class So101SimEnv(EnvConfig):
-+    """SO101 仿真（squint / ManiSkill3）评测环境。
++    """SO101 仿真（ManiSkill3）评测环境。
 +
 +    走 make_env 的通用分支：import package_name（=so101_sim）触发注册，再
-+    gym.make(gym_id=SO101Sim-v1, **gym_kwargs)。8 个任务由 task 字段选择：
-+    SO101{Reach,Lift,Place,Stack}{Cube,Can}-v1。
++    gym.make(gym_id=SO101Sim-v1, **gym_kwargs)。task 字段在三个分发场景里选择：
++    SO101PickPlaceCube40-v1 / SO101PickPlaceCube20-v1 / SO101PickPlaceCylinder40-v1，
++    每个场景都是 top + wrist 双相机。
 +    """
 +
-+    task: str = "SO101ReachCube-v1"
++    task: str = "SO101PickPlaceCube40-v1"
 +    fps: int = 20
-+    episode_length: int = 50
++    episode_length: int = 400
 +    obs_type: str = "pixels_agent_pos"
 +    obs_mode: str = "rgb"
 +    render_mode: str = "rgb_array"
@@ -33,20 +34,23 @@ index 9c1c083..f2b7c7f 100644
 +        default_factory=lambda: {
 +            "action": ACTION,
 +            "agent_pos": OBS_STATE,
-+            "pixels/base_camera": f"{OBS_IMAGES}.base_camera",
++            "pixels/top": f"{OBS_IMAGES}.top",
++            "pixels/wrist": f"{OBS_IMAGES}.wrist",
 +        }
 +    )
 +
 +    def __post_init__(self):
 +        if self.obs_type == "pixels":
-+            self.features["pixels/base_camera"] = PolicyFeature(
-+                type=FeatureType.VISUAL, shape=(self.observation_height, self.observation_width, 3)
-+            )
++            for camera in ("top", "wrist"):
++                self.features[f"pixels/{camera}"] = PolicyFeature(
++                    type=FeatureType.VISUAL, shape=(self.observation_height, self.observation_width, 3)
++                )
 +        elif self.obs_type == "pixels_agent_pos":
 +            self.features["agent_pos"] = PolicyFeature(type=FeatureType.STATE, shape=(6,))
-+            self.features["pixels/base_camera"] = PolicyFeature(
-+                type=FeatureType.VISUAL, shape=(self.observation_height, self.observation_width, 3)
-+            )
++            for camera in ("top", "wrist"):
++                self.features[f"pixels/{camera}"] = PolicyFeature(
++                    type=FeatureType.VISUAL, shape=(self.observation_height, self.observation_width, 3)
++                )
 +        else:
 +            raise ValueError(f"Unsupported obs_type: {self.obs_type}")
 +

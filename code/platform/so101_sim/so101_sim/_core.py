@@ -1,8 +1,8 @@
 """共享的 ManiSkill 批量环境构造核。
 
-`So101SimEnv`（lerobot 单环境评测口）和 `make_train_env`（RL 千级并行训练口）都从这一句
-`gym.make` 出发，只是 num_envs / obs_mode / 渲染参数不同——保证两条消费路径拿到的是同一个
-底层仿真定义（同一批 squint 任务、同一份机器人资产），不会各自漂移出两套环境。
+`lerobot_env.So101SimEnv`（lerobot 单环境评测口）和 `wrappers.visual_rl_env`（RL 批量训练口）
+都从这一句 `gym.make` 出发，只是 num_envs / obs_mode / 渲染参数不同——保证两条消费路径拿到的
+是同一个底层仿真定义（同一批任务、同一份机器人资产），不会各自漂移出两套环境。
 """
 
 from __future__ import annotations

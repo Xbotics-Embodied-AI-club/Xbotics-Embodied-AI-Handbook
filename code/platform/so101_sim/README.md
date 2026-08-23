@@ -1,56 +1,74 @@
-# so101_sim — SO101 仿真闭环（接入 lerobot）
+# so101_sim —— SO101 机械臂仿真环境
 
-把 **squint** 的 ManiSkill3 SO101 任务接进 lerobot：**无机械臂**也能在仿真里跑 policy 评测，
-并作为后续「RL 大量生成数据 → VLA 微调」的地基。定位对标 LIBERO——课程训练任务的统一落脚点。
+基于 ManiSkill3 / SAPIEN（PhysX GPU 后端）的 SO-101 仿真，物体尺寸、机器人几何与
+运动速度都按真机 KIT 标定。**独立包**：不依赖 lerobot 也能用。
 
-## 8 个任务
+## 三个场景
 
-squint 官方 8 任务（4 类 × {Cube, Can}，配 4 个 3D 打印件，sim 物体与真机一致）：
-
-| 类别 | 任务 id |
+| 环境 id | 场景 |
 |---|---|
-| Reach | `SO101ReachCube-v1` / `SO101ReachCan-v1` |
-| Lift | `SO101LiftCube-v1` / `SO101LiftCan-v1` |
-| Place | `SO101PlaceCube-v1` / `SO101PlaceCan-v1` |
-| Stack | `SO101StackCube-v1` / `SO101StackCan-v1` |
+| `SO101PickPlaceCube40-v1` | 抓 4cm 方块放进料盒 |
+| `SO101PickPlaceCube20-v1` | 抓 2cm 方块放进料盒 |
+| `SO101PickPlaceCylinder40-v1` | 抓 4cm 圆柱（立在桌面，抓圆面）放进料盒 |
 
-## 环境
+一个场景一个环境，不做参数化派生。
 
-在统一 uv 环境的 `gpu_x86` extra 里（`mani_skill==3.0.1` 已含），并先打好 lerobot 补丁：
+## 两个入口
 
-```bash
-cd experiments
-bash lerobot/fetch_lerobot.sh     # 含 0004-so101-sim-env.patch（注册 env.type=so101_sim）
-uv sync --extra gpu_x86
+### 1. 原生（ManiSkill 批量环境）
+
+数据生产与 RL 都走这个。观测是 **GPU 上的 torch tensor**，首维恒为 `num_envs`：
+
+```python
+import gymnasium as gym
+import so101_sim  # import 即注册
+
+env = gym.make("SO101PickPlaceCube40-v1", num_envs=64, obs_mode="state",
+               sim_backend="gpu", render_mode="all")
+obs, _ = env.reset(seed=0)      # obs.shape == (64, ...)，在 cuda 上
 ```
 
-## 入口
+视觉 RL 另有一个便利构造器（降采样 16px + 颜色抖动 + 向量化），返回的仍是
+ManiSkill 标准的 `ManiSkillVectorEnv`：
 
-policy 仿真评测走 lerobot 原生 CLI（真机/仿真同一条命令，只换 `--env.type`）：
-
-```bash
-# so101_sim 需在 PYTHONPATH 上（从 code/ 根运行即可）
-PYTHONPATH=. lerobot-eval \
-  --env.type=so101_sim \
-  --env.task=SO101ReachCube-v1 \
-  --policy.path=<训练好的 policy> \
-  --eval.n_episodes=10 --eval.batch_size=1
+```python
+from so101_sim import visual_rl_env
+env = visual_rl_env("SO101PickPlaceCube40-v1", num_envs=1024, image_size=16)
 ```
 
-输出 `pc_success` + 每集录像。`--policy.type=act`（不给 `--policy.path`）会用随机初始化的 policy
-跑通全流程，可用于自检管线。
+### 2. lerobot 评测（标准单环境 gym.Env）
 
-> RL 训练（`train_rl.py`）、数据集生成（`gen_dataset.py`）、回放换色（`replay.py`）属后续阶段，接入本模块的 `So101SimEnv`。
+`So101SimEnv` 把批量 tensor 观测转成 lerobot 约定的 numpy 格式
+（`{"agent_pos": ..., "pixels": {"top": ..., "wrist": ...}}`，两路相机都给）：
 
-## 结构与边界
+```bash
+lerobot-eval --env.type=so101_sim --env.task=SO101PickPlaceCube40-v1 --eval.n_episodes=20
+```
+
+`--env.type=so101_sim` 这个选项由 `platform/lerobot/0004-so101-sim-env.patch` 注册
+（上游 lerobot 没有）。**依赖方向是单向的**：本包不 import lerobot，是 lerobot 通过补丁
+认识本包——所以不打补丁时入口 1 照样能用。
+
+## 结构
 
 ```
 so101_sim/
-├── __init__.py         # import 即注册 8 个 SO101 任务 + lerobot 评测入口 SO101Sim-v1
-├── so101_sim_env.py    # So101SimEnv(gym.Env)：ManiSkill 观测 → lerobot 格式（唯一依赖 squint 的适配器）
-└── vendor/squint/      # vendored squint（MIT）：8 任务定义 + SO101 机器人资产（见其 README）
+├── envs.py                 三个分发场景（mixin 组合：双相机 / 真机尺寸 / 可达生成 / 速度包线）
+├── tasks/                  任务基类与成功判定（place.py + base_random_env.py）
+├── robots/
+│   ├── so101_kit.py        KIT 版机器人（含底板、型材、两个相机支架）
+│   ├── so101_kit_slow.py   真机速度包线版
+│   ├── so101_base/         裸臂 SO101 本体与网格
+│   └── kit_assets/         KIT URDF + 网格 + 物体
+├── lerobot_env.py          入口 2：lerobot 评测口
+├── wrappers.py              RL 观测包装 + visual_rl_env / state_rl_env
+└── _core.py                两个入口共享的 gym.make 内核（防止环境定义漂移）
 ```
 
-关键边界：**只有 `so101_sim_env.py` 依赖 vendored squint / ManiSkill**；其余一切（评测、后续 RL
-数据生成、机器人伪装）都只依赖 `So101SimEnv`。换仿真器或升级 squint 只动这一处。lerobot 侧的
-`0004` 补丁只加一个 `EnvConfig` 注册，走 `make_env` 的通用 `package_name/gym_id` 分支。
+`tasks/` 与 `robots/so101_base/` 最初取自 squint（MIT），现已分叉自维护，
+来源与分叉声明见 [`so101_sim/tasks/UPSTREAM.md`](so101_sim/tasks/UPSTREAM.md)。
+
+## 装
+
+由 `code/pyproject.toml` 以 editable 装入统一 uv 环境（`so101_sim = { path = ... }`），
+`import so101_sim` 直接可用，不需要设 `PYTHONPATH`。

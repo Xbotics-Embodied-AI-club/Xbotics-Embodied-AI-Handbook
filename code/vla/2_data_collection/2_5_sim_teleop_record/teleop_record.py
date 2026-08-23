@@ -21,7 +21,7 @@ import cv2
 import gymnasium as gym
 import h5py
 
-import so101_sim  # import 即向 ManiSkill 注册 8 个 SO101 仿真任务
+import so101_sim  # import 即向 ManiSkill 注册 3 个 SO101 仿真场景
 
 from mani_skill.utils.wrappers.record import RecordEpisode
 
@@ -82,7 +82,7 @@ class Keyboard:
 
 
 # ── 起一个带录制器的 SO-101 仿真 ──────────────────────────────────────────
-TASK = "SO101ReachCube-v1"   # squint 的 8 个任务之一：把红方块够到位；换任务改这一行
+TASK = "SO101PickPlaceCube40-v1"   # 把 4cm 方块抓起来放进料盒；换场景改这一行
 FPS = 20                     # 仿真控制频率，也是数据集回放帧率
 
 
@@ -127,7 +127,7 @@ def to_lerobot(h5_path, out_dir):
             f"--output-dir={out_dir}",
             f"--fps={FPS}",
             f"--image-size={IMAGE_SIZE}",
-            f"--task-name=reach the red cube",
+            f"--task-name=pick up the cube and place it in the bin",
         ],
         check=True,
     )
@@ -149,7 +149,7 @@ def teleop():
         obs, _ = rec.reset(seed=ep)
         for _ in range(EPISODE_STEPS):
             obs, _, terminated, truncated, _ = rec.step(kb.action()[None])
-            frame = obs["sensor_data"]["base_camera"]["rgb"][0].cpu().numpy()
+            frame = obs["sensor_data"]["top"]["rgb"][0].cpu().numpy()
             cv2.imshow("SO-101 遥操", cv2.resize(frame[:, :, ::-1], (512, 512)))
             cv2.waitKey(1)
             if kb.end_episode or bool(terminated[0]) or bool(truncated[0]):

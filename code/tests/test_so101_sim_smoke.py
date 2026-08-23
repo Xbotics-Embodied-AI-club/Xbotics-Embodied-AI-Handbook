@@ -1,6 +1,6 @@
-"""so101_sim 冒烟测试：squint SO101 仿真接入 lerobot 的最小闭环自检。
+"""so101_sim 接入 lerobot 的最小闭环自检：import → 注册 → make → reset/step → lerobot make_env 通路。
 
-覆盖 import → 注册 → make → reset/step → lerobot make_env 通路。需要 CUDA（ManiSkill GPU 后端）。
+需要 CUDA（ManiSkill GPU 后端）。
 运行：`python -m pytest tests/test_so101_sim_smoke.py`（so101_sim 已 editable 安装，无需 PYTHONPATH）。
 """
 
@@ -13,15 +13,13 @@ if not torch.cuda.is_available():
     pytest.skip("so101_sim 需要 CUDA（ManiSkill GPU 后端）", allow_module_level=True)
 
 EXPECTED_TASKS = {
-    "SO101ReachCube-v1",
-    "SO101ReachCan-v1",
-    "SO101LiftCube-v1",
-    "SO101LiftCan-v1",
-    "SO101PlaceCube-v1",
-    "SO101PlaceCan-v1",
-    "SO101StackCube-v1",
-    "SO101StackCan-v1",
+    "SO101PickPlaceCube40-v1",
+    "SO101PickPlaceCube20-v1",
+    "SO101PickPlaceCylinder40-v1",
 }
+
+# 三个场景都是双相机（top 俯视全局 / wrist 随夹爪），与真机数据集一致。
+EXPECTED_CAMERAS = ["top", "wrist"]
 
 
 def test_import_registers_tasks_and_entrypoint():
@@ -40,7 +38,7 @@ def test_env_make_reset_step_obs_format():
 
     env = gym.make(
         "SO101Sim-v1",
-        task="SO101ReachCube-v1",
+        task="SO101PickPlaceCube40-v1",
         obs_type="pixels_agent_pos",
         observation_width=128,
         observation_height=128,
@@ -48,7 +46,9 @@ def test_env_make_reset_step_obs_format():
     try:
         obs, info = env.reset(seed=0)
         assert info == {"is_success": False}
-        assert obs["pixels"]["base_camera"].shape == (128, 128, 3)
+        assert sorted(obs["pixels"]) == EXPECTED_CAMERAS
+        for name in EXPECTED_CAMERAS:
+            assert obs["pixels"][name].shape == (128, 128, 3)
         assert obs["agent_pos"].shape == (6,)
         assert env.action_space.shape == (6,)
 
@@ -64,7 +64,7 @@ def test_lerobot_make_env_generic_branch():
     from lerobot.envs.configs import So101SimEnv
     from lerobot.envs.factory import make_env
 
-    cfg = So101SimEnv(task="SO101ReachCube-v1")
+    cfg = So101SimEnv(task="SO101PickPlaceCube40-v1")
     assert cfg.type == "so101_sim"
     assert cfg.package_name == "so101_sim"
     assert cfg.gym_id == "SO101Sim-v1"

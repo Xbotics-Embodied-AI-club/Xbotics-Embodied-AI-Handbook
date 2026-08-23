@@ -28,14 +28,13 @@ off-policy 的数据流和 on-policy（rl/1_1 的 PPO）不同：这里有个**�
 每一轮先用当前策略采几步塞进池子，再从池子里随机抽若干 minibatch 做 SAC 更新——
 "边玩边学、旧经验反复用"正是 off-policy 样本高效的来源。
 
-四件套：环境 `so101_sim.make_train_env(obs_mode="visual")`（与 lerobot 评测共用
+四件套：环境 `so101_sim.visual_rl_env(...)`（与 lerobot 评测共用
 同一个 so101_sim 环境定义）＋ 本文件顶部的网络/更新 `VisualSAC`（LightningModule）
 ＋ 数据 `SO101SACData`（LightningDataModule，持有环境和回放池）＋ 本文件的 `trainer.fit`。
 自包含单文件，和 v3/v4/v5 一样：模型在前，`ReplayBuffer`/`trainer.fit` 在后。
 """
 
 import os
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -45,8 +44,7 @@ import torch.nn.functional as F
 import lightning as L
 from torch.utils.data import DataLoader, IterableDataset
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import so101_sim  # noqa: E402  统一环境：lerobot 评测与 RL 训练共用同一份定义
+import so101_sim  # 统一环境：lerobot 评测与 RL 训练共用同一份定义
 
 
 def mlp(sizes, out_activation=False):
@@ -289,27 +287,34 @@ class ReplayBuffer:
 
 
 class SO101SACData(L.LightningDataModule):
-    """持有环境和回放池；每轮先采样、再把 minibatch 交给 Trainer。"""
+    """持有环境和回放池；每轮先采样、再把 minibatch 交给 Trainer。
 
-    def __init__(self, env, model, buffer, steps_per_iter, updates_per_iter, batch_size, learning_starts):
+    `env` 是 ManiSkill 标准 `ManiSkillVectorEnv`：不像旧版 `TrainEnv` 那样自己缓存
+    `self.obs`，这里改由本类持有 `self.obs`，每次 `step` 后手动滚动到下一步。
+    """
+
+    def __init__(self, env, model, buffer, action_dim, steps_per_iter, updates_per_iter,
+                batch_size, learning_starts):
         super().__init__()
         self.env, self.model, self.buffer = env, model, buffer
+        self.action_dim = action_dim
         self.steps_per_iter, self.updates_per_iter = steps_per_iter, updates_per_iter
         self.batch_size, self.learning_starts = batch_size, learning_starts
         self.last_success = 0.0
+        self.obs, _ = env.reset()
 
     def _collect(self, use_policy):
-        rgb, state = self.env.obs["rgb"], self.env.obs["state"]
+        rgb, state = self.obs["rgb"], self.obs["state"]
         if use_policy:
             action = self.model.sample_action(rgb, state)
         else:  # 预热：均匀随机动作把池子填起来
-            low, high = self.env.single_action_space.low, self.env.single_action_space.high
-            low = torch.as_tensor(low, device=self.env.device)
-            high = torch.as_tensor(high, device=self.env.device)
-            action = low + (high - low) * torch.rand(self.env.num_envs, self.env.action_dim, device=self.env.device)
-        next_obs, reward, _, _, success = self.env.step(action)
+            low = torch.as_tensor(self.env.single_action_space.low, device=self.env.device)
+            high = torch.as_tensor(self.env.single_action_space.high, device=self.env.device)
+            action = low + (high - low) * torch.rand(self.env.num_envs, self.action_dim, device=self.env.device)
+        next_obs, reward, _, _, info = self.env.step(action)
         self.buffer.add(rgb, state, action, reward, next_obs["rgb"], next_obs["state"])
-        return success.float().mean().item()
+        self.obs = next_obs
+        return info["success"].float().mean().item()
 
     def train_dataloader(self):
         def gen():
@@ -346,14 +351,14 @@ class SuccessLogger(L.Callback):
 def run_training(task, num_envs, max_iterations, updates_per_iter, batch_size,
                  buffer_capacity, learning_starts, image_size, device, seed=1):
     torch.manual_seed(seed)
-    env = so101_sim.make_train_env(task, num_envs=num_envs, obs_mode="visual",
-                                    image_size=image_size, device=device)
-    env.reset()
+    env = so101_sim.visual_rl_env(task, num_envs=num_envs, image_size=image_size)
+    action_dim = env.single_action_space.shape[-1]
+    state_dim = env.observation_space["state"].shape[-1]
     low = torch.as_tensor(env.single_action_space.low, device=device)
     high = torch.as_tensor(env.single_action_space.high, device=device)
-    model = VisualSAC(env.state_dim, env.action_dim, low, high).to(device)
-    buffer = ReplayBuffer(buffer_capacity, image_size, env.state_dim, env.action_dim, device)
-    data = SO101SACData(env, model, buffer, steps_per_iter=1, updates_per_iter=updates_per_iter,
+    model = VisualSAC(state_dim, action_dim, low, high).to(device)
+    buffer = ReplayBuffer(buffer_capacity, image_size, state_dim, action_dim, device)
+    data = SO101SACData(env, model, buffer, action_dim, steps_per_iter=1, updates_per_iter=updates_per_iter,
                         batch_size=batch_size, learning_starts=learning_starts)
 
     ckpt_dir = Path(os.environ["DATASETS_ROOT"]) / "models" / "trained" / "so101_sim_sac" / task
@@ -369,7 +374,7 @@ def run_training(task, num_envs, max_iterations, updates_per_iter, batch_size,
 
 
 # 改这里选任务与训练时长，然后 `python train_v6_squint.py`。
-TASK = "SO101ReachCube-v1"
+TASK = "SO101PickPlaceCube40-v1"
 
 if __name__ == "__main__":
     # 沿用 squint 的成熟配方：每步 256 次更新（UTD），批 512，回放池 50 万。

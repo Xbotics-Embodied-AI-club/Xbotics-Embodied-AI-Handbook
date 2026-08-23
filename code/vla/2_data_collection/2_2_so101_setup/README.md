@@ -1,8 +1,10 @@
-# SO-101 硬件绑定
+# SO-101 硬件标定与自检
 
-给主从臂串口和相机装 udev 固定名，之后遥操/录制脚本里的设备名才稳定：
+> 设备绑定（udev 固定相机与串口名）已上移到平台层
+> [`platform/so101_real/setup/`](../../../platform/so101_real/setup/)，本节只讲标定与自检。
 
-- `bind_uarm_serial_port.sh` — 读 USB 序列号，绑 `/dev/uarmLeft`、`/dev/uarmRight`（或 ttyLeader/ttyFollower）
-- `bind_uarm_serial_port_s100.sh` / `bind_camera_s100.sh` — RDK S100 板端的固定 USB 位版本（`/dev/top_camera`、`/dev/wrist_camera`）
+标定从臂、检查相机、回放录制的 episode 验证硬件是否正常：
 
-均支持 `--dry-run` 先看规则再写入。
+- `calibrate_follower.sh` — 标定 SO101 从臂，结果落 `$HF_LEROBOT_HOME/calibration/`
+- `check_cameras.py` — 两路相机同时取图测实际帧率，各存一张样张确认没装反
+- `replay_episode.sh` — 把某条 episode 的动作逐帧原样回放到真机，验证标定和硬件是否正常

@@ -18,11 +18,11 @@ code/
 ├── rl/                           # RL 课程演示代码（按主题组组织，见 rl/README.md）
 │   ├── 1_rl_basics/              # G1 行走 + 动作跟随，REINFORCE→A2C→PPO 三算法对照
 │   ├── 2_grpo_posttraining/      # GRPO 后训练：VLM 数数 + VLA-0 自我提升
-│   └── 3_offpolicy/              # Off-policy：SO101 视觉 RL（squint）+ HIL-SERL 真机（讲16）
+│   └── 3_offpolicy/              # Off-policy：SO101 视觉 RL + HIL-SERL 真机（讲16）
 └── platform/                     # 上游框架 + 硬件 + 部署（非课程 demo，被 import/fetch）
     ├── lerobot/                  #   lerobot 本地补丁 + fetch + 上游源（见 platform/lerobot/…）
     ├── rdk/                      #   地瓜 RDK 板端部署（ACT 上板，见 platform/rdk/README.md）
-    └── so101_sim/                #   SO101 仿真环境包（editable；squint/ManiSkill3，入 lerobot-eval + RL 数据生成）
+    └── so101_sim/                #   SO101 仿真环境包（editable；ManiSkill3，入 lerobot-eval + RL 数据生成）
 ```
 
 > 演示代码面向课堂：常量就近内联、自上而下按讲解顺序读，不用命令行参数层。
@@ -38,7 +38,7 @@ code/
 | `rdk_s100` | 地瓜 RDK S100/S600 板端：SO-101 数据采集（aarch64，`--no-editable`） | PyPI aarch64 | `lerobot[feetech]` |
 
 ```bash
-cd experiments
+cd code
 bash platform/lerobot/fetch_lerobot.sh   # 拉取 lerobot 0.5.1 源并打补丁（不入库）
 uv sync --extra gpu_x86
 ```
