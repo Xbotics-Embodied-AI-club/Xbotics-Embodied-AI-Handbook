@@ -1,0 +1,23 @@
+# 第 4 讲 Demo（无硬件仿真版）运行依赖
+#
+# 本 Demo 为纯 Python + Jupyter Notebook，不依赖 ROS 2 运行时。
+# 使用 numpy 完成反投影与坐标变换，matplotlib 完成点云/坐标轴/目标点可视化。
+#
+# 安装：
+#   pip install -r requirements.txt
+#
+# 已在本机验证的版本（Ubuntu 22.04 / Python 3.10.12）：
+#   numpy==1.21.5  scipy==1.8.0  matplotlib==3.5.1  PyYAML==6.0.3  Pillow==9.0.1
+
+numpy>=1.21
+scipy>=1.8
+matplotlib>=3.5
+PyYAML>=6.0
+Pillow>=9.0
+jupyter
+ipykernel
+
+# 可选：讲义 4.10.3 / 4.11.1 提到的 Open3D 点云可视化库。
+# 本 Demo 用 matplotlib 3D 完成等价的点云/坐标轴/目标点可视化，无需安装；
+# 若希望体验 Open3D 交互式窗口，可取消注释安装（体积较大）。
+# open3d>=0.17

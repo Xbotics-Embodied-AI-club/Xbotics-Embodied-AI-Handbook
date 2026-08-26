@@ -1,0 +1,40 @@
+# 第 4 讲 Demo：相机内参样例（对应讲义 4.6.3）
+#
+# 采用 ROS sensor_msgs/CameraInfo 的标准字段布局，便于后续接真机 / ROS 驱动时
+# 直接对照。无硬件仿真版只需用到 camera_matrix 的 data（3x3 行主序）与图像分辨率。
+#
+# 内参取值与讲义 4.6.3 的例子一致：fx=fy=600, cx=320, cy=240 @ 640x480。
+# 无畸变（distortion_coefficients 全 0），因此 raw == rectified，投影矩阵 P 与
+# 内参一致（对应 checklist 第 3 条：rectified 图像用 P 中的有效焦距/主点）。
+
+image_width: 640
+image_height: 480
+camera_name: lecture4_sim_camera
+frame_id: camera_optical_frame
+
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [600.0, 0.0, 320.0,
+         0.0, 600.0, 240.0,
+         0.0, 0.0, 1.0]
+
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.0, 0.0, 0.0, 0.0, 0.0]
+
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1.0, 0.0, 0.0,
+         0.0, 1.0, 0.0,
+         0.0, 0.0, 1.0]
+
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [600.0, 0.0, 320.0, 0.0,
+         0.0, 600.0, 240.0, 0.0,
+         0.0, 0.0, 1.0, 0.0]

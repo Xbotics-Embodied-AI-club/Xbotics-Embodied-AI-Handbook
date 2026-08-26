@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# 隔离环境（由 setup_env.sh 生成）
+.venv/
+
+# TUM 原始序列（大文件，prepare_tum_data.py 提取到 data/ 后即可删）
+rgbd_dataset_freiburg1_desk/
+*.tgz
