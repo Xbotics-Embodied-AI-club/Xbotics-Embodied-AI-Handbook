@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# 隔离环境（由 python3 -m venv .venv 创建）
+.venv/
+
+# 机器人资产：嵌套 git 仓库，不入库
+# 复现方式见 README「环境准备」的 sparse clone 三行命令
+mujoco_menagerie/
+
+# 渲染产物（体积大，可由 render_video.py 重新生成）
+results/*.mp4
+results/*.ppm
