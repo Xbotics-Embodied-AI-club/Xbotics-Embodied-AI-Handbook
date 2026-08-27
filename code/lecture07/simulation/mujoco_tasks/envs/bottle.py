@@ -23,7 +23,8 @@ BOTTLE_NECK_RADIUS = 0.012
 BOTTLE_NECK_HALF_HEIGHT = 0.015
 BOTTLE_NECK_CENTER_Z = BOTTLE_HEIGHT - BOTTLE_NECK_HALF_HEIGHT
 BOTTLE_MASS = 0.30
-BOTTLE_FREE_DAMPING = 5.0
+# MuJoCo 3.x 中 free joint 的阻尼是 3 维平动阻尼（旋转阻尼不支持），不再是标量。
+BOTTLE_FREE_DAMPING = [5.0, 5.0, 5.0]
 # Match the floor plane: stiff support, low bounce.
 BOTTLE_CONTACT_SOLREF = (0.02, 1.0)
 BOTTLE_CONTACT_SOLIMP = (0.95, 0.99, 0.001, 0.50, 1.0)
@@ -40,8 +41,13 @@ BOX_Y = 0.12
 # The box.obj mesh is a hollow tray (four thin walls + a bottom plate).  MuJoCo
 # meshes collide as a single convex hull, which would fill the interior, so the
 # collision is built from thin box geoms instead and the mesh stays visual-only.
-BOX_WALL_THICKNESS = 0.003
-BOX_BOTTOM_THICKNESS = 0.003
+#
+# 碰撞几何不能太薄：瓶子 body 的接触参数很软（solref timeconst 0.02），落在
+# 3 mm 薄的底/壁上会穿透约 2.4 mm（占厚度 80%），接近完全穿透，导致瓶子在
+# box 里被接触力推着滑动、落点漂移。加厚到 8 mm 让穿透占比降到 ~20%，瓶子
+# 能稳定地「坐」在 box 底部而不穿出。
+BOX_WALL_THICKNESS = 0.008
+BOX_BOTTOM_THICKNESS = 0.008
 BOX_COLLISION_RGBA = (0.65, 0.55, 0.45, 0.0)
 
 SCENE_MATERIALS_XML = """
@@ -190,6 +196,13 @@ def configure_bottle_physics(model: mujoco.MjModel) -> None:
     """Re-apply bottle contact parameters after scene-wide contact tuning."""
 
     import numpy as np
+
+    # MuJoCo 3.x 会把 free joint 的 3 维平动阻尼广播到全部 6 个自由度（含 3
+    # 个旋转 DOF），而 free joint 的旋转阻尼本应恒为 0。旋转阻尼会拖慢瓶子
+    # 释放后的翻转，落地时产生水平漂移、超出 place 容差。这里把旋转 DOF 的
+    # 阻尼清零，恢复「平动阻尼、旋转无阻尼」的正确物理。
+    bottle_dof = int(model.joint("bottle_free").dofadr[0])
+    model.dof_damping[bottle_dof + 3 : bottle_dof + 6] = 0.0
 
     bottle_solref = np.asarray(BOTTLE_CONTACT_SOLREF, dtype=np.float64)
     bottle_solimp = np.asarray(BOTTLE_CONTACT_SOLIMP, dtype=np.float64)

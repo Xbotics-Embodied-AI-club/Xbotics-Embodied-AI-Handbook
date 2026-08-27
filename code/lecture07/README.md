@@ -37,6 +37,8 @@ lecture07/
 
 ## 快速开始（仿真 / Mock，无硬件必做）
 
+> 要求 Python >= 3.11。单元测试与 MuJoCo 仿真依赖 `mujoco`、`numpy`（见 `requirements.txt`）。
+
 ```bash
 cd code/lecture07
 python -m venv .venv
@@ -45,6 +47,7 @@ python -m venv .venv
 # Linux/macOS:
 # source .venv/bin/activate
 pip install -e .
+pip install -r requirements.txt
 python simulation/pick_place_fsm.py --task cube
 python simulation/pick_place_fsm.py --task bottle
 python analyze_runs.py
@@ -59,13 +62,12 @@ python -m unittest discover -s tests -v
 `code/platform/so101_sim/.../so101.urdf`，并在白色桌面上绘制 8 cm × 8 cm 的红色 A 区与蓝色 B 区方框。
 
 ```bash
-pip install -e ".[mujoco]"
 # 完整 pick-place 状态机：cube（90° 翻转双指夹取）/ bottle（水平径向抓取入盒）
 python simulation/mujoco_pick_place.py --task cube
 python simulation/mujoco_pick_place.py --task bottle
 # 场景中绘制 5 个动作位姿（pre_grasp/grasp/lift/place/retreat）
 python simulation/mujoco_pick_place.py --task bottle --show-poses
-# 无窗口离屏运行并录制视频
+# 无窗口离屏运行并录制视频（另需 imageio[pyav] / imageio[ffmpeg]，见 requirements.txt）
 python simulation/mujoco_pick_place.py --task bottle --viewer null --video runs/bottle.mp4
 ```
 

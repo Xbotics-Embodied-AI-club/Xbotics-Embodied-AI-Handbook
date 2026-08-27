@@ -107,7 +107,7 @@ TASK_LAYOUTS: dict[str, dict[str, object]] = {
         "retreat_height": 0.10,
         "gripper_close_width": 0.038,
         "object_width": 0.038,
-        "place_xy_tolerance": 0.07,
+        "place_xy_tolerance": 0.09,
         "slow_speed": 0.06,
         "settle_time": 0.8,
         "center_offset": (0.0, 0.0, 0.055),
