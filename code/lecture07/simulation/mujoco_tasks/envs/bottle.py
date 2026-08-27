@@ -42,10 +42,7 @@ BOX_Y = 0.12
 # meshes collide as a single convex hull, which would fill the interior, so the
 # collision is built from thin box geoms instead and the mesh stays visual-only.
 #
-# 碰撞几何不能太薄：瓶子 body 的接触参数很软（solref timeconst 0.02），落在
-# 3 mm 薄的底/壁上会穿透约 2.4 mm（占厚度 80%），接近完全穿透，导致瓶子在
-# box 里被接触力推着滑动、落点漂移。加厚到 8 mm 让穿透占比降到 ~20%，瓶子
-# 能稳定地「坐」在 box 底部而不穿出。
+
 BOX_WALL_THICKNESS = 0.008
 BOX_BOTTOM_THICKNESS = 0.008
 BOX_COLLISION_RGBA = (0.65, 0.55, 0.45, 0.0)
@@ -197,10 +194,7 @@ def configure_bottle_physics(model: mujoco.MjModel) -> None:
 
     import numpy as np
 
-    # MuJoCo 3.x 会把 free joint 的 3 维平动阻尼广播到全部 6 个自由度（含 3
-    # 个旋转 DOF），而 free joint 的旋转阻尼本应恒为 0。旋转阻尼会拖慢瓶子
-    # 释放后的翻转，落地时产生水平漂移、超出 place 容差。这里把旋转 DOF 的
-    # 阻尼清零，恢复「平动阻尼、旋转无阻尼」的正确物理。
+    # MuJoCo 3.x 会把 free joint 的 3 维平动阻尼广播到全部 6 个自由度,将旋转清0
     bottle_dof = int(model.joint("bottle_free").dofadr[0])
     model.dof_damping[bottle_dof + 3 : bottle_dof + 6] = 0.0
 
