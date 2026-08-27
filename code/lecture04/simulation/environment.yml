@@ -1,0 +1,23 @@
+# 第 4 讲 Demo（无硬件仿真版）conda 环境定义
+#
+# 用法：
+#   conda env create -f environment.yml      # 首次创建
+#   conda env update -f environment.yml      # 依赖变更后更新
+#   conda activate lecture4-sensors
+#
+# 或直接用一键脚本：bash setup_env.sh（会自动选择 conda 或 venv）。
+# 注意：本 Demo 无 ROS 2 运行时依赖，纯 Python 即可跑通（见讲义 4.10.3）。
+
+name: lecture4-sensors
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - scipy
+  - matplotlib
+  - pyyaml
+  - pillow
+  - jupyter
+  - ipykernel
