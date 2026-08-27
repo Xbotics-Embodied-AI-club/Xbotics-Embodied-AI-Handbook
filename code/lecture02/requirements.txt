@@ -1,0 +1,4 @@
+# 本讲 Demo 在 ROS2 环境中运行：rclpy / sensor_msgs / std_msgs / launch_ros
+# 由 ROS2 发行版（Humble）提供，不通过 pip 安装，也不使用 code/ 根的 uv 环境。
+# 此处只列 ROS2 之外的额外 Python 依赖。
+numpy>=1.21
