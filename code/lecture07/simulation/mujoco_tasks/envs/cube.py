@@ -40,7 +40,8 @@ SCENE_MATERIALS_XML = """
 def add_task_objects(spec: mujoco.MjSpec) -> None:
     cube_body = spec.worldbody.add_body(name="cube", pos=[CUBE_X, CUBE_Y, TABLE_TOP_Z])
     cube_free = cube_body.add_freejoint(name="cube_free")
-    cube_free.damping = 1.0
+    # MuJoCo 3.x 中 free joint 的阻尼是 3 维平动阻尼（旋转阻尼不支持），不再是标量。
+    cube_free.damping = [1.0, 1.0, 1.0]
     cube_geom = cube_body.add_geom(
         name="cube_geom",
         type=mujoco.mjtGeom.mjGEOM_BOX,

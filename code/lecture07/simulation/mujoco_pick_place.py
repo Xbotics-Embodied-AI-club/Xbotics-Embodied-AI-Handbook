@@ -136,6 +136,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print IK / attach telemetry while the state machine runs",
     )
     parser.add_argument(
+        "--move-timeout",
+        type=float,
+        default=30.0,
+        help="Single move / gripper operation timeout in seconds (default: 30). "
+        "Raise this if bottle runs abort with 'motion timeout' on a slow machine "
+        "or with live viewer rendering.",
+    )
+    parser.add_argument(
         "--video",
         default=None,
         help="Record the run to an MP4 file (e.g. runs/bottle_horizontal.mp4)",
@@ -278,6 +286,7 @@ def main() -> int:
         args.task,
         viewer=sync_target,
         verbose=args.verbose,
+        move_timeout=args.move_timeout,
     )
 
     backend.connect()

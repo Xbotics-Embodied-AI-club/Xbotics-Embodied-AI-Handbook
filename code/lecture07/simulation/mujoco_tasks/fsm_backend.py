@@ -221,11 +221,16 @@ class MuJoCoFSMBackend(RobotBackend):
         self,
         target: Pose,
         speed: float,
-        timeout: float = 8.0,
+        timeout: float | None = None,
     ) -> MotionResult:
         if not self._connected:
             return MotionResult(False, "backend is not connected")
 
+        # 默认单次移动超时跟随 backend 的 move_timeout（而非旧的 8 s 硬编码）。
+        # bottle 慢速大范围转运 + 带 viewer 的逐帧渲染会显著拉长单次 move，
+        # 8 s 极易触发 "motion timeout" 中断。
+        if timeout is None:
+            timeout = self.move_timeout
         deadline = monotonic() + max(timeout, self.move_timeout * 0.25)
         target_pos = np.array([target.x, target.y, target.z], dtype=np.float64)
         target_quat = np.array(
@@ -483,11 +488,13 @@ class MuJoCoFSMBackend(RobotBackend):
         self,
         width: float,
         force: float = 0.5,
-        timeout: float = 8.0,
+        timeout: float | None = None,
     ) -> MotionResult:
         del force
         if self.task is None:
             return MotionResult(False, "task has not been reset")
+        if timeout is None:
+            timeout = self.move_timeout
 
         target_qpos = grasp_width_to_gripper_qpos(
             width,

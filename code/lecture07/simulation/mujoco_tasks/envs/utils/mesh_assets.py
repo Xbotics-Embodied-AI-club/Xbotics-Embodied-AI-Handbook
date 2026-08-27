@@ -14,8 +14,9 @@ if TYPE_CHECKING:
 
 _LECTURE07_ROOT = Path(__file__).resolve().parents[4]
 _CODE_ROOT = _LECTURE07_ROOT.parent
-URDF_PATH = _CODE_ROOT / "platform" / "so101_sim" / "so101_sim" / "vendor" / "squint" / "envs" / "robot" / "so101.urdf"
-MESH_DIR = URDF_PATH.parent / "meshes"
+URDF_PATH = _CODE_ROOT / "platform" / "so101_sim" / "so101_sim" / "robots" / "so101_base" / "so101.urdf"
+
+MESH_DIR = URDF_PATH.parent
 
 
 def add_textured_material(spec: mujoco.MjSpec, prefix: str, texture_path: Path | None) -> str | None:

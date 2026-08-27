@@ -1,3 +1,11 @@
-# Core mock demo uses only the Python standard library.
-# Install optional MuJoCo dependencies through:
-#   python -m pip install -e '.[mujoco]'
+# 核心依赖：运行 MuJoCo pick-place 状态机与单元测试
+mujoco>=3.0.0
+numpy>=1.24
+
+# 可选：Gymnasium 环境包装器（simulation/mujoco_tasks/envs/gym_env.py）
+gymnasium>=0.29
+
+# 可选：视频录制（mujoco_pick_place.py 的 --video 参数，libx264 编码）
+imageio>=2.31
+imageio[pyav]
+imageio[ffmpeg]

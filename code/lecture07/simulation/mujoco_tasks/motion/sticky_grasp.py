@@ -150,6 +150,19 @@ class StickyGraspAssist:
             self.model.geom_contype[geom_id] = contype
             self.model.geom_conaffinity[geom_id] = conaffinity
         self._saved_collision.clear()
+
+        
+        object_pos = data.geom_xpos[self._object_geom_ids[0]]
+        jaw_positions = np.stack([data.geom_xpos[jaw_id] for jaw_id in self._jaw_geom_ids])
+        nearest = jaw_positions[int(np.argmin(np.linalg.norm(jaw_positions[:, :2] - object_pos[:2], axis=1)))]
+        direction = object_pos - nearest
+        direction[2] = 0.0  # 只在水平面平移，保持释放高度不变
+        norm = float(np.linalg.norm(direction))
+        if norm > 1e-6:
+            data.qpos[self._object_qpos_adr : self._object_qpos_adr + 3] += (
+                direction / norm * 0.006
+            )
+
         data.qvel[self._object_dof_adr : self._object_dof_adr + 6] = 0.0
         self._attached = False
         self._contact_count = 0
