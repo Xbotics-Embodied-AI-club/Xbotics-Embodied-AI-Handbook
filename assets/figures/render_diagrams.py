@@ -24,6 +24,7 @@
 该看不清还是看不清。要救只有三条作图侧的路——放大字号、收窄画布、把信息拆成两张图。
 """
 
+import math
 from pathlib import Path
 
 import matplotlib
@@ -336,17 +337,23 @@ def actor_critic_a2c():
          ("代码里用多步平滑版 $\\hat{A}^{\\mathrm{GAE}}$", 10, False),
          ("一步版：$A=r+\\gamma V(s')-V(s)$", 10, False)])
 
+    # critic 在这张图里担两个角色，原先两条箭头同为绿色，正文只能靠位置区分"哪条绿箭头"。
+    # 现在按通路性质分色：灰=前向数据流，绿=critic 供给 V，红/紫=两条训练回流（actor 一条、
+    # critic 一条）。紫色只用于箭头与标签，不进 FILL，所以不加进模块级调色板。
+    PURPLE = "#7D3C98"
+
     arrow(ax, (0.305, 0.64), (0.375, 0.64), "#555555")
     label(ax, 0.34, 0.70, "a", "#555555", 10)
     arrow(ax, (0.555, 0.60), (0.605, 0.50), "#555555")
     label(ax, 0.605, 0.62, "r, s′", "#555555", 10)
     arrow(ax, (0.305, 0.20), (0.595, 0.34), GREEN, rad=-0.10)
-    label(ax, 0.45, 0.195, "V(s), V(s′)", GREEN, 10, bg=True)
+    # 标签压在绿箭头上方：下方那条带留给紫色的 critic 训练回流，两条通路各占一层
+    label(ax, 0.44, 0.30, "V(s), V(s′)", GREEN, 10, bg=True)
 
     arrow(ax, (0.78, 0.535), (0.16, 0.74), RED, rad=0.14)
     label(ax, 0.48, 0.885, "用 A 加权策略梯度，更新 actor", RED, 11, True)
-    arrow(ax, (0.66, 0.265), (0.16, 0.09), GREEN, rad=0.12)
-    label(ax, 0.44, 0.025, "critic 回归 returns，把 V 估得更准", GREEN, 11, True)
+    arrow(ax, (0.66, 0.265), (0.16, 0.09), PURPLE, rad=0.12)
+    label(ax, 0.44, 0.025, "critic 回归 returns，把 V 估得更准", PURPLE, 11, True)
     save(fig, "lecture14", "fig-actor-critic-a2c")
 
 
@@ -465,33 +472,107 @@ def q_propagation():
     save(fig, "lecture16", "fig162-q-propagation")
 
 
-# ── 第15讲 8.6：VLA-0 后训练成功率对照 ─────────────────────────────────
-# 数字取自同节表格。两次评测的样本量不同（n=12 / n=20），所以把 n 标在柱子上，
-# 另外把同口径的那一组（n=20，0.50 → 0.60）单独框出来，避免拿不同 n 的两根柱子说话。
-def vla0_success():
-    fig, ax = plt.subplots(figsize=(6.6, 3.2))
-    bars = [("弱基座\n（少步 SFT）", 0.50, 20, GREY),
-            ("GRPO 无 KL\n（第 2 次迭代）", 0.167, 12, RED),
-            ("GRPO + KL\n（第 2 次迭代）", 0.667, 12, GREEN),
-            ("GRPO + KL\n（同口径复评）", 0.60, 20, GREEN)]
-    for i, (name, value, n, color) in enumerate(bars):
-        ax.bar(i, value, 0.55, color=FILL[color], edgecolor=color, linewidth=2)
-        ax.text(i, value + 0.025, f"{value:.0%}  (n={n})", ha="center", fontsize=10, color=color)
+# ── 第16讲 2.4：CartPole 任务长什么样 ──────────────────────────────────
+# 正文已经把"小车 + 杆子 + 左右推"说清楚了，所以图要给的是文字给不了的两样东西：
+# (1) 两个终止阈值（±2.4 出界、±12° 倾角）在空间上各管哪一块——文字只能分开报数字，
+#     图能让读者一眼看出"角度那道线比位置那道线先撞上"；
+# (2) 推车方向与杆子倒向的反直觉对应——右半两个姿态并排，杆往右倒时车也往右追。
+# 数字口径：CartPole-v1 的 ±2.4 与 ±0.21 rad(≈12°)，与脚本 OBS_LOW/HIGH 一致；
+# 分桶数 8 取自同一脚本的 NUM_BINS。
+def cartpole_task():
+    fig, ax = canvas(7.8, 4.4)
+    W_IN, H_IN = 7.8, 4.4          # 画角度要按画布长宽比折算，否则 12° 画出来不是 12°
 
-    # 同口径对照：只有第 1 根和第 4 根是同一个 n。
-    ax.annotate("", xy=(3, 0.86), xytext=(0, 0.86),
-                arrowprops=dict(arrowstyle="<->", color=BLUE, linewidth=1.2))
-    ax.text(1.5, 0.90, "同口径对照：n=20 时 50% → 60%", ha="center", fontsize=10, color=BLUE)
+    def tip(px, py, deg, inches):
+        """从 (px,py) 出发、与竖直方向成 deg 度、视觉长度 inches 的那个端点。"""
+        rad = math.radians(deg)
+        return px + inches * math.sin(rad) / W_IN, py + inches * math.cos(rad) / H_IN
 
-    ax.set_xticks(range(len(bars))); ax.set_xticklabels([b[0] for b in bars], fontsize=10)
-    ax.set_ylabel("任务成功率（贪婪解码评测）", fontsize=10)
-    ax.set_ylim(0, 1.0); ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
-    ax.set_yticklabels(["0", "25%", "50%", "75%", "100%"], fontsize=10)
-    ax.tick_params(labelsize=10)
-    ax.set_title("LIBERO 物体抓放任务上的后训练成功率", fontsize=11, color="#444444")
-    ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
-    fig.tight_layout()
-    save(fig, "lecture15", "fig15-8-vla0-success")
+    def draw_pole(px, py, deg, inches, color, lw=3.0):
+        ex, ey = tip(px, py, deg, inches)
+        ax.plot([px, ex], [py, ey], color=color, linewidth=lw, solid_capstyle="round")
+        return ex, ey
+
+    label(ax, 0.5, 0.965, "CartPole：两个终止阈值管哪一块，以及为什么推车方向反直觉",
+          "#333333", 13, True)
+    ax.plot([0.595, 0.595], [0.03, 0.90], color="#CCCCCC", linewidth=1.4, linestyle="--")
+
+    # ── 左半：把两个阈值画在同一张场景里 ──────────────────────────────
+    TRACK_Y, X0, XC, X1 = 0.35, 0.03, 0.26, 0.50      # 轨道；XC 是位置 0，两端是 ±2.4
+    CART_X, CART_W, CART_H = 0.36, 0.072, 0.058
+    PIVOT = (CART_X, TRACK_Y + CART_H)
+
+    ax.plot([X0, X1], [TRACK_Y, TRACK_Y], color="#666666", linewidth=2.4)
+    for bx, name in ((X0, "−2.4"), (X1, "+2.4")):
+        ax.plot([bx, bx], [TRACK_Y - 0.06, TRACK_Y + 0.17], color=RED,
+                linewidth=1.8, linestyle="--")
+        label(ax, bx, TRACK_Y + 0.205, name, RED, 10, True)
+    ax.plot([XC, XC], [TRACK_Y - 0.022, TRACK_Y + 0.022], color="#999999", linewidth=1.6)
+    label(ax, XC, TRACK_Y - 0.052, "0", "#888888", 10)
+
+    # ±12° 的扇形：杆尖只要越出这片浅橙，回合当场结束
+    wedge = [PIVOT] + [tip(*PIVOT, d, 1.42) for d in range(-12, 13, 2)]
+    ax.add_patch(Polygon(wedge, closed=True, facecolor="#FDF2E0",
+                         edgecolor="none", zorder=0))
+    for d in (-12, 12):
+        ex, ey = tip(*PIVOT, d, 1.42)
+        ax.plot([PIVOT[0], ex], [PIVOT[1], ey], color=ORANGE,
+                linewidth=1.6, linestyle="--")
+    ax.plot([PIVOT[0], PIVOT[0]], [PIVOT[1], tip(*PIVOT, 0, 1.42)[1]],
+            color="#BBBBBB", linewidth=1.2, linestyle=":")
+
+    plain_box(ax, CART_X - CART_W / 2, TRACK_Y, CART_W, CART_H, GREY)
+    pole_x, pole_y = draw_pole(*PIVOT, 6, 1.28, "#8B5A2B")
+    ax.plot(*PIVOT, "o", color="#333333", markersize=9, markerfacecolor="white",
+            markeredgewidth=1.8, zorder=6)
+
+    label(ax, 0.30, 0.815, "③ 杆角度 θ 只有 ±12° 可用", ORANGE, 10, True)
+    label(ax, 0.30, 0.768, "（≈0.21 rad）越出即回合结束", ORANGE, 10)
+
+    # ④ 角速度画成杆尖上的一小段转向弧，落在它描述的那个量上
+    arrow(ax, (pole_x + 0.008, pole_y + 0.030), (pole_x + 0.042, pole_y - 0.030),
+          "#8B5A2B", rad=-0.5, lw=1.4)
+    label(ax, pole_x + 0.050, pole_y - 0.048, "④ 杆角速度 $\\dot{\\theta}$",
+          "#8B5A2B", 10, ha="left")
+
+    # 自由转轴是这个任务的题眼：没有任何电机去扶那根杆
+    arrow(ax, (0.075, 0.585), (CART_X - 0.020, PIVOT[1] + 0.014), "#333333", rad=-0.22, lw=1.4)
+    label(ax, 0.030, 0.615, "自由转轴：没有电机", "#333333", 10, True, ha="left")
+
+    ax.annotate("", xy=(CART_X, TRACK_Y - 0.115), xytext=(XC, TRACK_Y - 0.115),
+                arrowprops=dict(arrowstyle="<|-|>", color=BLUE, linewidth=1.5))
+    label(ax, 0.31, TRACK_Y - 0.175, "① 车位置 x", BLUE, 10, True)
+    arrow(ax, (CART_X + 0.045, TRACK_Y + 0.028), (CART_X + 0.108, TRACK_Y + 0.028), BLUE, lw=1.5)
+    label(ax, CART_X + 0.118, TRACK_Y + 0.028, "② 车速度 $\\dot{x}$", BLUE, 10,
+          ha="left", bg=True)
+
+    label(ax, 0.29, 0.078, "两道终止线卡的不是同一件事：红虚线卡住车能滑多远，", "#555555", 10)
+    label(ax, 0.29, 0.030, "橙扇形卡住杆能歪多少——越过任何一道，回合当场结束", "#555555", 10)
+
+    # ── 右半上：动作只有两档 ──────────────────────────────────────────
+    label(ax, 0.80, 0.845, "动作只有两档，没有第三个选项", "#333333", 11, True)
+    for ax_x, txt, color in ((0.70, "0：左推 ←", BLUE), (0.90, "1：右推 →", RED)):
+        box(ax, ax_x - 0.085, 0.735, 0.17, 0.075, color, [(txt, 11, True)])
+    label(ax, 0.80, 0.688, "没有「不动」这一档：每一拍都必须选一边", "#555555", 10)
+
+    # ── 右半下：反直觉的那一下 ────────────────────────────────────────
+    label(ax, 0.80, 0.605, "杆往右倒，车要往哪边推？", "#333333", 11, True)
+    for cx, deg, color, cap1, cap2 in (
+            (0.685, 11, RED, "倒到 11°", "再偏一点就出界"),
+            (0.905, 4, GREEN, "回到 4°", "车追到了杆下面")):
+        ax.plot([cx - 0.055, cx + 0.055], [0.36, 0.36], color="#999999", linewidth=1.8)
+        plain_box(ax, cx - 0.030, 0.36, 0.060, 0.048, GREY)
+        draw_pole(cx, 0.408, deg, 1.05, color, lw=2.6)
+        label(ax, cx, 0.315, cap1, color, 10, True)
+        label(ax, cx, 0.268, cap2, "#666666", 10)
+    arrow(ax, (0.762, 0.435), (0.828, 0.435), RED, lw=2.0)
+    label(ax, 0.795, 0.478, "往右推", RED, 10, True)
+
+    label(ax, 0.80, 0.185, "杆往右倒就把车往右推——不是往左把它顶回去。", RED, 10, True)
+    label(ax, 0.80, 0.135, "车得追到杆的正下方，杆才会自己回正。", "#555555", 10)
+    label(ax, 0.80, 0.062, "四个观测量 ①②③④ 都是连续值，", "#555555", 10)
+    label(ax, 0.80, 0.018, "表格法必须先把每一维切成 8 段才存得下。", "#555555", 10)
+    save(fig, "lecture16", "fig16-cartpole-task")
 
 
 # ── 第13讲 1.2：三条实时路线各动推理链路的哪一段 ───────────────────────
@@ -1578,4 +1659,4 @@ actor_critic_a2c()
 actor_critic_ddpg()
 replay_buffer()
 q_propagation()
-vla0_success()
+cartpole_task()

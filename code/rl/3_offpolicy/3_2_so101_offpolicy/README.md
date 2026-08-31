@@ -22,11 +22,14 @@ python rl/3_offpolicy/3_2_so101_offpolicy/train_v3_ddpg.py    # v3/v4/v5 可直�
 python rl/3_offpolicy/3_2_so101_offpolicy/train_v6_squint.py  # ⚠️ 现在跑不起来，见下
 ```
 
-> ⚠️ **v6 现在直接跑会报错。** `train_v6_squint.py` 的 `CNNEncoder` 与 `ReplayBuffer`
+> ⚠️ **v6 现在直接跑会报错。** `train_v6_squint.py` 的 `CNNEncoder`
+> （`nn.Conv2d(3, 32, ...)`）与 `ReplayBuffer`（`rgb`/`next_rgb` 按 `(容量, H, W, 3)` 开）
 > 按单相机 **3 通道**写死，而 `platform/so101_sim` 现存的三个分发场景都是双相机
-> （`top` + `wrist`）**6 通道**输出，通道数对不上。v3/v4/v5 走 `state_rl_env`（只吃关节
-> 状态、不过渲染管线），不受影响。要跑 v6 得先把编码器与回放池改成吃 6 通道，
-> 见文末「待重新整训」。
+> （`top` + `wrist`）**6 通道**输出，通道数对不上。**报错点在热身采样**：策略还没开始跑，
+> `_collect(use_policy=False)` 用随机动作采的第一批帧写进 `buffer.add()` 时就挂了
+> （池子 3 通道、帧 6 通道），跟 `torch.load` / `state_dict` 无关——这个文件里根本没有
+> `torch.load`。v3/v4/v5 走 `state_rl_env`（只吃关节状态、不过渲染管线），不受影响。
+> 要跑 v6 得先把编码器与回放池改成吃 6 通道，见文末「待重新整训」。
 
 v3/v4/v5 从关节状态（`obs_mode="state"`）学习，公平预算 500 iter 对照：DDPG 全程震荡
 （mean_reward≈0.28，success_once 始终 0）、TD3 治住震荡但仍是 0（mean_reward≈0.52）、
@@ -37,6 +40,12 @@ C51 分布式 Critic，success≈0.99，且能顺手产 VLA 课要的数据。
 > 上面这组对照数据是在已下线的单相机 `SO101ReachCube-v1` 任务上跑出来的，四个文件现在
 > 的 `TASK` 已改指向 `platform/so101_sim` 现存的 KIT 分发场景（`SO101PickPlaceCube40-v1`
 > 等）；重跑不会复现这组数值，本模块的算法阶梯待重新整训（见文末说明）。
+>
+> 另外，**那次实验的原始训练记录没有留在仓库里**：`../result/` 下只有 CartPole 两级的
+> `cartpole-*.json`，本模块一个数值文件都没有。讲义里那几张 SO-101 曲线图（奖励阶梯、
+> 成功率阶梯、SAC 破局、观测归一化对照）都是当时的截图，图上的数无法在仓库内逐点复核，
+> 也没有重画脚本。重新整训时应当顺带把逐 iter 的记录落成 `../result/*.json`，
+> 并补一个像 `3_1/plot_returns.py` 那样从 json 重画的脚本。
 
 ## v6 顺带产出的 VLA 数据：`datagen/`
 

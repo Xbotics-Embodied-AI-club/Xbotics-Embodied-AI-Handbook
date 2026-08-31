@@ -8,8 +8,15 @@ filters:
 # 代码块自动折行。pandoc 默认把 Highlighting 定成不折行的 Verbatim，超过版心
 # （letter 减 1in 边距 = 468pt，等宽体约 86 列）的行会直接冲出右边界被裁掉——
 # 实测第 8/9/10/14/15 讲都有代码行这样丢字符。fvextra 加 breaklines 后自动折行。
+# 成书要件（F9-3 / F9-4）：目录 + 图目录 + 表目录。lof / lot 只收录 markdown
+# `![图注](路径)` 这类构成浮动体的图，以及带题注的表；HTML <img> 与无题注表格不进。
+# 内容清单（不带页码）另见 docs/appendix/figure-index.md。
 format:
   pdf:
+    toc: true
+    toc-depth: 3
+    lof: true
+    lot: true
     include-in-header:
       text: |
         \usepackage{fvextra}

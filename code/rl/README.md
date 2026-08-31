@@ -15,7 +15,6 @@ rl/
 │   └── result/             #   各模块结果（json 摘要 + 演示视频）
 ├── 2_grpo_posttraining/    # 组2 GRPO 后训练：让模型自我提升
 │   ├── 2_1_grpo_vlm_counting/       #   GRPO 微调小 VLM 学数数
-│   ├── 2_2_grpo_vla0_libero/        #   GRPO 后训练 VLA-0 提升成功率
 │   ├── data/
 │   └── result/
 └── 3_offpolicy/            # 组3 Off-policy：值学习地基→连续控制→真机落地，六级依次提升
@@ -43,7 +42,6 @@ rl/
 | `1_rl_basics/1_2_video_to_g1_reference` | 人类视频 → G1 参考动作工具链 | 讲14（支撑） |
 | `1_rl_basics/1_3_g1_motion_tracking` | 同三算法对照 · G1 动作跟随 | 讲14 |
 | `2_grpo_posttraining/2_1_grpo_vlm_counting` | GRPO 微调小 VLM 学数数 | 讲15 |
-| `2_grpo_posttraining/2_2_grpo_vla0_libero` | GRPO 后训练 VLA-0 提升成功率 | 讲15 |
 | `3_offpolicy/3_1_cartpole_value_rl` | 值学习入门 Q-learning→DQN（CartPole 贯穿） | 讲16 |
 | `3_offpolicy/3_2_so101_offpolicy` | SO101 连续控制 DDPG→TD3→SAC→视觉分布式 SAC；`datagen/` 顺手产 VLA 数据 | 讲16（讲14 作案例引用） |
 | `3_offpolicy/3_3_hilserl_so101`（待建） | 真机人在环学接触型任务（HIL-SERL） | 讲16 |
