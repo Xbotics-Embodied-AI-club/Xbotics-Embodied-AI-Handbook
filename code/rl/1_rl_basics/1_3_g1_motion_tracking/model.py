@@ -1,3 +1,10 @@
+"""动作跟随三个版本共用的模型与优势估计工具。
+
+结构与行走线的同名文件一致：`ActorCritic` 是普通 PyTorch 模型，`compute_gae`
+是 v2/v3 用的优势估计工具。
+
+讲义对应：第14讲 6.6 节。
+"""
 from __future__ import annotations
 
 import torch
@@ -5,11 +12,21 @@ from torch import nn
 
 
 def compute_gae(rewards, dones, values, next_value, gamma, lam):
-    """广义优势估计（GAE）。
+    """用广义优势估计（GAE）把一段 rollout 换算成每步的优势与回报目标。
 
-    rewards/dones 形状 (T, N)，values 形状 (T, N, 1)，next_value 形状 (N, 1)。
-    从后往前递推：delta = r + gamma * V(s') * (1-done) - V(s)，
-    advantage 累加 gamma*lam 折扣。returns = advantage + value。
+    从后往前递推，是因为第 t 步的优势要用到第 t+1 步的结果；遇到回合结束时截断，
+    免得把下一个回合的回报算进上一个回合。
+
+    Args:
+        rewards: 形状 (T, N) 的即时奖励。
+        dones: 形状 (T, N)，回合在该步结束则为 1。
+        values: 形状 (T, N, 1)，critic 对每步状态的估值。
+        next_value: 形状 (N, 1)，最后一步之后那个状态的估值。
+        gamma: 折扣因子。
+        lam: GAE 系数，在偏差与噪声之间取平衡。
+
+    Returns:
+        (advantages, returns)：前者当策略梯度的权重，后者是 critic 的回归目标。
     """
     rewards_3d = rewards.unsqueeze(-1) if rewards.ndim == 2 else rewards
     dones_3d = dones.unsqueeze(-1) if dones.ndim == 2 else dones
@@ -58,6 +75,16 @@ class ActorCritic(nn.Module):
 
     @staticmethod
     def build_mlp(input_dim, hidden_dims, output_dim):
+        """堆一串「线性层 + ELU」，最后一层不带激活。
+
+        Args:
+            input_dim: 输入维度。
+            hidden_dims: 各隐藏层宽度。
+            output_dim: 输出维度。
+
+        Returns:
+            拼好的 `nn.Sequential`。
+        """
         layers, last = [], input_dim
         for hidden in hidden_dims:
             layers += [nn.Linear(last, hidden), nn.ELU()]
@@ -67,12 +94,24 @@ class ActorCritic(nn.Module):
 
     @torch.no_grad()
     def update_actor_normalizer(self, obs):
+        """用新采到的一批观测更新 actor 侧的归一化统计量。
+
+        观测分布会随策略一起漂移，统计量必须边采边更新。
+
+        Args:
+            obs: 一批 actor 观测。
+        """
         self.actor_mean, self.actor_var, self.actor_count = self._update_stats(
             obs, self.actor_mean, self.actor_var, self.actor_count
         )
 
     @torch.no_grad()
     def update_critic_normalizer(self, obs):
+        """同上，更新的是 critic 侧的统计量。
+
+        Args:
+            obs: 一批 critic 观测。
+        """
         self.critic_mean, self.critic_var, self.critic_count = self._update_stats(
             obs, self.critic_mean, self.critic_var, self.critic_count
         )
@@ -89,30 +128,91 @@ class ActorCritic(nn.Module):
         return new_mean, new_var, new_count
 
     def normalize_actor(self, obs):
+        """把 actor 观测按当前统计量标准化。
+
+        Args:
+            obs: 原始观测。
+
+        Returns:
+            标准化后的观测。
+        """
         return (obs - self.actor_mean) / (torch.sqrt(self.actor_var) + self.normalizer_epsilon)
 
     def normalize_critic(self, obs):
+        """把 critic 观测按当前统计量标准化。
+
+        Args:
+            obs: 原始观测。
+
+        Returns:
+            标准化后的观测。
+        """
         return (obs - self.critic_mean) / (torch.sqrt(self.critic_var) + self.normalizer_epsilon)
 
     def action_distribution(self, obs):
+        """给出当前状态下的动作分布。
+
+        均值由 actor 网络算出，标准差是一组与状态无关的可训练参数。
+
+        Args:
+            obs: 一批 actor 观测。
+
+        Returns:
+            逐关节独立的高斯分布。
+        """
         mean = self.actor(self.normalize_actor(obs))
         std = self.std.clamp_min(1.0e-6).expand_as(mean)
         return torch.distributions.Normal(mean, std)
 
     def value(self, critic_obs):
+        """critic 给状态打分。
+
+        Args:
+            critic_obs: 一批 critic 观测。
+
+        Returns:
+            形状 (N, 1) 的状态价值估计。
+        """
         return self.critic(self.normalize_critic(critic_obs))
 
     def act(self, obs, critic_obs):
+        """采样阶段用：采一个动作，并带回训练要用的量。
+
+        Args:
+            obs: actor 观测。
+            critic_obs: critic 观测。
+
+        Returns:
+            (动作, 对数概率, 状态价值, 分布均值, 分布标准差)。
+        """
         dist = self.action_distribution(obs)
         actions = dist.sample()
         log_prob = dist.log_prob(actions).sum(dim=-1)
         return actions, log_prob, self.value(critic_obs), dist.mean, dist.stddev
 
     def evaluate(self, obs, critic_obs, actions):
+        """训练阶段用：拿当前策略重新评估一批已采好的动作。
+
+        Args:
+            obs: actor 观测。
+            critic_obs: critic 观测。
+            actions: 采样阶段执行过的动作。
+
+        Returns:
+            (对数概率, 熵, 状态价值, 分布均值)。
+        """
         dist = self.action_distribution(obs)
         log_prob = dist.log_prob(actions).sum(dim=-1)
         entropy = dist.entropy().sum(dim=-1)
         return log_prob, entropy, self.value(critic_obs), dist.mean
 
     def act_inference(self, obs):
+        """部署 / 评测时用：直接取分布均值，不采样。
+
+        Args:
+            obs: actor 观测。
+
+        Returns:
+            确定性动作。
+        """
         return self.actor(self.normalize_actor(obs))

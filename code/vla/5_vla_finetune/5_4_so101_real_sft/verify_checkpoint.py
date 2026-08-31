@@ -3,12 +3,14 @@
 为什么非要单独验归一化：π0 把状态和动作按数据集统计量做标准化，真正的 mean/std 不在
 模型权重里，而在两个几 KB 的伴随文件里（前处理的 normalizer、后处理的 unnormalizer）。
 少了这两个文件，加载时会静默退回恒等归一化——模型照样能跑、loss 照样好看，但输出动作的
-尺度整体是错的，机械臂只会停在原地或直接跑飞。piper 项目上就是这么白跑过一轮训练，
-所以每存一个 checkpoint 就立刻验一次，而不是等训练全跑完再看。
+尺度整体是错的，机械臂只会停在原地或直接跑飞。这种失败在真机上出现过：整轮训练白跑，
+而训练日志里看不出任何异常。所以每存一个 checkpoint 就立刻验一次，不等训练全跑完再看。
 
-用法：
-    python scripts/verify_checkpoint.py <checkpoint>/pretrained_model
-    python scripts/verify_checkpoint.py <末checkpoint>/pretrained_model <冒烟>/metrics.json
+在讲12 2.3 节被引用。
+
+用法（在 code/ 目录下跑）：
+    python vla/5_vla_finetune/5_4_so101_real_sft/verify_checkpoint.py <checkpoint>/pretrained_model
+    python vla/5_vla_finetune/5_4_so101_real_sft/verify_checkpoint.py <末checkpoint>/pretrained_model <冒烟>/metrics.json
 第二个参数是欠训 checkpoint 的指标，当作及格地板（终检用）。
 """
 

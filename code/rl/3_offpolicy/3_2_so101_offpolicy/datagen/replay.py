@@ -43,6 +43,20 @@ def _make_target_env(task: str, work: Path):
 
 
 def replay(task: str, in_h5: Path, out_h5: Path, work: Path) -> Path:
+    """回放 `env_states`，把每一集换成目标外观/相机重渲一遍。
+
+    关键在于**回放的是状态不是动作**：状态逐帧钉死，重渲不会因为物理不确定性跑偏，
+    所以换外观、换相机位姿都不用重新训练策略——真机标定改了，改这里重跑即可。
+
+    Args:
+        task: `so101_sim` 注册的任务 id。
+        in_h5: `rollout.py` 产出的原始 h5。
+        out_h5: 重渲后的输出路径。
+        work: 中间产物目录。
+
+    Returns:
+        重渲后的 h5 路径（`APPEARANCE == "default"` 时直接复制，不重渲）。
+    """
     import h5py
 
     if APPEARANCE == "default":

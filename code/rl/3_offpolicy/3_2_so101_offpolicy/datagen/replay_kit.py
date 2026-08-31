@@ -58,6 +58,14 @@ def replay_kit(kit_task: str, in_h5: Path, out_h5: Path,
 
     输出 h5 保留原 `actions`/`success`/`env_states` 等，把 `obs/sensor_data` 换成
     top/wrist 两路 RGB（原来的 base_camera 整组删掉）。
+    Args:
+        kit_task: 目标 KIT 场景 id。
+        in_h5: 源轨迹 h5。
+        out_h5: 输出路径。
+        source_articulation: 源轨迹里机器人 articulation 的键名。
+
+    Returns:
+        重渲后的 h5 路径。
     """
     shutil.copy(in_h5, out_h5)
     env = gym.make(kit_task, num_envs=1, obs_mode="rgb+segmentation", render_mode="all",

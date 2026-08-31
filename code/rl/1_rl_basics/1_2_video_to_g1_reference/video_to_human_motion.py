@@ -1,3 +1,10 @@
+"""管线第一步：从一段普通视频里恢复人体动作。
+
+调用 GVHMR 把单目视频还原成世界坐标系下的三维人体动作（SMPL-X 参数）。
+渲染很吃时间也用不上，所以走的是不渲染的那条分支。
+
+讲义对应：第14讲 4.4 节。
+"""
 from __future__ import annotations
 
 import os
@@ -8,10 +15,20 @@ from typing import Callable
 
 
 def required_packages() -> list[str]:
+    """列出这一步额外需要的第三方包。
+
+    Returns:
+        包名列表，供调用方在缺依赖时给出可读的提示。
+    """
     return ["hmr4d"]
 
 
 def default_checkpoint_root() -> Path:
+    """给出 GVHMR 预训练权重的默认存放目录。
+
+    Returns:
+        下载权重所在目录。
+    """
     return Path(os.environ["DATASETS_ROOT"]) / "models" / "downloaded" / "gvhmr" / "inputs" / "checkpoints"
 
 
@@ -24,6 +41,15 @@ def recover_human_motion(
     static_camera: bool = True,
     runner: Callable[..., object] = subprocess.run,
 ) -> Path:
+    """对一段视频跑 GVHMR，得到世界坐标系下的人体动作。
+
+    Args:
+        video_path: 输入视频。
+        output_dir: 预测结果落盘目录。
+
+    Returns:
+        GVHMR 预测文件的路径。
+    """
     video_path = Path(video_path).expanduser().resolve()
     if not video_path.is_file():
         raise FileNotFoundError(f"input video not found: {video_path}")
@@ -63,6 +89,7 @@ def recover_human_motion(
 
 def main() -> None:
     # 主要修改这一段：输入视频与 GVHMR 输出目录。
+    """对课程自带的那段武术视频跑一次动作恢复。"""
     video = Path("input_video.mp4")
     output_dir = Path("gvhmr_output")
     checkpoint_root = None

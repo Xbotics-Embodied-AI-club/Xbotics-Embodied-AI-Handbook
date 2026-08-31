@@ -12,7 +12,8 @@ DATASET_ROOT="$DATASETS_ROOT/so101_sim/_gen/SO101ReachCube-v1/dataset"
 # 微调结果落通用数据根，不进 git。
 OUTPUT_DIR="$DATASETS_ROOT/models/trained/so101_sim_smolvla/SO101ReachCube-v1"
 
-# 步数按收敛取；97GB 显存可开大 batch。数据是同一仿真内分布，20k 步足够拟合。
+# 步数按收敛取。数据全部来自同一个仿真分布，20k 步足够拟合；显存吃不下就把 batch 减半、
+# 用梯度累积补回等效批量（讲12 4.3 节），等效批量不变时收敛行为基本一致。
 STEPS=20000
 BATCH_SIZE=64
 
@@ -41,4 +42,5 @@ uv run lerobot-train \
     --output_dir="$OUTPUT_DIR" 2>&1 | tee "$LOG"
 
 # 结果：$OUTPUT_DIR/checkpoints/last/pretrained_model 是最终策略；
-# checkpoints/<step>/ 是各存点。训练日志（loss 曲线数据）在 $OUTPUT_DIR 下。
+# checkpoints/<step>/ 是各存点。plot_loss.py 要读的那份控制台日志在上面 tee 出的
+# scratch/train_smolvla.log，不在 $OUTPUT_DIR 里。

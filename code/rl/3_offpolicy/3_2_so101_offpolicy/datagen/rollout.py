@@ -33,6 +33,22 @@ EPISODE_STEPS = 400  # 与三个分发场景注册的 max_episode_steps 一致�
 
 
 def rollout(task: str, ckpt_path: Path, n_episodes: int, out_dir: Path, device: str = "cuda") -> Path:
+    """让训好的视觉策略在仿真里跑若干集，把成功轨迹录成 h5。
+
+    录的是 128px 的全分辨率画面加完整 `env_states`，而策略自己只看 16px 降采样视图——
+    两者分开是有意的：数据集要给 VLA 用，分辨率不能被策略的"眯眼"输入限死；而
+    `env_states` 留着，后面 `replay.py` 才能换个外观把同一条轨迹重渲一遍，不必重训。
+
+    Args:
+        task: `so101_sim` 注册的任务 id。
+        ckpt_path: `train_v6_squint.py` 存下的策略 checkpoint。
+        n_episodes: 要跑多少集。
+        out_dir: h5 落盘目录。
+        device: 推理设备。
+
+    Returns:
+        录好的 h5 文件路径。
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     n_batches = math.ceil(n_episodes / NUM_ENVS)
 

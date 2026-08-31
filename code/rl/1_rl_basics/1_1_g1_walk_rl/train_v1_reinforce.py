@@ -24,11 +24,33 @@ from model import ActorCritic  # noqa: E402
 
 
 def default_checkpoint_root(run_name: str) -> Path:
+    """给出这次训练存权重的目录。
+
+    权重是大文件，按仓库约定落在共享数据根下、不进 git，所以路径从环境变量拼出来。
+
+    Args:
+        run_name: 本次训练的名字，同时用作目录名。
+
+    Returns:
+        存放 checkpoint 的目录路径。
+    """
     datasets_root = Path(os.environ["DATASETS_ROOT"])
     return datasets_root / "models" / "trained" / "xbotics_rl_g1_walk" / run_name
 
 
 def save_checkpoint(path, model, optimizer, iteration, training_settings):
+    """存一份可续训、也可直接拿去评测的权重。
+
+    优化器状态和这次训练的全部设置一起存下来，评测脚本才能凭 checkpoint 自己重建
+    出维度一致的网络，不必再猜环境配置。
+
+    Args:
+        path: 目标文件路径。
+        model: 要保存的 `ActorCritic`。
+        optimizer: 当前优化器。
+        iteration: 当前是第几次迭代。
+        training_settings: 本次训练的全部设置，一并写进文件。
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
@@ -42,7 +64,18 @@ def save_checkpoint(path, model, optimizer, iteration, training_settings):
 
 
 def reward_to_go(reward_steps, done_steps, gamma):
-    """从后往前累加折扣回报；遇到 done 截断（不跨 episode）。"""
+    """从后往前累加折扣回报；遇到回合结束就截断，不跨回合。
+
+    倒着走是因为第 t 步的回报要用到第 t+1 步的结果；正着走就得把整段存下来再回头算。
+
+    Args:
+        reward_steps: 形状 (T, N) 的即时奖励，T 是采样步数，N 是并行环境数。
+        done_steps: 形状 (T, N)，回合在该步结束则为 1。
+        gamma: 折扣因子。
+
+    Returns:
+        形状 (T, N) 的 reward-to-go，直接拿来当策略梯度的权重。
+    """
     returns = torch.zeros_like(reward_steps)
     running = torch.zeros(reward_steps.shape[1], device=reward_steps.device)
     for step in reversed(range(reward_steps.shape[0])):
@@ -65,6 +98,14 @@ class G1WalkRolloutDataset(IterableDataset):
         yield self.sample_rollout()
 
     def sample_rollout(self):
+        """用当前策略采一段轨迹，并把它整理成一个训练 batch。
+
+        权重先减整批均值再除以整批标准差：这是常见的方差降低与尺度归一化技巧，
+        用一点有限样本偏差换稳定性，不是严格无偏的基线。
+
+        Returns:
+            含 obs / actions / advantages 与本轮平均奖励的字典。
+        """
         env = self.env
         num_envs = env.num_envs
         obs, critic_obs = env.get_observations()
@@ -104,6 +145,10 @@ class G1WalkRolloutDataset(IterableDataset):
 
 
 class G1WalkData(L.LightningDataModule):
+    """把持久环境交给 Trainer 的 LightningDataModule。
+
+    环境要跨迭代活着（仿真状态连续推进），所以由它长期持有，而不是每轮新建。
+    """
     def __init__(self, env, model, num_steps_per_env, gamma):
         super().__init__()
         self.env = env
@@ -112,6 +157,14 @@ class G1WalkData(L.LightningDataModule):
         self.gamma = gamma
 
     def train_dataloader(self):
+        """每个 epoch 重建一次数据集。
+
+        重建就意味着重新采样——on-policy 要求数据来自当前策略，这一条由 Trainer 的
+        `reload_dataloaders_every_n_epochs=1` 和这里配合实现。
+
+        Returns:
+            包着在线数据集的 DataLoader；`batch_size=None` 表示数据集自己吐整批。
+        """
         dataset = G1WalkRolloutDataset(self.env, self.model, self.num_steps_per_env, self.gamma)
         return DataLoader(dataset, batch_size=None)
 
@@ -138,6 +191,11 @@ class G1WalkLightningReinforce(L.LightningModule):
         self.learning_rate = 1.0e-3
 
     def setup(self, stage):
+        """训练开始前建好权重目录并起一个 W&B run。
+
+        Args:
+            stage: Lightning 传入的阶段名，只在 "fit" 阶段做事。
+        """
         if stage != "fit":
             return
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -148,11 +206,28 @@ class G1WalkLightningReinforce(L.LightningModule):
 
     def configure_optimizers(self):
         # 只优化 actor 和动作标准差；critic 不参与训练。
+        """只把 actor 和动作标准差交给优化器。
+
+        网络类里虽然带着 critic，但 REINFORCE 本身用不到它；刻意让它闲置，三个版本才能
+        共用同一个网络类，对照时不掺入结构差异。
+
+        Returns:
+            Adam 优化器。
+        """
         params = list(self.model.actor.parameters()) + [self.model.std]
         self.optimizer = torch.optim.Adam(params, lr=self.learning_rate)
         return self.optimizer
 
     def training_step(self, batch, batch_idx):
+        """算一个 batch 的 REINFORCE loss，并记录指标、按需存盘。
+
+        Args:
+            batch: 采样端产出的一整段数据。
+            batch_idx: Lightning 传入的批序号，本实现用不到。
+
+        Returns:
+            本步的 loss。
+        """
         distribution = self.model.action_distribution(batch["obs"])
         log_probs = distribution.log_prob(batch["actions"]).sum(dim=-1)
         entropy = distribution.entropy().sum(dim=-1)
@@ -175,12 +250,34 @@ class G1WalkLightningReinforce(L.LightningModule):
         return loss
 
     def teardown(self, stage):
+        """训练结束后收尾，把 W&B run 正常关掉。
+
+        Args:
+            stage: Lightning 传入的阶段名。
+        """
         if self.wandb_run is not None:
             self.wandb_run.finish()
 
 
 def run_training(run_name, num_envs, max_iterations, num_steps_per_env, save_interval, device,
                  seed=1, checkpoint_dir=None, wandb_project="rl_class", wandb_mode="online"):
+    """起一次完整训练：建环境、建模型、交给 Trainer 跑完。
+
+    Args:
+        run_name: 本次训练的名字，用作权重目录名与 W&B run 名。
+        num_envs: 并行环境数。
+        max_iterations: 训练迭代次数，一次迭代 = 采一段 rollout + 更新。
+        num_steps_per_env: 每个环境每轮采多少步。
+        save_interval: 每多少次迭代存一次权重。
+        device: 仿真与训练所在设备。
+        seed: 随机种子。
+        checkpoint_dir: 权重目录，给 None 时按 run_name 自动拼。
+        wandb_project: W&B 项目名。
+        wandb_mode: W&B 模式，离线跑改成 offline 即可。
+
+    Returns:
+        最后一次存盘的 checkpoint 路径。
+    """
     checkpoint_dir = checkpoint_dir or default_checkpoint_root(run_name)
     gamma = 0.99
 
@@ -218,6 +315,7 @@ def run_training(run_name, num_envs, max_iterations, num_steps_per_env, save_int
 
 
 def main():
+    """按课堂预算跑一次 REINFORCE 训练。"""
     run_training(
         run_name="g1-walk-reinforce",
         num_envs=4096,

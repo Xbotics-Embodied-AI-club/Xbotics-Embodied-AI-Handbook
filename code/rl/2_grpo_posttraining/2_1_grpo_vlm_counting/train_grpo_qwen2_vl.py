@@ -1,3 +1,14 @@
+"""用 GRPO 后训练 Qwen2.5-VL，让它学会数清图里有几个物体。
+
+第15讲 4.2 节走读这个文件的奖励函数与训练骨架，4.3 节给出它跑出来的前后对照。
+
+整条流水线按 Lightning 四件套组织：`ClevrCountingDataset` 准备样本、
+`ClevrCountingData` 包 dataloader、`QwenVLGRPOModel` 是模型本体、
+`GRPOLightningModule` 管训练与评测的生命周期，入口是 `trainer.fit(model, data)`。
+和第14讲那三版 RL 的一处不同：组采样发生在 TRL 的 `GRPOTrainer` 内部，
+所以 `training_step` 只被调用一次，进去之后一口气跑完 300 个 GRPO step。
+"""
+
 from __future__ import annotations
 
 # unsloth 必须在 trl / peft / transformers / datasets 之前导入，否则它对 GRPO 训练的兼容补丁不会生效。
@@ -22,20 +33,31 @@ import wandb
 
 
 def default_paths() -> dict[str, str]:
-    """路径只读环境变量。.env/.envrc 负责加载，代码里不写默认值。"""
+    """列出本实验会读写的两个根目录，训练前先打出来确认边界。
 
-    # 结果摘要随课程代码走，训练产物随数据根走。
-    result_dir = Path(__file__).resolve().parents[1] / "result" / "2_1_grpo_vlm_counting"
+    路径只从环境变量读，`.env` / `.envrc` 负责加载，代码里不写默认值。
+
+    Returns:
+        dict[str, str]: `hf_home` 是模型下载缓存，`trained_root` 是本实验训练产物的落点。
+    """
+
     trained_root = Path(os.environ["DATASETS_ROOT"]) / "models" / "trained" / "xbotics_rl_grpo_vlm"
     return {
         "hf_home": os.environ["HF_HOME"],
         "trained_root": str(trained_root),
-        "result_dir": str(result_dir),
     }
 
 
 def extract_answer(text: str) -> str | None:
-    """从 <answer>...</answer> 标签里取出最终计数。"""
+    """从 <answer>...</answer> 标签里取出最终计数。
+
+    Args:
+        text: 模型生成的整段回答，或标准答案。
+
+    Returns:
+        str | None: 标签里的内容；没有合法标签时返回 None——这一步失败，
+        格式奖励就是 0，正确性奖励也无从谈起。
+    """
 
     match = re.search(r"<answer>\s*(.*?)\s*</answer>", text, flags=re.IGNORECASE | re.DOTALL)
     if match is None:
@@ -44,6 +66,15 @@ def extract_answer(text: str) -> str | None:
 
 
 def normalize_answer(value: str | None) -> str | None:
+    """把答案归一化后再比较，免得"07"和"7"被判成不同答案。
+
+    Args:
+        value: 从标签里抽出来的答案文本，可能为 None。
+
+    Returns:
+        str | None: 纯整数走 int 往返去掉前导零和正号，其余转小写；输入为 None 时原样返回。
+    """
+
     if value is None:
         return None
     stripped = value.strip()
@@ -53,10 +84,31 @@ def normalize_answer(value: str | None) -> str | None:
 
 
 def format_reward(completion: str) -> float:
+    """格式奖励：每条回答都判得动，信号密集，先把答案的位置教会。
+
+    Args:
+        completion: 模型生成的一条回答。
+
+    Returns:
+        float: 抽得出 <answer> 标签得 1.0，否则 0.0。
+    """
+
     return 1.0 if extract_answer(completion) is not None else 0.0
 
 
 def correctness_reward(completion: str, target: str) -> float:
+    """正确性奖励：只比最终计数，不管模型在标签外写了什么解释。
+
+    抽不出答案直接判 0——所以格式奖励必须先立起来，这条才有的放矢。
+
+    Args:
+        completion: 模型生成的一条回答。
+        target: 标准答案，允许带标签也允许是裸数字。
+
+    Returns:
+        float: 归一化后两者相等得 1.0，否则 0.0。
+    """
+
     predicted = normalize_answer(extract_answer(completion))
     expected = normalize_answer(extract_answer(target) or target)
     if predicted is None or expected is None:
@@ -65,15 +117,31 @@ def correctness_reward(completion: str, target: str) -> float:
 
 
 def build_run_dir(run_name: str | None = None) -> Path:
-    """生成本次训练目录：adapter、logs、eval、wandb 都放在同一个 run 下面。"""
+    """生成本次训练目录：adapter、logs、eval、wandb 都放在同一个 run 下面。
 
-    paths = default_paths()
+    Args:
+        run_name: 指定 run 名；留空则按当前时间生成，便于多次训练互不覆盖。
+
+    Returns:
+        Path: 训练产物根下的这一次 run 目录。
+    """
+
     name = run_name or "grpo-qwen25vl3b-clevr-" + datetime.now().strftime("%Y%m%d-%H%M")
-    return Path(paths["trained_root"]) / name
+    return Path(default_paths()["trained_root"]) / name
 
 
 def training_prompt(problem: str) -> list[dict]:
-    # 训练时给模型的任务很窄：看图、数数、只在标签里写最终答案。
+    """把任务收得很窄：看图、数数、只在标签里写最终答案。
+
+    窄是有意的——回答越自由，判分脚本越抓不准答案在哪。
+
+    Args:
+        problem: 数据集里那句问题，形如"图中有几个红色的金属物体"。
+
+    Returns:
+        list[dict]: 一条 chat 格式的消息，图像占位符在前、问题在后。
+    """
+
     return [
         {
             "role": "user",
@@ -86,7 +154,15 @@ def training_prompt(problem: str) -> list[dict]:
 
 
 def tagged_answer(value) -> str:
-    # 标准答案也统一成标签格式，奖励函数就能直接比较最终计数。
+    """把标准答案也套上标签，奖励函数两边就能走同一条抽取逻辑。
+
+    Args:
+        value: 数据集给的答案，通常是整数，也可能已经带着标签。
+
+    Returns:
+        str: 形如 `<answer> 7 </answer>` 的字符串。
+    """
+
     text = str(value).strip()
     if text.lower().startswith("<answer>"):
         return text
@@ -94,6 +170,19 @@ def tagged_answer(value) -> str:
 
 
 def first_present(example: dict, field_names: list[str]):
+    """公开数据集的字段名各叫各的，按候选名依次找出第一个能用的。
+
+    Args:
+        example: 数据集的一条样本。
+        field_names: 按优先级排好的候选字段名。
+
+    Returns:
+        样本里第一个存在且非空的字段值。
+
+    Raises:
+        KeyError: 候选名一个都没命中，说明这份数据集的格式超出了预期。
+    """
+
     for field_name in field_names:
         if field_name in example and example[field_name] is not None:
             return example[field_name]
@@ -101,9 +190,16 @@ def first_present(example: dict, field_names: list[str]):
 
 
 def prepare_training_example(example: dict) -> dict:
-    """把 CLEVR 训练样本整理成 GRPOTrainer 需要的 image、prompt、answer。"""
+    """把 CLEVR 训练样本整理成 GRPOTrainer 需要的 image、prompt、answer。
 
-    # 训练图像统一成 RGB + 512x512，减少视觉输入形状上的干扰。
+    Args:
+        example: `leonardPKU/clevr_cogen_a_train` 的一条原始样本。
+
+    Returns:
+        dict: 训练用的三件套。图像统一成 RGB + 512x512，是为了把"视觉输入形状"
+        这个变量从对照里排除掉。
+    """
+
     image = example["image"]
     if image.mode != "RGB":
         image = image.convert("RGB")
@@ -116,9 +212,16 @@ def prepare_training_example(example: dict) -> dict:
 
 
 def prepare_counting_example(example: dict, index: int) -> dict:
-    """把不同计数字段名统一成 predict/test 都能读懂的格式。"""
+    """把评测集整理成 predict/test 都能读懂的格式。
 
-    # 不同公开数据集字段名不完全一致，这里只做一次最小统一。
+    Args:
+        example: 评测数据集的一条原始样本。
+        index: 样本序号，写进结果里才能定位到具体是哪一题答错了。
+
+    Returns:
+        dict: 含 index、image、problem、target 四项。
+    """
+
     image = first_present(example, ["image", "img", "picture"])
     if hasattr(image, "mode") and image.mode != "RGB":
         image = image.convert("RGB")
@@ -131,7 +234,14 @@ def prepare_counting_example(example: dict, index: int) -> dict:
 
 
 def describe_image(image) -> str:
-    """把图像尺寸和颜色模式压成一行，方便训练前快速检查数据。"""
+    """把图像尺寸和颜色模式压成一行，方便训练前扫一眼数据。
+
+    Args:
+        image: PIL 图像。
+
+    Returns:
+        str: 形如 `512x512, RGB`。
+    """
 
     width, height = image.size
     return f"{width}x{height}, {image.mode}"
@@ -150,6 +260,15 @@ class ClevrCountingDataset(Dataset):
         return self.examples[index]
 
     def with_chat_template(self, tokenizer) -> "ClevrCountingDataset":
+        """把 prompt 预先展开成字符串，供旧版 TRL 使用。
+
+        Args:
+            tokenizer: 带 chat template 的 processor。
+
+        Returns:
+            ClevrCountingDataset: prompt 已展开的新数据集，原数据集不动。
+        """
+
         formatted_examples = []
         for example in self.examples:
             formatted_examples.append(
@@ -176,6 +295,12 @@ class ClevrCountingData(L.LightningDataModule):
         self.eval_examples = eval_examples
 
     def setup(self, stage: str | None = None) -> None:
+        """按阶段拉取数据集切片。
+
+        Args:
+            stage: Lightning 传入的阶段名（fit / predict / test），None 表示全都准备。
+        """
+
         if stage in (None, "fit"):
             # 训练只取一个小切片，单卡 GRPO 能在演示时间内看到变化。
             train_split = f"train[:{self.train_examples}]"
@@ -193,7 +318,11 @@ class ClevrCountingData(L.LightningDataModule):
             )
 
     def preview_rows(self) -> list[dict[str, str | int]]:
-        """抽几条训练/评测样本，展示模型到底在学什么。"""
+        """抽几条训练/评测样本，展示模型到底在学什么。
+
+        Returns:
+            list[dict]: 每行含 split、dataset、index、image、problem、answer，可直接打印。
+        """
 
         train_preview = load_dataset(self.train_dataset_id, split="train[:2]")
         eval_preview = load_dataset(self.eval_dataset_id, split="train[:2]")
@@ -240,12 +369,31 @@ class ClevrCountingData(L.LightningDataModule):
             print()
 
     def train_dataloader(self):
+        """训练 dataloader。
+
+        Returns:
+            DataLoader: batch_size=1 且不打乱——真正的组采样在 GRPOTrainer 内部进行，
+            这里只是把训练集递进去。
+        """
+
         return DataLoader(self.train_dataset, batch_size=1, shuffle=False, collate_fn=lambda rows: rows)
 
     def predict_dataloader(self):
+        """预测 dataloader，逐条生成回答并写 JSONL。
+
+        Returns:
+            DataLoader: 固定顺序的评测集。
+        """
+
         return DataLoader(self.eval_dataset, batch_size=1, shuffle=False, collate_fn=lambda rows: rows)
 
     def test_dataloader(self):
+        """测试 dataloader，与 predict 用同一套题，保证前后对比是同一把尺子。
+
+        Returns:
+            DataLoader: 固定顺序的评测集。
+        """
+
         return DataLoader(self.eval_dataset, batch_size=1, shuffle=False, collate_fn=lambda rows: rows)
 
 
@@ -258,7 +406,12 @@ class QwenVLGRPOModel(nn.Module):
         self.fast_inference = fast_inference
 
     def load_for_training(self) -> None:
-        # 训练时加载 4bit 基座模型，显存主要留给生成和 LoRA 更新。
+        """加载 4bit 基座并挂上 LoRA，显存主要留给生成和 LoRA 更新。
+
+        视觉塔保持冻结、只训语言侧：数数任务的反馈改的是"怎么把答案说出来"，
+        不是"怎么看图"。
+        """
+
         self.model, self.tokenizer = FastVisionModel.from_pretrained(
             model_name=self.model_id,
             max_seq_length=8192,
@@ -266,7 +419,6 @@ class QwenVLGRPOModel(nn.Module):
             fast_inference=self.fast_inference,
             gpu_memory_utilization=0.8,
         )
-        # 只训练语言侧 LoRA，视觉塔保持冻结；计数任务的反馈主要改写回答方式。
         self.model = FastVisionModel.get_peft_model(
             self.model,
             finetune_vision_layers=False,
@@ -284,7 +436,13 @@ class QwenVLGRPOModel(nn.Module):
         )
 
     def load_for_prediction(self, adapter_dir: Path | None) -> None:
-        # 评测时先加载同一个基座，再按需挂上训练得到的 LoRA adapter。
+        """加载同一个基座用于评测，按需挂上训练得到的 LoRA adapter。
+
+        Args:
+            adapter_dir: adapter 目录；传 None 就评测后训练前的基座，
+            两次评测共用这一个入口，前后对比才没有实现差异。
+        """
+
         self.model, self.tokenizer = FastVisionModel.from_pretrained(
             model_name=self.model_id,
             max_seq_length=8192,
@@ -296,17 +454,42 @@ class QwenVLGRPOModel(nn.Module):
         FastVisionModel.for_inference(self.model)
 
     def build_trainer(self, train_dataset: ClevrCountingDataset, run_dir: Path):
+        """把两条判分规则和一份 GRPO 配置交给 TRL，组采样与优势计算都由它代劳。
+
+        Args:
+            train_dataset: 已准备好的训练集。
+            run_dir: 本次 run 的目录，日志写在它下面的 logs/。
+
+        Returns:
+            GRPOTrainer: 调用它的 train() 就跑完全部 GRPO step。
+        """
+
         if Version("trl") < Version("0.24.0"):
             # 旧版 TRL 需要先把 chat template 展开成字符串。
             train_dataset = train_dataset.with_chat_template(self.tokenizer)
 
-        # 格式奖励：模型必须按 <answer>...</answer> 输出，便于把格式约束和正确性分开观察。
         def formatting_reward_func(completions, **unused):
+            """格式奖励，逐条打分；把格式约束和正确性分开，才看得出模型先学会了哪一件。
+
+            Args:
+                completions: GRPOTrainer 一次送来同一道题的一整组回答。
+
+            Returns:
+                list[float]: 与 completions 等长的奖励列表。
+            """
             return [format_reward(completion) for completion in completions]
 
-        # 正确性奖励：只比较最终计数答案，弱化自然语言解释。
         def correctness_reward_func(completions, answer, **unused):
-            return [correctness_reward(c, t) for c, t in zip(completions, answer)]
+            """正确性奖励，逐条打分；只比最终计数，模型怎么解释不影响得分。
+
+            Args:
+                completions: 同一道题的一整组回答。
+                answer: 与之对齐的标准答案列表。
+
+            Returns:
+                list[float]: 与 completions 等长的奖励列表。
+            """
+            return [correctness_reward(completion, target) for completion, target in zip(completions, answer)]
 
         # GRPO 每个问题采样 4 个回答，同组回答互相比较后更新 LoRA。
         grpo_config = GRPOConfig(
@@ -342,9 +525,25 @@ class QwenVLGRPOModel(nn.Module):
         )
 
     def save_adapter(self, run_dir: Path) -> None:
+        """只存 LoRA 权重，基座不动，几十兆就能带走这次训练的全部成果。
+
+        Args:
+            run_dir: 本次 run 的目录，adapter 落在它下面的 adapter/。
+        """
+
         self.model.save_lora(str(run_dir / "adapter"))
 
     def build_messages(self, image, problem: str) -> list[dict]:
+        """拼评测时的 chat 消息，问法与训练时逐字一致。
+
+        Args:
+            image: 待数数的图像。
+            problem: 那句问题。
+
+        Returns:
+            list[dict]: 一条 chat 格式的消息。
+        """
+
         return [
             {
                 "role": "user",
@@ -359,8 +558,20 @@ class QwenVLGRPOModel(nn.Module):
         ]
 
     def generate_answer(self, image, problem: str, max_new_tokens: int) -> str:
+        """让模型回答一道数数题。
+
+        评测走确定性生成（`do_sample=False`），训练前后的结果才可以直接比。
+
+        Args:
+            image: 待数数的图像。
+            problem: 那句问题。
+            max_new_tokens: 生成长度上限。
+
+        Returns:
+            str: 模型生成的那段回答，已去掉 prompt 部分。
+        """
+
         messages = self.build_messages(image, problem)
-        # 图像和文本一起进入 Qwen2.5-VL 的 processor/tokenizer。
         prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         image_inputs, video_inputs = qwen_vl_utils.process_vision_info(messages)
         inputs = self.tokenizer(
@@ -373,7 +584,6 @@ class QwenVLGRPOModel(nn.Module):
         if hasattr(inputs, "to"):
             inputs = inputs.to(self.model.device)
 
-        # 评测阶段用确定性生成，训练前后结果更容易直接比较。
         generated_ids = self.model.generate(
             **inputs,
             max_new_tokens=max_new_tokens,
@@ -412,6 +622,12 @@ class GRPOLightningModule(L.LightningModule):
         self.test_rows = []
 
     def setup(self, stage: str) -> None:
+        """建好 run 目录，并按阶段决定加载可训练模型还是评测模型。
+
+        Args:
+            stage: Lightning 传入的阶段名（fit / predict / test）。
+        """
+
         # 一个 run 目录里放 adapter、日志、评测输出和 W&B 本地文件。
         (self.run_dir / "adapter").mkdir(parents=True, exist_ok=True)
         (self.run_dir / "logs").mkdir(parents=True, exist_ok=True)
@@ -428,32 +644,74 @@ class GRPOLightningModule(L.LightningModule):
             self.vlm.load_for_prediction(self.adapter_dir)
 
     def training_step(self, batch, batch_idx):
+        """把训练整个交给 GRPOTrainer，所以这一步只会被执行一次。
+
+        Args:
+            batch: dataloader 递来的样本，这里用不上——组采样在 GRPOTrainer 内部完成。
+            batch_idx: 批次序号。
+
+        Returns:
+            torch.Tensor: 一个零标量，只为满足 Lightning 对 training_step 返回值的约定。
+        """
+
         if not self.has_trained:
-            # 这个 Lightning step 只触发一次，内部由 GRPOTrainer 跑完 300 个 GRPO step。
             self.grpo_trainer.train()
             self.vlm.save_adapter(self.run_dir)
             self.has_trained = True
         return torch.zeros((), device=self.device)
 
     def predict_step(self, batch, batch_idx):
+        """逐条生成回答并累积，供 epoch 结束时统一落盘。
+
+        Args:
+            batch: 一批评测样本。
+            batch_idx: 批次序号。
+
+        Returns:
+            list[dict]: 这一批的预测结果。
+        """
+
         rows = [self.predict_one(example) for example in batch]
         self.prediction_rows.extend(rows)
         return rows
 
     def on_predict_epoch_end(self) -> None:
+        """把逐题预测写成 JSONL，答错的题事后能一条条翻出来看。"""
+
         output_jsonl = self.run_dir / "eval" / f"{self.prediction_name}_predictions.jsonl"
         output_jsonl.write_text("\n".join(json.dumps(row, ensure_ascii=False) for row in self.prediction_rows) + "\n")
 
     def test_step(self, batch, batch_idx):
+        """逐条生成并打分。
+
+        Args:
+            batch: 一批评测样本。
+            batch_idx: 批次序号。
+
+        Returns:
+            dict[str, float]: 这一批的准确率与格式合规率。
+        """
+
         rows = [self.predict_one(example) for example in batch]
         self.test_rows.extend(rows)
         return score_rows(rows)
 
     def on_test_epoch_end(self) -> None:
+        """把整套题的汇总写成 JSON，这份文件就是讲义里前后对照表的出处。"""
+
         summary_json = self.run_dir / "eval" / f"{self.prediction_name}_summary.json"
         summary_json.write_text(json.dumps(score_rows(self.test_rows), ensure_ascii=False, indent=2) + "\n")
 
     def predict_one(self, example: dict) -> dict:
+        """回答一道题并记下题面、标准答案和模型输出。
+
+        Args:
+            example: 一条评测样本。
+
+        Returns:
+            dict: 含 index、problem、target、completion、prediction_name。
+        """
+
         completion = self.vlm.generate_answer(
             example["image"],
             example["problem"],
@@ -468,21 +726,38 @@ class GRPOLightningModule(L.LightningModule):
         }
 
     def configure_optimizers(self):
+        """返回 None：优化器由 GRPOTrainer 自己管，Lightning 这边不需要再建一个。
+
+        Returns:
+            None
+        """
+
         return None
 
 
 def score_rows(rows: list[dict]) -> dict[str, float]:
+    """用与训练时同一对奖励函数给评测结果打分。
+
+    复用奖励函数不是偷懒——训练看的和评测看的必须是同一把尺子。
+
+    Args:
+        rows: predict_one 产出的结果行。
+
+    Returns:
+        dict[str, float]: 题数、数数准确率、答案格式合规率。
+    """
+
     if not rows:
         return {"count": 0, "accuracy": 0.0, "format": 0.0}
 
-    # accuracy 看答案是否正确，format 看输出是否遵守 <answer> 标签。
     accuracy = sum(correctness_reward(row["completion"], row["target"]) for row in rows) / len(rows)
     format_score = sum(format_reward(row["completion"]) for row in rows) / len(rows)
     return {"count": len(rows), "accuracy": accuracy, "format": format_score}
 
 
 def main() -> None:
-    # 主要修改这一段：fit 训练，predict 写 JSONL，test 写 summary。
+    """改 running_stage 切换三个阶段：fit 训练、predict 写 JSONL、test 写 summary。"""
+
     running_stage = "fit"
     run_dir = build_run_dir("grpo-qwen25vl3b-clevr-lightning-demo")
     prediction_name = "adapter"

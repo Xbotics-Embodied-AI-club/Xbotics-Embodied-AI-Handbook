@@ -1,6 +1,16 @@
+"""动作跟随任务上的第三版：完整 PPO，也是本组两条任务线共同的收官版本。
+
+三块让训练稳住的机制一个不少：概率比值裁剪（clip）、同一段 rollout 切成多个
+minibatch 反复训几轮、按 KL 散度自适应调整学习率，外加对 value 估值的对称裁剪。
+行走线的同名脚本证明了这套配方在简单任务上就已经领先；换到"逐帧贴住一段参考动作"
+这种更难的任务上，v1/v2 明显跟不动，这套机制的必要性才真正显出来。
+
+讲义对应：第14讲 6.4 节（代码走读）与 6.6 节（实验加码）。
+"""
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import Iterator
 
@@ -10,11 +20,23 @@ import wandb
 from torch import nn
 from torch.utils.data import DataLoader, IterableDataset
 
-from .env import BeyondMimicEnv
-from .motion import MotionClip
+# 与本组其余脚本一致：按脚本自身所在目录取同级模块，直接 `python xxx.py` 就能跑。
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from env import BeyondMimicEnv  # noqa: E402
+from motion import MotionClip  # noqa: E402
 
 
 def default_checkpoint_root(run_name: str) -> Path:
+    """给出这次训练存权重的目录。
+
+    权重是大文件，按仓库约定落在共享数据根下、不进 git，所以路径从环境变量拼出来。
+
+    Args:
+        run_name: 本次训练的名字，同时用作目录名。
+
+    Returns:
+        存放 checkpoint 的目录路径。
+    """
     datasets_root = Path(os.environ["DATASETS_ROOT"])
     return datasets_root / "models" / "trained" / "xbotics_rl_beyondmimic" / run_name
 
@@ -27,6 +49,19 @@ def compute_gae(
     gamma: float,
     lam: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
+    """用广义优势估计（GAE）把一段 rollout 换算成每步的优势与回报目标。
+
+    Args:
+        rewards: 形状 (T, N) 的即时奖励。
+        dones: 形状 (T, N)，回合在该步结束则为 1。
+        values: 形状 (T, N, 1) 的 critic 估值。
+        next_value: 形状 (N, 1)，最后一步之后那个状态的估值。
+        gamma: 折扣因子。
+        lam: GAE 系数。
+
+    Returns:
+        (advantages, returns)。
+    """
     rewards_3d = rewards.unsqueeze(-1) if rewards.ndim == 2 else rewards
     dones_3d = dones.unsqueeze(-1) if dones.ndim == 2 else dones
     values_3d = values.unsqueeze(-1) if values.ndim == 2 else values
@@ -52,6 +87,20 @@ def adapt_learning_rate_to_kl(
     min_lr: float = 1.0e-5,
     max_lr: float = 1.0e-2,
 ) -> float:
+    """按新旧策略的 KL 距离自动收放学习率。
+
+    clip 只让「走太远」无利可图，并不真的锁住步长；再加这一层兜底。
+
+    Args:
+        optimizer: 要调整的优化器。
+        kl: 本次更新前后策略的 KL 距离。
+        desired_kl: 希望维持的 KL 水平。
+        min_lr: 学习率下限。
+        max_lr: 学习率上限。
+
+    Returns:
+        调整后的学习率。
+    """
     current_lr = optimizer.param_groups[0]["lr"]
     kl_value = float(kl.detach().cpu())
     if kl_value > 2.0 * desired_kl:
@@ -63,6 +112,14 @@ def adapt_learning_rate_to_kl(
 
 
 def describe_motion_dataset(motion_file: Path) -> dict[str, str | int | float | list[float]]:
+    """读一遍参考动作文件，汇总成一份可打印的概况。
+
+    Args:
+        motion_file: 参考动作 npz 路径。
+
+    Returns:
+        含帧数、帧率、时长与几帧关节角样本的字典。
+    """
     motion = MotionClip.load(motion_file, device="cpu")
     middle_frame = motion.num_frames // 2
     return {
@@ -79,6 +136,11 @@ def describe_motion_dataset(motion_file: Path) -> dict[str, str | int | float | 
 
 
 def print_motion_dataset_preview(motion_file: Path) -> None:
+    """把参考动作的概况打到终端，开训前肉眼确认数据没读错。
+
+    Args:
+        motion_file: 参考动作 npz 路径。
+    """
     preview = describe_motion_dataset(motion_file)
     print("Motion dataset preview")
     for key, value in preview.items():
@@ -92,6 +154,15 @@ def save_checkpoint(
     iteration: int,
     training_settings: dict[str, str | int | float],
 ) -> None:
+    """存一份可续训、也可直接拿去评测的权重。
+
+    Args:
+        path: 目标文件路径。
+        model: 要保存的模型。
+        optimizer: 当前优化器。
+        iteration: 当前是第几次迭代。
+        training_settings: 本次训练的全部设置。
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
@@ -131,6 +202,13 @@ class BeyondMimicRolloutDataset(IterableDataset):
         yield from self.iter_mini_batches(rollout)
 
     def sample_rollout(self) -> dict[str, torch.Tensor]:
+        """用当前策略采一段轨迹，并记下旧策略的对数概率与分布参数。
+
+        这些量必须在采样时就存下来：训练阶段要拿它们算概率比值和 KL，那时策略已经变了。
+
+        Returns:
+            含整段 rollout 与 GAE 优势的字典。
+        """
         env = self.env
         num_envs = env.num_envs
         # 从持久环境读出当前观测，沿用上一轮训练后的仿真状态。
@@ -189,6 +267,16 @@ class BeyondMimicRolloutDataset(IterableDataset):
         }
 
     def iter_mini_batches(self, rollout: dict[str, torch.Tensor]) -> Iterator[dict[str, torch.Tensor]]:
+        """把一整段 rollout 打散成若干 minibatch，重复吐几轮。
+
+        PPO 的数据复用就实现在这里，Lightning 那边一行不用改。
+
+        Args:
+            rollout: `sample_rollout` 的产出。
+
+        Yields:
+            一个个 minibatch 字典。
+        """
         batch_size = rollout["actions"].shape[0] * rollout["actions"].shape[1]
         mini_batch_size = batch_size // self.num_mini_batches
         usable_size = mini_batch_size * self.num_mini_batches
@@ -244,9 +332,21 @@ class BeyondMimicData(L.LightningDataModule):
         self.env = None
 
     def attach_model(self, model: "ActorCritic") -> None:
+        """把模型挂到数据模块上。
+
+        模型要到 Trainer 起来之后才存在，所以数据模块先建、模型后挂。
+
+        Args:
+            model: 采样时要用的策略网络。
+        """
         self.model = model
 
     def setup(self, stage: str) -> None:
+        """训练开始前建好权重目录并起一个 W&B run。
+
+        Args:
+            stage: Lightning 传入的阶段名，只在 fit 阶段做事。
+        """
         if stage != "fit" or self.env is not None:
             return
         torch.manual_seed(self.seed)
@@ -256,6 +356,11 @@ class BeyondMimicData(L.LightningDataModule):
 
     def train_dataloader(self) -> DataLoader:
         # 每个 epoch 重新构造数据集 = 用刚更新过的策略采一段全新 rollout。
+        """每个 epoch 重建一次数据集，保证数据永远来自当前策略。
+
+        Returns:
+            包着在线数据集的 DataLoader。
+        """
         dataset = BeyondMimicRolloutDataset(
             env=self.env,
             model=self.model,
@@ -295,6 +400,16 @@ class ActorCritic(nn.Module):
 
     @staticmethod
     def build_mlp(input_dim: int, hidden_dims: tuple[int, ...], output_dim: int) -> nn.Sequential:
+        """堆一串「线性层 + ELU」，最后一层不带激活。
+
+        Args:
+            input_dim: 输入维度。
+            hidden_dims: 各隐藏层宽度。
+            output_dim: 输出维度。
+
+        Returns:
+            拼好的 `nn.Sequential`。
+        """
         layers: list[nn.Module] = []
         last_dim = input_dim
         for hidden_dim in hidden_dims:
@@ -306,6 +421,11 @@ class ActorCritic(nn.Module):
 
     @torch.no_grad()
     def update_actor_normalizer(self, obs: torch.Tensor) -> None:
+        """用新采到的观测更新 actor 侧归一化统计量。
+
+        Args:
+            obs: 一批 actor 观测。
+        """
         self.actor_mean, self.actor_var, self.actor_count = self.update_running_stats(
             obs,
             self.actor_mean,
@@ -315,6 +435,11 @@ class ActorCritic(nn.Module):
 
     @torch.no_grad()
     def update_critic_normalizer(self, critic_obs: torch.Tensor) -> None:
+        """同上，更新的是 critic 侧统计量。
+
+        Args:
+            obs: 一批 critic 观测。
+        """
         self.critic_mean, self.critic_var, self.critic_count = self.update_running_stats(
             critic_obs,
             self.critic_mean,
@@ -329,6 +454,17 @@ class ActorCritic(nn.Module):
         var: torch.Tensor,
         count: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """按新一批样本增量更新均值与方差。
+
+        Args:
+            x: 一批观测。
+            mean: 当前均值。
+            var: 当前方差。
+            count: 已累计样本数。
+
+        Returns:
+            (新均值, 新方差, 新计数)。
+        """
         batch_mean = x.mean(dim=0)
         batch_var = x.var(dim=0, unbiased=False)
         batch_count = torch.tensor(float(x.shape[0]), device=x.device)
@@ -340,17 +476,49 @@ class ActorCritic(nn.Module):
         return new_mean, new_var, new_count
 
     def normalize_actor(self, obs: torch.Tensor) -> torch.Tensor:
+        """把 actor 观测标准化。
+
+        Args:
+            obs: 原始观测。
+
+        Returns:
+            标准化后的观测。
+        """
         return (obs - self.actor_mean) / (torch.sqrt(self.actor_var) + self.normalizer_epsilon)
 
     def normalize_critic(self, critic_obs: torch.Tensor) -> torch.Tensor:
+        """把 critic 观测标准化。
+
+        Args:
+            obs: 原始观测。
+
+        Returns:
+            标准化后的观测。
+        """
         return (critic_obs - self.critic_mean) / (torch.sqrt(self.critic_var) + self.normalizer_epsilon)
 
     def action_distribution(self, obs: torch.Tensor) -> torch.distributions.Normal:
+        """给出当前状态下的动作分布。
+
+        Args:
+            obs: 一批 actor 观测。
+
+        Returns:
+            逐关节独立的高斯分布。
+        """
         mean = self.actor(self.normalize_actor(obs))
         std = self.std.clamp_min(1.0e-6).expand_as(mean)
         return torch.distributions.Normal(mean, std)
 
     def value(self, critic_obs: torch.Tensor) -> torch.Tensor:
+        """critic 给状态打分。
+
+        Args:
+            critic_obs: 一批 critic 观测。
+
+        Returns:
+            形状 (N, 1) 的状态价值估计。
+        """
         return self.critic(self.normalize_critic(critic_obs))
 
     def act(
@@ -358,6 +526,15 @@ class ActorCritic(nn.Module):
         obs: torch.Tensor,
         critic_obs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """采样阶段用：采一个动作，并带回训练要用的量。
+
+        Args:
+            obs: actor 观测。
+            critic_obs: critic 观测。
+
+        Returns:
+            (动作, 对数概率, 状态价值, 分布均值, 分布标准差)。
+        """
         distribution = self.action_distribution(obs)
         actions = distribution.sample()
         log_prob = distribution.log_prob(actions).sum(dim=-1)
@@ -370,6 +547,16 @@ class ActorCritic(nn.Module):
         critic_obs: torch.Tensor,
         actions: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """训练阶段用：拿当前策略重新评估一批已采好的动作。
+
+        Args:
+            obs: actor 观测。
+            critic_obs: critic 观测。
+            actions: 采样阶段执行过的动作。
+
+        Returns:
+            (对数概率, 熵, 状态价值, 分布均值)。
+        """
         distribution = self.action_distribution(obs)
         log_prob = distribution.log_prob(actions).sum(dim=-1)
         entropy = distribution.entropy().sum(dim=-1)
@@ -377,6 +564,14 @@ class ActorCritic(nn.Module):
         return log_prob, entropy, value, distribution.mean
 
     def act_inference(self, obs: torch.Tensor) -> torch.Tensor:
+        """部署 / 评测时用：直接取分布均值。
+
+        Args:
+            obs: actor 观测。
+
+        Returns:
+            确定性动作。
+        """
         return self.actor(self.normalize_actor(obs))
 
 
@@ -417,6 +612,11 @@ class BeyondMimicLightningPPO(L.LightningModule):
         self.desired_kl = 0.01
 
     def setup(self, stage: str) -> None:
+        """训练开始前建好权重目录并起一个 W&B run。
+
+        Args:
+            stage: Lightning 传入的阶段名，只在 fit 阶段做事。
+        """
         if stage != "fit":
             return
 
@@ -431,13 +631,28 @@ class BeyondMimicLightningPPO(L.LightningModule):
 
     def configure_optimizers(self) -> torch.optim.Optimizer:
         # 保留对原始 optimizer 的引用，供 KL 自适应学习率和 checkpoint 直接使用。
+        """把全部参数交给一个 Adam。
+
+        Returns:
+            Adam 优化器。
+        """
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
         return self.optimizer
 
     def on_train_epoch_start(self) -> None:
+        """每轮开始时清空本轮的指标缓存。"""
         self.epoch_records = []
 
     def training_step(self, mini_batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
+        """算一个 minibatch 的 PPO loss，并把指标攒进本轮缓存。
+
+        Args:
+            mini_batch: 数据集吐出的一个 minibatch。
+            batch_idx: Lightning 传入的批序号，本实现用不到。
+
+        Returns:
+            本步的 loss。
+        """
         loss, policy_loss, value_loss, entropy_loss, kl = self.loss_for_batch(mini_batch)
         # 把本 minibatch 的 KL 暂存，交给 on_before_optimizer_step 调学习率。
         self.latest_kl = kl.detach()
@@ -456,9 +671,15 @@ class BeyondMimicLightningPPO(L.LightningModule):
 
     def on_before_optimizer_step(self, optimizer: torch.optim.Optimizer) -> None:
         # 原生 hook：反向之后、optimizer.step 之前，按 KL 调整学习率。
+        """每次真正迈步之前，先按 KL 把学习率调好。
+
+        Args:
+            optimizer: Lightning 传入的优化器。
+        """
         adapt_learning_rate_to_kl(self.optimizer, self.latest_kl, self.desired_kl)
 
     def on_train_epoch_end(self) -> None:
+        """把本轮各 minibatch 的指标平均后上报，并按需存盘。"""
         iteration = self.current_epoch + 1
         metrics = {key: sum(r[key] for r in self.epoch_records) / len(self.epoch_records) for key in self.epoch_records[0]}
         metrics["lr"] = self.optimizer.param_groups[0]["lr"]
@@ -472,6 +693,16 @@ class BeyondMimicLightningPPO(L.LightningModule):
         self,
         batch: dict[str, torch.Tensor],
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """算一个 minibatch 上的三项 loss 与 KL。
+
+        KL 在 `no_grad` 下算：它只用来调学习率，不参与反向传播。
+
+        Args:
+            batch: 一个 minibatch。
+
+        Returns:
+            (总 loss, 策略 loss, 价值 loss, 熵, KL)。
+        """
         log_probs, entropy, values, action_means = self.model.evaluate(
             batch["obs"],
             batch["critic_obs"],
@@ -500,6 +731,16 @@ class BeyondMimicLightningPPO(L.LightningModule):
         return loss, policy_loss, value_loss, entropy_loss, kl
 
     def value_loss(self, values: torch.Tensor, old_values: torch.Tensor, returns: torch.Tensor) -> torch.Tensor:
+        """critic 的回归损失，可选对新估值做对称裁剪。
+
+        Args:
+            values: 当前 critic 的估值。
+            old_values: 采样时记下的旧估值。
+            returns: 回归目标。
+
+        Returns:
+            标量损失。
+        """
         if not self.use_clipped_value_loss:
             return torch.square(values - returns).mean()
 
@@ -507,6 +748,11 @@ class BeyondMimicLightningPPO(L.LightningModule):
         return torch.max(torch.square(values - returns), torch.square(value_clipped - returns)).mean()
 
     def teardown(self, stage: str) -> None:
+        """训练结束后收尾，把 W&B run 正常关掉。
+
+        Args:
+            stage: Lightning 传入的阶段名。
+        """
         if self.wandb_run is not None:
             self.wandb_run.finish()
 
@@ -524,6 +770,24 @@ def run_training(
     wandb_project: str = "rl_class",
     wandb_mode: str = "online",
 ) -> Path:
+    """起一次完整训练：建环境、建模型、交给 Trainer 跑完。
+
+    Args:
+        motion_file: 要跟随的参考动作文件。
+        run_name: 本次训练的名字，用作权重目录名与 W&B run 名。
+        num_envs: 并行环境数。
+        max_iterations: 训练迭代次数。
+        num_steps_per_env: 每个环境每轮采多少步。
+        save_interval: 每多少次迭代存一次权重。
+        device: 仿真与训练所在设备。
+        seed: 随机种子。
+        checkpoint_dir: 权重目录，给 None 时按 run_name 自动拼。
+        wandb_project: W&B 项目名。
+        wandb_mode: W&B 模式。
+
+    Returns:
+        最后一次存盘的 checkpoint 路径。
+    """
     checkpoint_dir = checkpoint_dir or default_checkpoint_root(run_name)
     gamma = 0.99
     lam = 0.95
@@ -589,6 +853,7 @@ def run_training(
 
 
 def main() -> None:
+    """按本模块的默认设置跑一次完整 PPO 训练。"""
     group_root = Path(__file__).resolve().parents[1]
 
     # 主要修改这一段：数据、轮数、环境数和 W&B 模式。

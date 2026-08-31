@@ -1,6 +1,6 @@
 # 3_2 SO101 连续控制：DDPG → TD3 → SAC → 视觉分布式 SAC
 
-组3 讲16 的连续控制阶梯，承接 3_1 的值学习地基（CartPole 上的 Q-learning/DQN 都是
+第16讲的连续控制阶梯，承接 3_1 的值学习地基（CartPole 上的 Q-learning/DQN 都是
 离散动作，对每个动作打分再 argmax）。SO101 机械臂的动作是连续的，argmax 没法穷举了，
 四级由简到繁依次解决"怎么在连续动作空间里做 off-policy 学习"这个问题：
 
@@ -18,9 +18,15 @@
 
 ```bash
 cd code
-python rl/3_offpolicy/3_2_so101_offpolicy/train_v3_ddpg.py    # 依次跑通 v3→v4→v5→v6
-python rl/3_offpolicy/3_2_so101_offpolicy/train_v6_squint.py  # 改内联 TASK 换任务
+python rl/3_offpolicy/3_2_so101_offpolicy/train_v3_ddpg.py    # v3/v4/v5 可直接跑
+python rl/3_offpolicy/3_2_so101_offpolicy/train_v6_squint.py  # ⚠️ 现在跑不起来，见下
 ```
+
+> ⚠️ **v6 现在直接跑会报错。** `train_v6_squint.py` 的 `CNNEncoder` 与 `ReplayBuffer`
+> 按单相机 **3 通道**写死，而 `platform/so101_sim` 现存的三个分发场景都是双相机
+> （`top` + `wrist`）**6 通道**输出，通道数对不上。v3/v4/v5 走 `state_rl_env`（只吃关节
+> 状态、不过渲染管线），不受影响。要跑 v6 得先把编码器与回放池改成吃 6 通道，
+> 见文末「待重新整训」。
 
 v3/v4/v5 从关节状态（`obs_mode="state"`）学习，公平预算 500 iter 对照：DDPG 全程震荡
 （mean_reward≈0.28，success_once 始终 0）、TD3 治住震荡但仍是 0（mean_reward≈0.52）、
@@ -53,6 +59,11 @@ python rl/3_offpolicy/3_2_so101_offpolicy/train_v6_squint.py       # 先训 v6�
 python rl/3_offpolicy/3_2_so101_offpolicy/datagen/gen_dataset.py   # 再产数据集（改内联 TASK；外观在 datagen/replay.py）
 ```
 
+> ⚠️ 这条链现在**整条都跑不通**：第一步 v6 因上面那个 3/6 通道问题报错，产不出
+> `sac_ckpt.pt`；第二步 `datagen/rollout.py` 直接 `from train_v6_squint import CNNEncoder`
+> 复用同一个 3 通道编码器，就算有 ckpt 也会在同一处挂。两处要一起改成按环境实际
+> 通道数构造。
+
 产物（ckpt / h5 / 数据集）统一落 `DATASETS_ROOT` 下，不入代码仓。
 
 ## 结果
@@ -67,6 +78,10 @@ python rl/3_offpolicy/3_2_so101_offpolicy/datagen/gen_dataset.py   # 再产数�
 `so101_sim` 重构后三个分发场景改为 KIT 双相机（`SO101PickPlaceCube40-v1` 等），
 上面记录的阶梯对照结果全部来自已下线的单相机 `SO101ReachCube-v1`。四个训练脚本已
 机械收敛到新接口（`state_rl_env`/`visual_rl_env`，`TASK = "SO101PickPlaceCube40-v1"`），
-但尚未在新场景上重新跑出对照数据——v6 的 `ColorJitterWrapper` 对双相机 6 通道观测的
-处理方式与单相机时不同，重训前需要确认整条视觉管线在新场景下的行为。本模块的算法
-阶梯待与真机 HIL-SERL（`3_3`）一起重新整训。
+但尚未在新场景上重新跑出对照数据——v6 现在**在新场景上直接跑会报错**：`CNNEncoder`
+第一层是 `nn.Conv2d(3, 32, 4, stride=2)`、`ReplayBuffer` 的 `rgb` 缓冲也按 3 通道开，
+而 `visual_rl_env` 经 `FlattenRGBDObservationWrapper` 把 top/wrist 两路 RGB 沿通道维
+拼成 6 通道。要重训得先把这两处改成按环境实际通道数构造（`run_training` 已经用
+`observation_space["state"].shape[-1]` 推状态维，图像通道数同法可得），`datagen/rollout.py`
+复用同一个编码器，要一起改。`ColorJitterWrapper` 对 6 通道的行为也要顺带确认一遍。
+本模块的算法阶梯待与真机 HIL-SERL（`3_3`）一起重新整训。

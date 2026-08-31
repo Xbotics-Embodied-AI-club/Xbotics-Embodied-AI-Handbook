@@ -18,12 +18,22 @@ curves = json.loads((here.parent / "result" / "1_1_g1_walk_rl" / "train-reward-c
 out_path = here.parents[3] / "assets" / "figures" / "lecture14" / "ref" / "fig146-train-reward-curves.png"
 out_path.parent.mkdir(parents=True, exist_ok=True)
 
-# 训练奖励每次迭代抖得厉害，直接画成一团毛线；叠一条滑动平均把趋势显出来，
-# 原始曲线用淡色留在底下，读者能同时看到"抖"和"涨"。
+# 三条曲线的抖动程度差很多（A2C 那条尤其毛），只画原始值会互相盖住。
+# 叠一条滑动平均把趋势拎出来，原始曲线用淡色留在底下，
+# 这样"抖不抖"和"涨不涨"能在同一张图上分开读。
 WINDOW = 50
 
 
 def moving_average(values, window):
+    """算滑动平均，用来从逐次迭代的原始曲线里把趋势拉出来。
+
+    Args:
+        values: 逐次迭代的原始数值。
+        window: 窗口长度。开头不足一窗时按已有点数取平均，曲线才从第一个点就画得出来。
+
+    Returns:
+        与输入等长的滑动平均序列。
+    """
     out, running = [], 0.0
     for i, v in enumerate(values):
         running += v

@@ -1,9 +1,9 @@
 # vla0_smol —— VLA-0 的 0.5B LeRobot 原生策略（溯源说明）
 
 本目录只做**溯源说明**。vla0_smol 的 policy 代码不在这里，而是以补丁
-`code/lerobot/0002-vla0-smol-policy.patch` 注入到本仓 lerobot 源树
-（`code/lerobot/lerobot/src/lerobot/policies/vla0_smol/`），由
-`code/lerobot/fetch_lerobot.sh` 自动 `git apply`。
+`code/platform/lerobot/0002-vla0-smol-policy.patch` 注入到本仓 lerobot 源树
+（`code/platform/lerobot/lerobot/src/lerobot/policies/vla0_smol/`），由
+`code/platform/lerobot/fetch_lerobot.sh` 自动 `git apply`。
 
 ## 模型
 

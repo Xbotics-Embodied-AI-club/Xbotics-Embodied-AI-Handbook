@@ -28,6 +28,11 @@ off-policy 的数据流和 on-policy（rl/1_1 的 PPO）不同：这里有个**�
 每一轮先用当前策略采几步塞进池子，再从池子里随机抽若干 minibatch 做 SAC 更新——
 "边玩边学、旧经验反复用"正是 off-policy 样本高效的来源。
 
+**已知的架构缺口**：这里的 `CNNEncoder` 与 `ReplayBuffer` 按单相机 3 通道写的，而
+`platform/so101_sim` 现有的三个分发场景都是双相机（top + wrist）6 通道输出——在这些
+场景上直接跑本文件会因通道数不匹配报错，要跑得先把编码器与回放池改成吃 6 通道。
+这是本模块待重新整训的部分，见同目录 `README.md`「待重新整训」一节。
+
 四件套：环境 `so101_sim.visual_rl_env(...)`（与 lerobot 评测共用
 同一个 so101_sim 环境定义）＋ 本文件顶部的网络/更新 `VisualSAC`（LightningModule）
 ＋ 数据 `SO101SACData`（LightningDataModule，持有环境和回放池）＋ 本文件的 `trainer.fit`。
@@ -48,6 +53,15 @@ import so101_sim  # 统一环境：lerobot 评测与 RL 训练共用同一份定
 
 
 def mlp(sizes, out_activation=False):
+    """按给定的层宽搭一个全连接网络。
+
+    Args:
+        sizes: 各层维度，例如 [in, hidden, hidden, out]。
+        out_activation: 输出层后面要不要再接一个激活。
+
+    Returns:
+        `nn.Sequential` 网络。
+    """
     layers = []
     for i in range(len(sizes) - 1):
         layers += [nn.Linear(sizes[i], sizes[i + 1])]
@@ -69,6 +83,17 @@ class CNNEncoder(nn.Module):
         )
 
     def forward(self, rgb):
+        """把一批 16×16 图像编码成特征向量。
+
+        像素先从 0–255 折到 [-0.5, 0.5] 再进卷积——这一步和 v3–v5 的观测归一化是
+        同一个道理：不把输入拉回零均值、量级适中，后面的激活很容易被顶饱和。
+
+        Args:
+            rgb: 形状 (batch, H, W, C) 的 uint8 图像（环境给的就是这个排布）。
+
+        Returns:
+            形状 (batch, repr_dim) 的视觉特征。
+        """
         x = rgb.permute(0, 3, 1, 2).float() / 255.0 - 0.5
         return self.conv(x)
 
@@ -84,6 +109,18 @@ class Projection(nn.Module):
         self.state_proj = nn.Sequential(nn.Linear(state_dim, 256), nn.LayerNorm(256), nn.ReLU())
 
     def forward(self, feat, state):
+        """把视觉特征和本体状态各自投影后拼成一条向量。
+
+        两路都是 `Linear → LayerNorm → 激活`，`LayerNorm` 在这里顺带替代了 v3–v5 外挂的
+        观测归一化——归一化长在结构里，就不用再单独维护 running mean/var。
+
+        Args:
+            feat: CNN 编码器输出的视觉特征。
+            state: 本体状态。
+
+        Returns:
+            拼接后的联合特征向量。
+        """
         return torch.cat([self.rgb_proj(feat), self.state_proj(state)], dim=-1)
 
 
@@ -111,7 +148,15 @@ class Actor(nn.Module):
         return mean, log_std
 
     def get_action(self, feat, state):
-        """随机动作 + log 概率（含 tanh 雅可比修正）+ 确定性均值动作。"""
+        """随机动作 + log 概率（含 tanh 雅可比修正）+ 确定性均值动作。
+
+        Args:
+            feat: 视觉特征。
+            state: 本体状态。
+
+        Returns:
+            `(action, log_prob)`：挤压后的动作，及其对数概率。
+        """
         mean, log_std = self._mean_logstd(feat, state)
         normal = torch.distributions.Normal(mean, log_std.exp())
         x = normal.rsample()
@@ -142,18 +187,47 @@ class C51TwinQ(nn.Module):
         self.q1, self.q2 = head(self.proj1), head(self.proj2)
 
     def logits(self, feat, state, action):
-        """两个 Q 网络的原始 logits，堆成 [2, batch, num_atoms]。"""
+        """两个 Q 网络的原始 logits，堆成 [2, batch, num_atoms]。
+
+        Args:
+            feat: 视觉特征。
+            state: 本体状态。
+            action: 要评分的动作。
+
+        Returns:
+            两个 critic 各自在 `num_atoms` 个档位上的未归一化对数概率。
+        """
         l1 = self.q1(torch.cat([self.proj1(feat, state), action], dim=-1))
         l2 = self.q2(torch.cat([self.proj2(feat, state), action], dim=-1))
         return torch.stack([l1, l2], dim=0)
 
     def expected_q(self, feat, state, action):
-        """把分布折算回期望 Q 值：[2, batch]。"""
+        """把分布折算回期望 Q 值：[2, batch]。
+
+        Args:
+            feat: 视觉特征。
+            state: 本体状态。
+            action: 要评分的动作。
+
+        Returns:
+            把分布按档位取期望还原出来的标量 Q 值（actor 要的是这个数）。
+        """
         probs = F.softmax(self.logits(feat, state, action), dim=-1)
         return torch.sum(probs * self.support, dim=-1)
 
     def categorical_target(self, feat, state, action, rewards, discount):
-        """C51 的分布式贝尔曼目标：把下一步的分布沿支点平移·投影回来。[2, batch, num_atoms]。"""
+        """C51 的分布式贝尔曼目标：把下一步的分布沿支点平移·投影回来。[2, batch, num_atoms]。
+
+        Args:
+            feat: 下一步的视觉特征。
+            state: 下一步的本体状态。
+            action: 下一步的动作。
+            rewards: 即时奖励。
+            discount: 折扣因子。
+
+        Returns:
+            投影回固定档位后的目标概率分布，交叉熵的标签就是它。
+        """
         delta_z = (self.v_max - self.v_min) / (self.num_atoms - 1)
         target_z = (rewards.unsqueeze(-1) + discount * self.support).clamp(self.v_min, self.v_max)  # [B,atoms]
         b = (target_z - self.v_min) / delta_z
@@ -198,9 +272,22 @@ class VisualSAC(L.LightningModule):
 
     @property
     def alpha(self):
+        """当前温度：熵项在目标里占多大权重。
+
+        Returns:
+            标量温度 α。
+        """
         return self.log_alpha.exp()
 
     def configure_optimizers(self):
+        """四个优化器：actor、C51 双 critic（连同视觉编码器）、温度 α。
+
+        编码器跟着 critic 一起训、不跟 actor 训——让 actor 的梯度回传去改编码器，
+        表征会被策略带偏，这是视觉 RL 的常见做法。
+
+        Returns:
+            (actor 优化器, critic 优化器, α 优化器) 及其余项。
+        """
         critic_params = list(self.encoder.parameters()) + list(self.critic.parameters())
         return (torch.optim.Adam(self.actor.parameters(), lr=self.lr),
                 torch.optim.Adam(critic_params, lr=self.lr),
@@ -208,15 +295,42 @@ class VisualSAC(L.LightningModule):
 
     @torch.no_grad()
     def sample_action(self, rgb, state):
+        """采集用的动作：先过视觉编码器，再从策略分布里采样。
+
+        Args:
+            rgb: 16×16 的图像观测。
+            state: 本体状态。
+
+        Returns:
+            合法区间内的连续动作。
+        """
         action, _, _ = self.actor.get_action(self.encoder(rgb), state)
         return action
 
     @torch.no_grad()
     def eval_action(self, rgb, state):
+        """评测用的动作：取分布的均值，不采样。
+
+        Args:
+            rgb: 16×16 的图像观测。
+            state: 本体状态。
+
+        Returns:
+            确定性动作。
+        """
         _, _, det = self.actor.get_action(self.encoder(rgb), state)
         return det
 
     def training_step(self, batch, batch_idx):
+        """一个 minibatch 的视觉 SAC 更新，critic 换成 C51 分布式。
+
+        和 v5 的唯一实质差别在 critic 的损失：不再是对一个 Q 数值做均方误差，而是把
+        "回报落在 51 个档位上的概率"当成一个分类问题，用交叉熵去拟合分布式贝尔曼目标。
+
+        Args:
+            batch: 从回放池抽出的 `(rgb, state, action, reward, next_rgb, next_state)`。
+            batch_idx: Lightning 传入的批序号，这里用不到。
+        """
         actor_opt, critic_opt, alpha_opt = self.optimizers()
         rgb, state, action, reward, next_rgb, next_state = batch
 
@@ -273,6 +387,16 @@ class ReplayBuffer:
         return self.capacity if self.full else self.pos
 
     def add(self, rgb, state, action, reward, next_rgb, next_state):
+        """把一批转移写进回放池；写满一圈后从头覆盖最旧的。
+
+        一次写入的是 `num_envs` 条（并行环境同一拍的经验），所以下标要按环形取模算。
+
+        Args:
+            state: 这一拍的原始观测（存原始值，归一化留到喂网络前做）。
+            action: 执行的动作。
+            reward: 即时奖励。
+            next_state: 下一拍的原始观测。
+        """
         n = rgb.shape[0]
         idx = (torch.arange(n, device=self.device) + self.pos) % self.capacity
         self.rgb[idx] = rgb.to(torch.uint8); self.next_rgb[idx] = next_rgb.to(torch.uint8)
@@ -282,6 +406,16 @@ class ReplayBuffer:
         self.full = self.full or self.pos < n
 
     def sample(self, batch_size):
+        """从整个池子里均匀随机抽一个 minibatch。
+
+        不按轨迹、不按时间抽——随机打散正是打断样本相关性的那一步。
+
+        Args:
+            batch_size: 这一批抽多少条转移。
+
+        Returns:
+            `(state, action, reward, next_state)` 四个张量，已在 GPU 上。
+        """
         i = torch.randint(0, len(self), (batch_size,), device=self.device)
         return self.rgb[i], self.state[i], self.action[i], self.reward[i], self.next_rgb[i], self.next_state[i]
 
@@ -317,7 +451,17 @@ class SO101SACData(L.LightningDataModule):
         return info["success"].float().mean().item()
 
     def train_dataloader(self):
+        """每轮先采几步进池，再从池子里抽若干 minibatch 交给训练循环。
+
+        "采一步、学很多次"就是高更新采样比（UTD）的实现：每条经验被反复抽中，
+        这是 off-policy 样本效率的直接来源。Trainer 配了
+        `reload_dataloaders_every_n_epochs=1`，所以每一轮都会重新走一遍这里。
+
+        Returns:
+            每次迭代吐一个 minibatch 的 DataLoader（`batch_size=None`，数据集自己成批）。
+        """
         def gen():
+            """本轮的样本生成器：先补够预热经验，再采样，最后连吐若干 minibatch。"""
             while len(self.buffer) < self.learning_starts:
                 self._collect(use_policy=False)
             succ = [self._collect(use_policy=True) for _ in range(self.steps_per_iter)]
@@ -339,6 +483,14 @@ class SuccessLogger(L.Callback):
         self.ckpt_dir, self.save_interval, self.max_iterations = ckpt_dir, save_interval, max_iterations
 
     def on_train_epoch_end(self, trainer, pl_module):
+        """每轮打印成功率与平均奖励，并按间隔存一次 checkpoint。
+
+        存的只有推理要用的部分（actor 权重 + 归一化统计量），不存优化器状态——
+        这份 checkpoint 是拿去 rollout 和生成数据的，不用于续训。
+        Args:
+            trainer: Lightning Trainer，用来读当前轮次与 datamodule 上的统计量。
+            pl_module: 正在训练的模型，用来取要落盘的权重。
+        """
         it = trainer.current_epoch + 1
         succ = trainer.datamodule.last_success
         print(f"  iter {it}: success_once={succ:.2f}  alpha={pl_module.alpha.item():.3f}", flush=True)
@@ -350,6 +502,22 @@ class SuccessLogger(L.Callback):
 
 def run_training(task, num_envs, max_iterations, updates_per_iter, batch_size,
                  buffer_capacity, learning_starts, image_size, device, seed=1):
+    """搭好环境、模型、回放池，跑完整条训练，返回 checkpoint 路径。
+
+    Args:
+        task: `so101_sim` 注册的任务 id。
+        num_envs: 并行环境数。
+        max_iterations: 训练轮数，一轮 = 采 steps_per_iter 步 + 做 updates_per_iter 次更新。
+        updates_per_iter: 每轮的梯度更新次数，也就是更新采样比（UTD）。
+        batch_size: 每次更新抽的转移条数。
+        buffer_capacity: 回放池容量。
+        learning_starts: 开始用策略采样前，先用随机动作灌多少条经验。
+        device: 训练设备。
+        seed: 随机种子。
+
+    Returns:
+        checkpoint 文件路径。
+    """
     torch.manual_seed(seed)
     env = so101_sim.visual_rl_env(task, num_envs=num_envs, image_size=image_size)
     action_dim = env.single_action_space.shape[-1]

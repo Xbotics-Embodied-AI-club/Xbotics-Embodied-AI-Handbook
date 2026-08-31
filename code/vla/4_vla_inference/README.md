@@ -8,7 +8,7 @@
 | 模块 | 模型 | 路线 | checkpoint |
 |---|---|---|---|
 | `4_1_openvla_infer/` | OpenVLA（7B） | 自回归离散（256 bin/维，逐 token） | `openvla/openvla-7b-finetuned-libero-10` |
-| `4_2_pi0fast_pi05_infer/` | π0-FAST | 自回归离散（DCT+BPE 压缩） | `lerobot/pi0fast-libero-v044` |
+| `4_2_pi0fast_pi05_infer/` | π0-FAST | 自回归离散（DCT+BPE 压缩） | `lerobot/pi0fast-libero` |
 | 〃 | π0.5 | 连续动作头（flow matching+分层） | `lerobot/pi05_libero_finetuned_v044` |
 | `4_3_vla0_infer/` | VLA-0（0.5B） | 自回归离散（动作即数字串） | 讲 15 GRPO 实验产物（本地） |
 | `4_4_smolvla_infer/` | SmolVLA（0.45B） | 连续动作头（小模型） | `lerobot/smolvla_libero` |
@@ -16,7 +16,7 @@
 π0 本体的闭环在 `../1_policy_rollout/1_2_pi0_libero_rollout/`；异步推理（讲11 §7.4）
 是部署层改造，server/client 实战复用 `../3_imitation_learning/3_1_act/`。
 
-每个模块都是三件套：demo `.py`（课堂逐行走读，固定成功局）+ 同名 `.ipynb`（分节讲解）
+每个模块都是三件套：demo `.py`（逐行走读，固定成功局）+ 同名 `.ipynb`（分节讲解）
 + `*_eval.sh`（官方 `lerobot-eval` 标准评测：多 episode pc_success 统计 + 自动录像）。
 
 环境：`cd code && uv sync --extra gpu_x86`；4_1/4_3 依赖

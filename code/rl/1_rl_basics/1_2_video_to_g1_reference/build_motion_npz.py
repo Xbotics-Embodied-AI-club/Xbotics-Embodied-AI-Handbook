@@ -1,3 +1,10 @@
+"""管线第三步：把重定向结果打包成训练直接能读的参考动作文件。
+
+输出的 npz 里除了关节角，还带上各 body 在世界系下的位姿与速度——动作跟踪的奖励
+要按这些量逐帧比对。落盘前先校验一遍形状，坏文件不进训练。
+
+讲义对应：第14讲 4.4 节与 6.6 节。
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,6 +31,19 @@ REQUIRED_KEYS = [
 
 
 def validate_motion_npz(path: str | Path) -> dict[str, float | int]:
+    """校验一个参考动作 npz 是否字段齐、形状对。
+
+    宁可在打包这一步直接抛错，也不要让形状不对的文件悄悄进训练。
+
+    Args:
+        path: npz 文件路径。
+
+    Returns:
+        通过校验时给出这段动作的帧数、帧率等概况。
+
+    Raises:
+        ValueError: 缺字段或形状与 29 关节的 G1 对不上。
+    """
     data = np.load(path)
     missing = [key for key in REQUIRED_KEYS if key not in data.files]
     if missing:
@@ -57,6 +77,15 @@ def validate_motion_npz(path: str | Path) -> dict[str, float | int]:
 
 
 def copy_motion_npz(source: str | Path, output: str | Path) -> dict[str, float | int]:
+    """把一个已经合规的 npz 拷进课程数据目录。
+
+    Args:
+        source: 源文件。
+        output: 目标路径。
+
+    Returns:
+        目标路径。
+    """
     summary = validate_motion_npz(source)
     data = np.load(source)
     output = Path(output)
@@ -203,6 +232,18 @@ def build_motion_npz_from_csv(
     render: bool = False,
     builder: Callable[..., None] | None = None,
 ) -> dict[str, float | int]:
+    """用 mjlab 回放 GMR 导出的 CSV，补齐各 body 的位姿与速度后写成 npz。
+
+    CSV 里只有关节角；动作跟踪的奖励还要按各 body 在世界系下的位姿和速度逐帧比对，
+    这些量只能靠把动作在仿真器里回放一遍才算得出来。
+
+    Args:
+        source: GMR 导出的 CSV。
+        output: 输出 npz 路径。
+
+    Returns:
+        输出 npz 路径。
+    """
     source = Path(source)
     if not source.is_file():
         raise FileNotFoundError(f"GMR CSV not found: {source}")
@@ -214,6 +255,7 @@ def build_motion_npz_from_csv(
 
 
 def main() -> None:
+    """把重定向结果打包成课程用的参考动作文件。"""
     group_root = Path(__file__).resolve().parents[1]
 
     # 主要修改这一段：输入源、输出 npz、帧率与设备。

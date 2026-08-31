@@ -23,7 +23,15 @@ KIT_TASK = "SO101KitPlaceCube4RealSlow-v1"
 
 
 def annotate(h5_path: Path, kit_task: str = KIT_TASK) -> tuple[int, int]:
-    """就地给每条轨迹补两个 infos 字段。返回 (标注集数, 总帧数)。"""
+    """就地给每条轨迹补两个 infos 字段。返回 (标注集数, 总帧数)。
+
+    Args:
+        h5_path: 待标注的 h5。
+        kit_task: 对应的 KIT 任务 id，用来取物体几何。
+
+    Returns:
+        标注写回后的 h5 路径。
+    """
     env = gym.make(kit_task, num_envs=1, obs_mode="state", render_mode="all",
                    sim_backend="gpu", domain_randomization=False, reconfiguration_freq=1)
     env.reset(seed=0)

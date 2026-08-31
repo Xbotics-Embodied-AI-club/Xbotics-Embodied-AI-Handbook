@@ -1,5 +1,8 @@
 """从 ModelScope 下载 SO-ARM101 pick-place 数据集的 9 个任务子集。
 
+对应第9讲《操作数据闭环》4.6 节末尾提到的第三条路：不自己采，直接用现成的公开数据集
+把后面的合并、审计、训练整条链先走通。
+
 数据源 zhuzhuangtian/so101-pick-place-tasks 是 LeRobot v3.0 格式，9 个任务各自成一份完整
 数据集、直接放在仓库根（README 里写的 merged_datasets/ 子目录实际不存在，别照着找）。
 
@@ -27,7 +30,7 @@ EXPECTED = {
     "Stack_the_smaller_cube_on_the_larger_one": (200, 80905),
 }
 
-# 数据落训练机的大文件工作区（集群要求大文件放 /work，不放 home）
+# 9 个任务加起来是几十万帧的视频，属于大文件：只落共享数据根，永远不进 git 仓库。
 DOWNLOAD_DIR = Path(os.environ["DATASETS_ROOT"]) / "so101" / "datasets" / "raw"
 
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)

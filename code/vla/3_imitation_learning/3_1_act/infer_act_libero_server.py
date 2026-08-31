@@ -1,9 +1,12 @@
-"""启动 LeRobot async inference server，给 LIBERO client 远程调用。
+"""启动 LeRobot 的异步推理 server，让策略跑在 GPU 机器上、由远端 client 调用。
 
-运行方式：
-1. 先运行这个 server。
-2. 再运行 infer_act_libero_client.py。
-3. client 会把 observation 发过来，server 加载 policy 并返回 action chunk。
+对应第11讲的异步推理实验：策略推理和机器人控制拆到两台机器上，server 一次返回一段
+action chunk，client 按自己的控制频率消费，这样单次推理慢一点也不会把控制循环卡住。
+
+用法：先起这个 server，再运行 `infer_act_libero_client.py`。
+client 会在握手时把 checkpoint 路径发过来，server 据此加载策略。
+
+在 `code/` 目录下运行：`uv run python vla/3_imitation_learning/3_1_act/infer_act_libero_server.py`
 """
 from concurrent import futures
 import logging
@@ -15,52 +18,36 @@ from lerobot.async_inference.policy_server import PolicyServer
 from lerobot.transport import services_pb2_grpc
 
 
-# 课堂演示配置：只需要改这里，不需要命令行参数。
-# HOST/PORT 是 client 连接的地址；本机测试用 127.0.0.1 即可。
-HOST = "127.0.0.1"
-PORT = 8080
-
-# FPS 需要和 client 控制频率一致。LIBERO/robosuite 这里按 20Hz 做实时控制。
-FPS = 20
-
-# server 人为等待的推理延迟。课堂本地测试设为 0，让结果尽快返回。
-INFERENCE_LATENCY = 0.0  # 0 表示 action chunk 一算好就返回。
-
-# 如果 server 长时间收不到 observation，就会 timeout；本地仿真可以给宽一点。
-OBS_QUEUE_TIMEOUT = 10.0
-
-# gRPC 线程池大小；这个 demo 只有一个 client，4 个 worker 足够。
-WORKERS = 4
-
-
 def main() -> None:
-    # 打印 LeRobot server 的连接、加载 policy、推理耗时等日志。
+    """建好 gRPC server、注册 LeRobot 的 PolicyServer，然后一直监听。"""
+    # 打开 INFO 日志才看得到连接建立、策略加载、每次推理耗时这些关键信息。
     logging.basicConfig(level=logging.INFO)
 
-    # 这里直接使用 LeRobot 自带的 PolicyServer。
-    # 它负责接收 observation、跑 policy、再把 action chunk 发回 client。
     cfg = PolicyServerConfig(
-        host=HOST,
-        port=PORT,
-        fps=FPS,
-        inference_latency=INFERENCE_LATENCY,
-        obs_queue_timeout=OBS_QUEUE_TIMEOUT,
+        # 监听回环地址表示只接受本机 client；跨机部署时改成 0.0.0.0。
+        host="127.0.0.1",
+        port=8080,
+        # 要和 client 的控制频率一致，server 靠它推算每个动作对应的时间戳。
+        fps=20,
+        # 人为注入的推理延迟，用来模拟慢网络或慢模型；本地实验设 0，算完立刻返回。
+        inference_latency=0.0,
+        # 超过这个秒数没收到新观测就判定 client 掉线。仿真跑得慢，给宽一点。
+        obs_queue_timeout=10.0,
     )
     policy_server = PolicyServer(cfg)
 
-    # LeRobot 的 async inference 通信走 gRPC。
-    # services_pb2_grpc.add_AsyncInferenceServicer_to_server 会把 PolicyServer 注册成 RPC 服务。
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=WORKERS))
+    # LeRobot 的异步推理走 gRPC；这一步把 PolicyServer 注册成 RPC 服务。
+    # 只有一个 client，4 个 worker 线程足够。
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     services_pb2_grpc.add_AsyncInferenceServicer_to_server(policy_server, server)
     server.add_insecure_port(f"{cfg.host}:{cfg.port}")
 
-    # start() 之后 server 开始监听；wait_for_termination() 会一直阻塞。
     policy_server.logger.info(f"PolicyServer started on {cfg.host}:{cfg.port}")
     server.start()
     try:
         server.wait_for_termination()
     except KeyboardInterrupt:
-        # Ctrl+C 时关闭 gRPC server，同时通知 LeRobot PolicyServer 停止内部线程。
+        # 除了停 gRPC，还要让 PolicyServer 收掉自己的内部线程，否则进程退不干净。
         policy_server.logger.info("KeyboardInterrupt received, shutting down server.")
         server.stop(grace=0)
     finally:

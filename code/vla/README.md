@@ -33,7 +33,7 @@ vla/
 | `2_data_collection/2_4_lerobot_dataset` | 数据集格式走读 | 讲9 | 4_2_lerobot_dataset |
 | `3_imitation_learning/3_1_act` | ACT 训练/部署/解析全套 | 讲10（讲11 异步推理复用其 server/client） | 5_2_ACT |
 | `4_vla_inference/` | OpenVLA / π0-FAST / π0.5 / VLA-0 / SmolVLA 推理 demo（各闭环一次 + lerobot-eval 入口） | 讲11 | — |
-| `5_vla_finetune/`（待建，见组内 TODO.md） | 全量 / LoRA / 多卡微调 | 讲12 | — |
+| `5_vla_finetune/`（待建） | 全量 / LoRA / 多卡微调 | 讲12 | — |
 
 > 讲次调整只改本表，不动目录。编号只增不重排：`2_1` 已随统一 uv 环境废弃（原 LeRobot 环境修复说明），空号保留。RL 段（讲14-16）见 `../rl/README.md`。
 

@@ -31,6 +31,15 @@ def to_lerobot(h5_path: Path, out_dir: Path, task_name: str,
     """转格式。`image_size` 传 "WxH"（如 KIT 双相机的 "640x480"）或单个数字（正方形）。
 
     `fps` 必须等于采这批轨迹的环境的 control_freq。
+    Args:
+        h5_path: 待转换的 h5。
+        out_dir: LeRobotDataset 输出目录。
+        task_name: 写进数据集的自然语言任务描述。
+        image_size: 目标图像尺寸，"WxH" 或单个数字（正方形）。
+        fps: 必须等于采这批轨迹时环境的 control_freq，否则时间戳对不上。
+
+    Returns:
+        生成的数据集目录。
     """
     _alias_qpos(h5_path)
     subprocess.run(

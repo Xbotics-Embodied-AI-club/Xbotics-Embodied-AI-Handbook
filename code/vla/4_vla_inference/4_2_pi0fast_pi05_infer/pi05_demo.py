@@ -1,3 +1,8 @@
+"""π0.5 在 LIBERO 上闭环推理一次，把整段 rollout 写成 mp4。
+
+第11讲 5.5 节的配套代码。它和同目录的 pi0fast_demo.py 逐行同构、只换了 POLICY_PATH——
+π0.5 的离散 token 联合训练与分层推理都发生在训练配方里，对调用方完全不可见。
+"""
 from __future__ import annotations
 
 import os
@@ -15,12 +20,12 @@ from lerobot.utils.io_utils import write_video
 import lerobot.policies  # noqa: F401
 
 # MuJoCo 的离屏渲染需要 EGL。
-os.environ.setdefault("MUJOCO_GL", "egl")
+os.environ["MUJOCO_GL"] = "egl"
 
-# 关闭 torch compile / inductor，避免首次运行时出现大量 autotune 开销，
-# 让课堂 demo 更稳定、更可复现。
-os.environ.setdefault("TORCHINDUCTOR_DISABLE", "1")
-os.environ.setdefault("TORCH_COMPILE_DISABLE", "1")
+# 关闭 torch compile / inductor：首次运行的 autotune 开销很大，而这里只跑一局，
+# 编译省下的时间远不够抵掉它，还会让两次运行的结果对不上。
+os.environ["TORCHINDUCTOR_DISABLE"] = "1"
+os.environ["TORCH_COMPILE_DISABLE"] = "1"
 
 # 下面这组参数是已经验证过能跑出 success=True 的固定配置。
 # π0.5：π0 的开放世界升级版。动作输出仍走 flow matching 连续动作头，
@@ -37,16 +42,26 @@ OUT_PATH = Path("vla/4_vla_inference/4_2_pi0fast_pi05_infer/output/pi05_libero_s
 
 
 def set_episode_index(env, episode_index: int) -> None:
-    # LeRobot 的 LIBERO 向量环境外面包了一层 SyncVectorEnv。
-    # 真正控制初始状态的是里面每个子环境的 episode_index / init_state_id。
-    # 这里只跑 1 个环境，所以直接把第 0 个子环境切到我们选好的成功初始状态。
+    """把 LIBERO 环境切到指定编号的初始状态。
+
+    LeRobot 的 LIBERO 向量环境外面包了一层 SyncVectorEnv，真正决定物体初始摆放的是里面
+    每个子环境的 episode_index / init_state_id，改外层那一层没有用。
+
+    Args:
+        env: make_env 返回的向量环境，这里只跑 1 个子环境。
+        episode_index: 初始状态编号，演示固定用已经验证过能跑成功的那一局。
+    """
     for inner_env in env.envs:
         inner_env.episode_index = episode_index
         inner_env.init_state_id = episode_index
 
 
 def main() -> None:
-    # 固定随机种子，保证每次讲课演示时拿到相同的 rollout。
+    """加载策略、建好 LIBERO 环境、闭环跑完一局，把整段 rollout 写成 mp4。
+
+    跑不出成功就直接抛异常，不会静悄悄留下一段失败录像——一次演示要么给出成功的结果，
+    要么明确报错，不能只是"看起来运行过了"。
+    """
     torch.manual_seed(SEED)
     np.random.seed(SEED)
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)

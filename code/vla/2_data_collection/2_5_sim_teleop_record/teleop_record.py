@@ -1,5 +1,7 @@
 """无真机兜底线：用 SO-101 仿真器 + 键盘遥操，采出与实物线同格式的 LeRobot 数据集。
 
+对应第9讲《操作数据闭环》4.5 节「仿真方案：SO-101 仿真器键盘 / 手柄」。
+
 前一模块 `2_3_teleop_record` 用真的主从臂 + `lerobot-record` 采数据；没有机械臂时，
 本模块用 SO-101 仿真器顶替：人用键盘直接驱动仿真里的从臂，每一步把相机图、关节位置、
 动作都记下来，最后转成和实物线一模一样的 `LeRobotDataset`（128px 图 + 6 维 state + 6 维 action），
@@ -56,7 +58,7 @@ class Keyboard:
         self.end_episode = False
         self.stop = False
 
-        def on_press(key):
+        def _on_press(key):
             char = getattr(key, "char", None)
             if char:
                 self._pressed.add(char.lower())
@@ -65,14 +67,20 @@ class Keyboard:
             elif key == keyboard.Key.esc:
                 self.stop = True
 
-        def on_release(key):
+        def _on_release(key):
             char = getattr(key, "char", None)
             if char:
                 self._pressed.discard(char.lower())
 
-        keyboard.Listener(on_press=on_press, on_release=on_release).start()
+        keyboard.Listener(on_press=_on_press, on_release=_on_release).start()
 
     def action(self):
+        """把此刻按住的键翻译成一步的关节增量。
+
+        Returns:
+            np.ndarray: 形状 (6,) 的 float32 增量动作，取值在 [-STEP, STEP]；
+                没按任何键时全零，机械臂保持不动。
+        """
         a = np.zeros(6, dtype=np.float32)
         for char in list(self._pressed):
             if char in KEY_TO_JOINT:
@@ -91,6 +99,12 @@ def make_recorder(out_dir):
 
     每次 reset 开一集，每步自动把 128px 相机图、关节位置、动作都写进 h5。这正是 RL 数据
     生产线用的同一个录制器，所以录出来的 h5 结构一致，后面能直接喂给官方格式转换。
+
+    Args:
+        out_dir: h5 轨迹的落盘目录，录制器会在这里写出 teleop.h5。
+
+    Returns:
+        RecordEpisode: 已包好录制器的仿真环境，reset / step 用法与原环境一致。
     """
     env = gym.make(
         TASK, num_envs=1, obs_mode="rgb+segmentation", render_mode="all",
@@ -114,6 +128,13 @@ def to_lerobot(h5_path, out_dir):
     关节位置存在 `obs/agent/noisy_qpos`（带 sim2real 噪声），而官方转换只认 `qpos`——转换前
     给每条轨迹补一个同名别名即可。转出的 action / observation.state / observation.images
     三支柱与真机数据集逐字段一致。
+
+    Args:
+        h5_path: `make_recorder` 录出来的 h5 轨迹文件。
+        out_dir: 转换后 LeRobotDataset 的落盘目录。
+
+    Returns:
+        Path: 转换完成的数据集目录，即传入的 out_dir。
     """
     with h5py.File(h5_path, "a") as f:
         for traj in f:
@@ -140,6 +161,11 @@ EPISODE_STEPS = 50
 
 
 def teleop():
+    """键盘实采：连采 N_EPISODES 集，采完自动转成 LeRobotDataset。
+
+    每步读一次键盘状态当动作、推进一步仿真、把当前相机图显示出来，回车提前收一集、
+    Esc 整轮停。录完 flush 出 h5 再走一次格式转换。
+    """
     work = Path(os.environ["DATASETS_ROOT"]) / "so101_sim" / "_teleop" / TASK
     rec = make_recorder(work)
     kb = Keyboard()
@@ -168,6 +194,11 @@ def teleop():
 
 # ── 脚本回放自检：用内置动作序列代替键盘，跑通「采集 → 转换 → 加载」整条链 ────────
 def selfcheck():
+    """不接键盘也能跑：用一段写死的动作序列走通「采集 → 转换 → 加载」整条链。
+
+    采两集、每集 30 步，转成数据集之后再用 LeRobotDataset 真加载一遍，打印 episodes /
+    frames / features / 相机路数和首帧的动作、状态形状。上手实采前先用它验环境。
+    """
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
     work = Path(os.environ["DATASETS_ROOT"]) / "so101_sim" / "_teleop_selfcheck" / TASK

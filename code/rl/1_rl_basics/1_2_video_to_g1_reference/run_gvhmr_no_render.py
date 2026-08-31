@@ -1,3 +1,10 @@
+"""以「不渲染」的方式跑一次 GVHMR 推理。
+
+GVHMR 官方入口默认要出可视化视频，既慢又要额外依赖；课程只需要它的预测结果，
+所以这里把推理那一段单独跑起来，只落盘预测文件。
+
+讲义对应：第14讲 4.4 节。
+"""
 from __future__ import annotations
 
 import sys
@@ -173,6 +180,15 @@ def run_gvhmr_no_render(
     use_dpvo: bool = False,
     f_mm: int | None = None,
 ) -> Path:
+    """跑 GVHMR 推理，只落盘预测结果、不做可视化渲染。
+
+    Args:
+        video: 输入视频路径。
+        output_root: 结果根目录。
+
+    Returns:
+        预测文件路径。
+    """
     video_path = Path(video).expanduser().resolve()
     output_root = Path(output_root).expanduser().resolve()
     checkpoint_root = _resolve_checkpoint_root(checkpoint_root)
@@ -208,6 +224,7 @@ def _command_value(command_line: list[str], name: str, default: str | None = Non
 def main() -> None:
     # 本文件由 video_to_human_motion.py 以独立子进程调用（GVHMR 显存较大，跑完即随进程释放），
     # 因此入口按子进程约定从命令行读取视频与输出路径，而不是像其它入口写成可改变量。
+    """命令行入口：对给定视频跑一次不渲染的 GVHMR 推理。"""
     command_line = sys.argv[1:]
     video = _command_value(command_line, "--video")
     output_root = _command_value(command_line, "--output-root")

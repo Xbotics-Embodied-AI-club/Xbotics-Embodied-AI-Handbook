@@ -6,11 +6,6 @@ import os
 os.environ["MUJOCO_GL"] = "egl"   # 无桌面环境用 EGL 离屏渲染
 
 import numpy as np
-import matplotlib
-matplotlib.use("Agg")
-
-OUT_DIR = "output"
-os.makedirs(OUT_DIR, exist_ok=True)
 
 # ── 环境创建：LIBERO 按「套件 + 任务 id」组织，这里取 libero_spatial 的第 0 个任务 ──
 print("=== 环境创建 ===")
@@ -34,6 +29,15 @@ print("\n=== Observation 结构 ===")
 obs, info = env.reset()
 
 def print_obs_tree(d, prefix=""):
+    """递归打印观测字典，每个数组只打形状和 dtype。
+
+    观测是嵌套字典，直接 print 会刷一屏数字；这里只看结构——
+    哪几路图像、本体状态有几维，这才是策略输入接口的样子。
+
+    Args:
+        d: 观测字典，值可以是嵌套字典或 numpy 数组。
+        prefix: 递归时的缩进前缀。
+    """
     for k, v in d.items():
         if isinstance(v, dict):
             print(f"{prefix}{k}/")

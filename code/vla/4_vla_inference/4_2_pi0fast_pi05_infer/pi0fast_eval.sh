@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # π0-FAST LIBERO 微调 checkpoint 标准评测。
 # 与同目录 pi0fast_demo.py 等价的官方命令行入口：lerobot-eval 自带向量环境、多 episode
-# 统计（pc_success）与自动录像，评测/复现用它最方便；demo .py 则用于课堂逐行走读。
+# 统计（pc_success）与自动录像，评测/复现用它最方便；demo .py 则用于逐行走读。
 # 在 code/ 目录运行：bash vla/4_vla_inference/4_2_pi0fast_pi05_infer/pi0fast_eval.sh
 set -euo pipefail
 

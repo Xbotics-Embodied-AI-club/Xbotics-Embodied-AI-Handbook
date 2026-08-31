@@ -1,4 +1,11 @@
-"""载入某个版本训练出的策略，在仿真里跑一段并录成视频，三版同口径便于对照。"""
+"""按统一口径评测三个版本训练出的策略，并录成对照视频。
+
+讲义里 4.6、5.5、6.5 节的每一个"评测平均奖励"和"摔倒率"都由本文件产出：同一个
+环境、同样 16 个并行环境跑 400 步、一律取确定性动作。口径统一，版本之间的数字
+才可比。摘要写成 `result/1_1_g1_walk_rl/<run>.json`，视频写成同名 `.mp4`。
+
+讲义对应：第14讲 1.4 节（评测口径）、4.5 节（关联代码）。
+"""
 from __future__ import annotations
 
 import json
@@ -16,10 +23,27 @@ from model import ActorCritic  # noqa: E402
 
 
 def result_root() -> Path:
+    """给出本模块结果目录的路径。
+
+    Returns:
+        `result/1_1_g1_walk_rl/` 的绝对路径。
+    """
     return Path(__file__).resolve().parents[1] / "result" / "1_1_g1_walk_rl"
 
 
 def load_policy(checkpoint, device):
+    """从 checkpoint 里恢复一个可推理的策略。
+
+    网络的三个维度不写死在这里，而是从 checkpoint 存的 `training_settings` 里读——
+    环境一改维度就跟着变，硬编码迟早对不上。
+
+    Args:
+        checkpoint: checkpoint 文件路径。
+        device: 模型放到哪个设备上。
+
+    Returns:
+        (模型, 该 checkpoint 对应的训练迭代数)。
+    """
     data = torch.load(checkpoint, map_location="cpu", weights_only=False)
     settings = data.get("training_settings", {})
     model = ActorCritic(
@@ -42,6 +66,21 @@ def _recorded_frame(frame) -> np.ndarray:
 
 
 def run_rollout(checkpoint, run_name, num_envs=16, num_steps=400, device="cuda:0", seed=1):
+    """跑一段确定性 rollout，落盘评测摘要与视频。
+
+    动作取 `act_inference`（分布均值）而不是采样，评测成绩才不掺探索噪声。
+
+    Args:
+        checkpoint: 要评测的权重文件。
+        run_name: 结果文件名前缀，同时写进摘要里便于溯源。
+        num_envs: 并行环境数，三个版本必须一致。
+        num_steps: 每个环境跑多少步。
+        device: 仿真与推理所在设备。
+        seed: 随机种子，固定它三个版本才面对同一批初始状态。
+
+    Returns:
+        评测摘要字典，字段与落盘的 `.json` 一致。
+    """
     torch.manual_seed(seed)
     out_dir = result_root()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -89,6 +128,7 @@ def run_rollout(checkpoint, run_name, num_envs=16, num_steps=400, device="cuda:0
 
 
 def main():
+    """依次评测三个版本各自的最终 checkpoint。"""
     datasets_root = Path(os.environ["DATASETS_ROOT"])
     trained = datasets_root / "models" / "trained" / "xbotics_rl_g1_walk"
 

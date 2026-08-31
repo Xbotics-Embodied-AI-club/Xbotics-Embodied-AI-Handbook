@@ -91,6 +91,19 @@ def _stats(values):
 def _build_info(n_episodes, n_frames, fps):
     """照真机 task1 的 info.json 结构写，字段名/dtype/shape 逐项对齐。"""
     def feat(shape, names=None, dtype="float32"):
+        """造一条字段描述。
+
+        真机采集与仿真导出必须给出同一套字段名和 dtype，微调时才不会因为特征
+        对不上被拒——所以这里逐项照真机的 `info.json` 写，不自由发挥。
+
+        Args:
+            shape: 该字段的形状。
+            names: 各维度的名字（关节字段用关节名，其余可为 None）。
+            dtype: 数据类型字符串。
+
+        Returns:
+            一条符合 LeRobot `info.json` 约定的字段描述。
+        """
         return {"dtype": dtype, "shape": list(shape), "names": names, "fps": float(fps)}
 
     features = {
@@ -130,7 +143,17 @@ def _build_info(n_episodes, n_frames, fps):
 
 
 def export(h5_path: Path, out_dir: Path, task_name: str, fps: int = FPS) -> Path:
-    """把 `h5_path` 导成真机口径的 LeRobotDataset 到 `out_dir`。"""
+    """把 `h5_path` 导成真机口径的 LeRobotDataset 到 `out_dir`。
+
+    Args:
+        h5_path: 待导出的 h5。
+        out_dir: 输出目录。
+        task_name: 写进数据集的自然语言任务描述。
+        fps: 必须等于采这批轨迹时环境的 control_freq。
+
+    Returns:
+        生成的数据集目录。
+    """
     episodes = _episode_arrays(h5_path)
     if out_dir.exists():
         shutil.rmtree(out_dir)

@@ -45,6 +45,16 @@ from env import G1WalkEnv  # noqa: E402
 
 
 def default_checkpoint_root(run_name: str) -> Path:
+    """给出这次训练存权重的目录。
+
+    权重是大文件，按仓库约定落在共享数据根下、不进 git，所以路径从环境变量拼出来。
+
+    Args:
+        run_name: 本次训练的名字，同时用作目录名。
+
+    Returns:
+        存放 checkpoint 的目录路径。
+    """
     datasets_root = Path(os.environ["DATASETS_ROOT"])
     return datasets_root / "models" / "trained" / "xbotics_rl_g1_walk" / run_name
 
@@ -63,6 +73,11 @@ class RunningNorm(nn.Module):
 
     @torch.no_grad()
     def update(self, x):
+        """用新一批数据更新运行统计量。
+
+        Args:
+            x: 一批观测。
+        """
         batch_mean = x.mean(dim=0)
         batch_var = x.var(dim=0, unbiased=False)
         batch_count = x.shape[0]
@@ -74,6 +89,16 @@ class RunningNorm(nn.Module):
         self.count = total
 
     def normalize(self, x):
+        """按当前统计量标准化观测。
+
+        不做归一化时 tanh 很容易饱和、梯度被压没，是这套配方最常踩的坑之一。
+
+        Args:
+            x: 原始观测。
+
+        Returns:
+            标准化后的观测。
+        """
         return (x - self.mean) / (self.var.sqrt() + 1.0e-8)
 
 
@@ -107,7 +132,14 @@ class SquashedGaussianActor(nn.Module):
         return mean, log_std
 
     def get_action(self, obs):
-        """返回：随机动作、其 log 概率（含 tanh 雅可比修正）、确定性均值动作（评测用）。"""
+        """给出这一步要执行的动作。
+
+        Args:
+            obs: 观测。
+
+        Returns:
+            动作张量。
+        """
         mean, log_std = self._mean_logstd(obs)
         normal = torch.distributions.Normal(mean, log_std.exp())
         x = normal.rsample()  # 重参数化采样，梯度能穿回 mean / log_std
@@ -132,6 +164,15 @@ class QCritic(nn.Module):
         )
 
     def forward(self, obs, action):
+        """算两个 Q 网络对同一组状态动作的打分。
+
+        Args:
+            obs: 观测。
+            action: 动作。
+
+        Returns:
+            (Q1, Q2) 两个估值；训练时取小的那个，压住高估。
+        """
         return self.net(torch.cat([obs, action], dim=-1)).squeeze(-1)
 
 
@@ -153,6 +194,15 @@ class ReplayBuffer:
         return self.capacity if self.full else self.pos
 
     def add(self, obs, action, reward, next_obs, not_done):
+        """把一批转移写进回放池。
+
+        Args:
+            obs: 当前观测。
+            action: 执行的动作。
+            reward: 即时奖励。
+            next_obs: 下一观测。
+            not_done: 回合未结束则为 1。
+        """
         n = obs.shape[0]
         idx = (torch.arange(n, device=self.device) + self.pos) % self.capacity
         self.obs[idx] = obs
@@ -164,6 +214,14 @@ class ReplayBuffer:
         self.full = self.full or self.pos < n
 
     def sample(self, batch_size):
+        """从回放池里随机抽一批转移。
+
+        Args:
+            batch_size: 批大小。
+
+        Returns:
+            一批转移张量。
+        """
         i = torch.randint(0, len(self), (batch_size,), device=self.device)
         return self.obs[i], self.action[i], self.reward[i], self.next_obs[i], self.not_done[i]
 
@@ -213,6 +271,14 @@ class G1WalkData(L.LightningDataModule):
         self.last_fall = 0.0
 
     def collect_step(self, use_policy):
+        """与环境交互一步，把结果存进回放池。
+
+        Args:
+            use_policy: 为 False 时走随机动作，用来在训练启动前把池子填上一些数据。
+
+        Returns:
+            本步的平均奖励。
+        """
         obs = self.obs
         self.model.obs_norm.update(obs)  # 用原始观测更新归一化统计，每步一次
         if use_policy:
@@ -229,6 +295,14 @@ class G1WalkData(L.LightningDataModule):
         return float(reward.mean().detach().cpu()), float(terminated.float().mean().detach().cpu())
 
     def train_dataloader(self):
+        """每个 epoch 重建一次数据集。
+
+        重建就意味着重新采样——on-policy 要求数据来自当前策略，这一条由 Trainer 的
+        `reload_dataloaders_every_n_epochs=1` 和这里配合实现。
+
+        Returns:
+            包着在线数据集的 DataLoader；`batch_size=None` 表示数据集自己吐整批。
+        """
         return DataLoader(G1WalkReplayDataset(self), batch_size=None)
 
 
@@ -284,21 +358,47 @@ class G1WalkLightningSAC(L.LightningModule):
 
     @property
     def alpha(self):
+        """当前的熵温度系数。
+
+        用对数参数化再取指数，是为了让它恒为正、且优化起来更平稳。
+
+        Returns:
+            温度系数。
+        """
         return self.log_alpha.exp()
 
     @torch.no_grad()
     def sample_action(self, obs):
-        """采集用的随机动作。随机策略本身就是探索，不必像确定性策略那样另外叠噪声。"""
+        """采样一个带探索噪声的动作。
+
+        Args:
+            obs: 观测。
+
+        Returns:
+            (动作, 对数概率)。
+        """
         action, _, _ = self.actor.get_action(self.obs_norm.normalize(obs))
         return action
 
     @torch.no_grad()
     def eval_action(self, obs):
-        """评测用的确定性动作（取分布均值）。"""
+        """取确定性动作，评测时用。
+
+        Args:
+            obs: 观测。
+
+        Returns:
+            确定性动作。
+        """
         _, _, det_action = self.actor.get_action(self.obs_norm.normalize(obs))
         return det_action
 
     def setup(self, stage):
+        """训练开始前建好权重目录并起一个 W&B run。
+
+        Args:
+            stage: Lightning 传入的阶段名，只在 "fit" 阶段做事。
+        """
         if stage != "fit":
             return
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -309,6 +409,11 @@ class G1WalkLightningSAC(L.LightningModule):
         )
 
     def configure_optimizers(self):
+        """分别给 actor、critic 和温度系数配优化器。
+
+        Returns:
+            优化器列表。
+        """
         critic_params = list(self.critic1.parameters()) + list(self.critic2.parameters())
         return (
             torch.optim.Adam(self.actor.parameters(), lr=self.learning_rate),
@@ -317,6 +422,15 @@ class G1WalkLightningSAC(L.LightningModule):
         )
 
     def training_step(self, batch, batch_idx):
+        """跑一次 SAC 更新：critic 回归、actor 上升、温度自适应。
+
+        Args:
+            batch: 从回放池抽到的一批转移。
+            batch_idx: Lightning 传入的批序号。
+
+        Returns:
+            本步的 loss。
+        """
         actor_opt, critic_opt, alpha_opt = self.optimizers()
         obs, action, reward, next_obs, not_done = batch
         obs = self.obs_norm.normalize(obs)
@@ -370,6 +484,7 @@ class G1WalkLightningSAC(L.LightningModule):
         )
 
     def on_train_epoch_end(self):
+        """每轮结束时上报指标并按需存盘。"""
         iteration = self.current_epoch + 1
         elapsed = time.time() - self.start_time
         data_module = self.trainer.datamodule
@@ -391,6 +506,12 @@ class G1WalkLightningSAC(L.LightningModule):
             self.save_checkpoint_file(self.latest_checkpoint, iteration)
 
     def save_checkpoint_file(self, path, iteration):
+        """存一份权重。
+
+        Args:
+            path: 目标路径。
+            iteration: 当前迭代数。
+        """
         path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(
             {
@@ -404,6 +525,11 @@ class G1WalkLightningSAC(L.LightningModule):
         )
 
     def teardown(self, stage):
+        """训练结束后收尾，把 W&B run 正常关掉。
+
+        Args:
+            stage: Lightning 传入的阶段名。
+        """
         # 把 reward / env_steps / 墙钟的完整曲线单独存一份，画对照图时不必依赖 wandb。
         (self.checkpoint_dir / "history.json").write_text(json.dumps(self.history, indent=2) + "\n")
         if self.wandb_run is not None:
@@ -413,6 +539,27 @@ class G1WalkLightningSAC(L.LightningModule):
 def run_training(run_name, num_envs, max_iterations, steps_per_iter, updates_per_iter, batch_size,
                  buffer_capacity, learning_starts, action_limit, device,
                  seed=1, checkpoint_dir=None, wandb_project="rl_class", wandb_mode="online"):
+    """起一次 SAC 训练：建环境、建模型、填池子、交给 Trainer 跑完。
+
+    Args:
+        run_name: 本次训练的名字。
+        num_envs: 并行环境数。
+        max_iterations: 训练迭代次数。
+        steps_per_iter: 每次迭代与环境交互多少步。
+        updates_per_iter: 每次迭代做多少次梯度更新，决定更新采样比。
+        batch_size: 每次更新抽多大一批。
+        buffer_capacity: 回放池容量。
+        learning_starts: 先随机采多少步再开始更新。
+        action_limit: 动作幅度上限。
+        device: 仿真与训练所在设备。
+        seed: 随机种子。
+        checkpoint_dir: 权重目录。
+        wandb_project: W&B 项目名。
+        wandb_mode: W&B 模式。
+
+    Returns:
+        最后一次存盘的 checkpoint 路径。
+    """
     checkpoint_dir = checkpoint_dir or default_checkpoint_root(run_name)
 
     torch.manual_seed(seed)
@@ -456,6 +603,7 @@ def run_training(run_name, num_envs, max_iterations, steps_per_iter, updates_per
 def main():
     # off-policy 配方：几千个并行环境采样进同一个回放池、大 batch、较高的更新采样比（UTD）。
     # 动作幅度用一个固定对称边界（关节目标缩放量，几个标准差足够覆盖正常步态）。
+    """跑一次 off-policy SAC 训练，与前三版做对照。"""
     run_training(
         run_name="g1-walk-sac",
         num_envs=1024,

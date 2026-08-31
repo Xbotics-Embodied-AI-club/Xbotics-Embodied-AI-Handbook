@@ -14,7 +14,7 @@
 | `rollout.py` | before/after 贪婪确定性评测对照 |
 | `vendor/vla0_smol/` | VLA-0 上游说明（policy 本体经 lerobot 补丁注入，见下） |
 
-`.py` 与同名 `.ipynb` 内容一致，notebook 按讲解顺序分节，适合课堂走读。
+`.py` 与同名 `.ipynb` 内容一致，notebook 按讲解顺序分节，适合逐行走读。
 
 ## 环境
 

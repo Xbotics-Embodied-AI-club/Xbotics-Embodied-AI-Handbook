@@ -1,5 +1,8 @@
 """GRPO 后训练 VLA-0：任务成败当 0/1 奖励，组相对优势 + KL-to-ref。
 
+第15讲 8.2 节走读本文件的 `training_step` 与采集端的混合组统计，8.3 到 8.5 节
+逐条解释这里的三个超参（温度、前沿状态池、KL 强度）为什么是现在这个取值。
+
 和 2_1 让 VLM 学数数是同一套 GRPO 外壳，只是「文本 token」换成了「动作 token」：
 在 LIBERO 里同一初始状态采一组 rollout，组内按成败算相对优势（不需要 critic），
 再用 KL-to-ref 把策略锚在 SFT 基座附近——没有这个信赖域，稀疏 0/1 奖励的
@@ -82,6 +85,13 @@ class GRPOData(L.LightningDataModule):
         self.dataset = dataset
 
     def train_dataloader(self):
+        """训练 dataloader。
+
+        Returns:
+            DataLoader: `batch_size=None` 原样透传——batch 已经由数据集按"一次迭代
+            的全部组"组好，这里再分批反而会把组拆散。
+        """
+
         return DataLoader(self.dataset, batch_size=None)
 
 
@@ -104,6 +114,13 @@ class VLA0LightningGRPO(L.LightningModule):
         self.base_ckpt = Path(base_ckpt)
 
     def training_step(self, batch, batch_idx):
+        """一次迭代：逐条复算 logprob、累积梯度，最后统一裁剪并 step。
+
+        Args:
+            batch: 数据集产出的一次迭代数据，含生成记录、优势与几个统计量。
+            batch_idx: 迭代序号，兼作存档计数。
+        """
+
         opt = self.optimizers()
         opt.zero_grad()
         active = [(r, a) for r, a in zip(batch["records"], batch["advantages"]) if abs(a) >= 1e-8]
@@ -136,10 +153,18 @@ class VLA0LightningGRPO(L.LightningModule):
             print(f"  saved {outdir}", flush=True)
 
     def configure_optimizers(self):
+        """优化器。
+
+        Returns:
+            torch.optim.AdamW: 学习率刻意取小——大学习率和缺 KL 一样，会把策略推出胜任区。
+        """
+
         return torch.optim.AdamW(self.policy.model.parameters(), lr=self.lr)
 
 
 def main():
+    """跑一次 GRPO 后训练。要调的值都在下面两段里，含义见各行注释。"""
+
     torch.manual_seed(0)
 
     # ---- 路径：弱基座与输出都放共享训练产物根下 ----

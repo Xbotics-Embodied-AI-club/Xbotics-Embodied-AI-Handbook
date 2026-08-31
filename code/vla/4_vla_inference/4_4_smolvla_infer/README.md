@@ -4,7 +4,7 @@
 加载 LIBERO 微调 checkpoint 闭环推理一次并录像；与 4_1 的 7B OpenVLA 对比，加载
 和每步推理的速度差一个数量级。
 
-- `smolvla_demo.ipynb` — 课堂走读版（分节讲解）
+- `smolvla_demo.ipynb` — 逐行走读版（分节讲解）
 - `smolvla_demo.py` — 脚本版，跑通即产出 `output/smolvla_libero_success.mp4`
 - `smolvla_eval.sh` — 官方 `lerobot-eval` 标准评测入口（rename_map 把 image/image2 映射到 checkpoint 的 camera1/2；实测 2 episode pc_success=50%）
 

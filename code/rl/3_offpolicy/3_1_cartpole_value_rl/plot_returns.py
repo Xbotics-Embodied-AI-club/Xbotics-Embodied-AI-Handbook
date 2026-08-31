@@ -22,6 +22,18 @@ WINDOW = 20
 
 
 def moving_average(values, window):
+    """滑动平均，开头不足一窗时按已有的点数取均值（不丢前几个点）。
+
+    单回合回报本身抖得厉害，直接画成一团毛线看不出趋势；叠一条滑动平均才读得出
+    "有没有在涨"。开头不补 NaN 是有意的——曲线从第一个回合就画得出来。
+
+    Args:
+        values: 按回合顺序排列的回报序列。
+        window: 窗口长度（回合数）。
+
+    Returns:
+        与 values 等长的滑动平均列表。
+    """
     out, running = [], 0.0
     for i, v in enumerate(values):
         running += v

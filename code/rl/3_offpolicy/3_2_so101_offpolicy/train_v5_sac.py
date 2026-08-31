@@ -71,6 +71,14 @@ class RunningNorm(nn.Module):
 
     @torch.no_grad()
     def update(self, x):
+        """用一个 batch 的原始观测增量更新均值/方差（Welford 并行版）。
+
+        只在采集时调用、每步一次；训练时只读不写，这样同一批数据在不同更新轮里
+        被归一化的口径是一致的。
+
+        Args:
+            x: 形状 (num_envs, dim) 的原始观测。
+        """
         bm, bv, bc = x.mean(0), x.var(0, unbiased=False), x.shape[0]
         delta = bm - self.mean; tot = self.count + bc
         self.mean += delta * bc / tot
@@ -78,6 +86,16 @@ class RunningNorm(nn.Module):
         self.var = M2 / tot; self.count = tot
 
     def normalize(self, x):
+        """把原始观测按当前统计量归一化到零均值单位方差。
+
+        分母加 1e-8 是防某一维在训练最开始方差还接近 0 时除爆。
+
+        Args:
+            x: 原始观测张量，最后一维是状态维度。
+
+        Returns:
+            同形状的归一化观测。
+        """
         return (x - self.mean) / (self.var.sqrt() + 1e-8)
 
 
@@ -110,7 +128,15 @@ class SquashedGaussianActor(nn.Module):
         return mean, log_std
 
     def get_action(self, state):
-        """随机动作 + log 概率（含 tanh 雅可比修正）+ 确定性均值动作（评测用）。"""
+        """随机动作 + log 概率（含 tanh 雅可比修正）+ 确定性均值动作（评测用）。
+
+        Args:
+            state: 已归一化的观测。
+
+        Returns:
+            `(action, log_prob)`：挤压后的动作，以及它在挤压后分布下的对数概率
+            （算熵项要用，雅可比修正已经做过）。
+        """
         mean, log_std = self._mean_logstd(state)
         normal = torch.distributions.Normal(mean, log_std.exp())
         x = normal.rsample()  # 重参数化：采样路径可导，梯度能穿回 mean/log_std
@@ -135,6 +161,17 @@ class QCritic(nn.Module):
         )
 
     def forward(self, state, action):
+        """一次前向：状态和动作拼起来进 MLP，出一个标量 Q 值。
+
+        连续动作没法像 DQN 那样对每个动作出一个分，只能把动作当输入吃进来。
+
+        Args:
+            state: 已归一化的观测。
+            action: 要评分的动作。
+
+        Returns:
+            形状 (batch,) 的 Q 值。
+        """
         return self.net(torch.cat([state, action], dim=-1)).squeeze(-1)
 
 
@@ -163,9 +200,24 @@ class SAC(L.LightningModule):
 
     @property
     def alpha(self):
+        """当前温度：熵项在目标里占多大权重。
+
+        存成 `log_alpha` 再取指数，是为了让它在优化时天然保持为正。
+
+        Returns:
+            标量温度 α。
+        """
         return self.log_alpha.exp()
 
     def configure_optimizers(self):
+        """四个优化器：actor、两个 critic、以及温度 α。
+
+        α 也是学出来的——SAC 不用手调探索强度，而是让训练自己找"探索够用又不过头"
+        的那个平衡点，这就是"自动温度"这个零件的实现位置。
+
+        Returns:
+            (actor 优化器, critic1 优化器, critic2 优化器, α 优化器)。
+        """
         critic_params = list(self.critic1.parameters()) + list(self.critic2.parameters())
         return (torch.optim.Adam(self.actor.parameters(), lr=self.lr),
                 torch.optim.Adam(critic_params, lr=self.lr),
@@ -173,16 +225,42 @@ class SAC(L.LightningModule):
 
     @torch.no_grad()
     def sample_action(self, state):
-        """随机动作本身就是探索，采集时不再像 DDPG/TD3 那样额外叠高斯噪声。"""
+        """随机动作本身就是探索，采集时不再像 DDPG/TD3 那样额外叠高斯噪声。
+
+        Args:
+            state: 原始观测（未归一化）。
+
+        Returns:
+            合法区间内的连续动作。
+        """
         action, _, _ = self.actor.get_action(self.obs_norm.normalize(state))
         return action
 
     @torch.no_grad()
     def eval_action(self, state):
+        """评测用的动作：取分布的均值，不采样。
+
+        训练时策略是随机的（这正是熵探索要的），评测时再掺随机性就说不清成绩了。
+
+        Args:
+            state: 原始观测。
+
+        Returns:
+            确定性动作（分布均值经 tanh 挤压后的值）。
+        """
         _, _, det_action = self.actor.get_action(self.obs_norm.normalize(state))
         return det_action
 
     def training_step(self, batch, batch_idx):
+        """一个 minibatch 的 SAC 更新：critic → 温度 α → actor。
+
+        和 TD3 的差别全在"熵"上：目标 Q 里减掉一项 α·logπ（保持随机也算收益），
+        actor 的损失里同样带这一项。α 自己按"当前熵离目标熵差多少"调。
+
+        Args:
+            batch: 从回放池抽出的 `(state, action, reward, next_state)`。
+            batch_idx: Lightning 传入的批序号，这里用不到。
+        """
         actor_opt, critic_opt, alpha_opt = self.optimizers()
         state, action, reward, next_state = batch
         # buffer 里是原始 state，喂进网络前统一归一化（统计量只在采集时更新，这里只读）
@@ -244,6 +322,16 @@ class ReplayBuffer:
         return self.capacity if self.full else self.pos
 
     def add(self, state, action, reward, next_state):
+        """把一批转移写进回放池；写满一圈后从头覆盖最旧的。
+
+        一次写入的是 `num_envs` 条（并行环境同一拍的经验），所以下标要按环形取模算。
+
+        Args:
+            state: 这一拍的原始观测（存原始值，归一化留到喂网络前做）。
+            action: 执行的动作。
+            reward: 即时奖励。
+            next_state: 下一拍的原始观测。
+        """
         n = state.shape[0]
         idx = (torch.arange(n, device=self.device) + self.pos) % self.capacity
         self.state[idx] = state; self.next_state[idx] = next_state
@@ -252,6 +340,16 @@ class ReplayBuffer:
         self.full = self.full or self.pos < n
 
     def sample(self, batch_size):
+        """从整个池子里均匀随机抽一个 minibatch。
+
+        不按轨迹、不按时间抽——随机打散正是打断样本相关性的那一步。
+
+        Args:
+            batch_size: 这一批抽多少条转移。
+
+        Returns:
+            `(state, action, reward, next_state)` 四个张量，已在 GPU 上。
+        """
         i = torch.randint(0, len(self), (batch_size,), device=self.device)
         return self.state[i], self.action[i], self.reward[i], self.next_state[i]
 
@@ -289,7 +387,17 @@ class SO101SACData(L.LightningDataModule):
         return info["success"].float().mean().item(), reward.float().mean().item()
 
     def train_dataloader(self):
+        """每轮先采几步进池，再从池子里抽若干 minibatch 交给训练循环。
+
+        "采一步、学很多次"就是高更新采样比（UTD）的实现：每条经验被反复抽中，
+        这是 off-policy 样本效率的直接来源。Trainer 配了
+        `reload_dataloaders_every_n_epochs=1`，所以每一轮都会重新走一遍这里。
+
+        Returns:
+            每次迭代吐一个 minibatch 的 DataLoader（`batch_size=None`，数据集自己成批）。
+        """
         def gen():
+            """本轮的样本生成器：先补够预热经验，再采样，最后连吐若干 minibatch。"""
             while len(self.buffer) < self.learning_starts:
                 self._collect(use_policy=False)
             stats = [self._collect(use_policy=True) for _ in range(self.steps_per_iter)]
@@ -313,6 +421,14 @@ class SuccessLogger(L.Callback):
         self.ckpt_dir, self.save_interval, self.max_iterations = ckpt_dir, save_interval, max_iterations
 
     def on_train_epoch_end(self, trainer, pl_module):
+        """每轮打印成功率与平均奖励，并按间隔存一次 checkpoint。
+
+        存的只有推理要用的部分（actor 权重 + 归一化统计量），不存优化器状态——
+        这份 checkpoint 是拿去 rollout 和生成数据的，不用于续训。
+        Args:
+            trainer: Lightning Trainer，用来读当前轮次与 datamodule 上的统计量。
+            pl_module: 正在训练的模型，用来取要落盘的权重。
+        """
         it = trainer.current_epoch + 1
         succ = trainer.datamodule.last_success
         rew = trainer.datamodule.last_reward
@@ -326,6 +442,22 @@ class SuccessLogger(L.Callback):
 
 def run_training(task, num_envs, max_iterations, updates_per_iter, batch_size,
                  buffer_capacity, learning_starts, device, seed=1):
+    """搭好环境、模型、回放池，跑完整条训练，返回 checkpoint 路径。
+
+    Args:
+        task: `so101_sim` 注册的任务 id。
+        num_envs: 并行环境数。
+        max_iterations: 训练轮数，一轮 = 采 steps_per_iter 步 + 做 updates_per_iter 次更新。
+        updates_per_iter: 每轮的梯度更新次数，也就是更新采样比（UTD）。
+        batch_size: 每次更新抽的转移条数。
+        buffer_capacity: 回放池容量。
+        learning_starts: 开始用策略采样前，先用随机动作灌多少条经验。
+        device: 训练设备。
+        seed: 随机种子。
+
+    Returns:
+        checkpoint 文件路径。
+    """
     torch.manual_seed(seed)
     env = so101_sim.state_rl_env(task, num_envs=num_envs)
     state_dim = env.single_observation_space.shape[-1]

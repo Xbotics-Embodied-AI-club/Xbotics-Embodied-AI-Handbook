@@ -4,7 +4,7 @@
 离散成 256 个 bin，模型逐个"说出" 7 个动作 token。加载 LIBERO-10 官方微调
 checkpoint，在 LIBERO 里闭环推理一次并录像。
 
-- `openvla_demo.ipynb` — 课堂走读版（分节讲解）
+- `openvla_demo.ipynb` — 逐行走读版（分节讲解）
 - `openvla_demo.py` — 脚本版，跑通即产出 `output/openvla_libero_success.mp4`
 - `openvla_eval.sh` — 官方 `lerobot-eval` 标准评测入口（多 episode pc_success + 自动录像）
 

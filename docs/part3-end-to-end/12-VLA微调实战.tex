@@ -155,6 +155,8 @@
  
 
 
+\usepackage{fvextra}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,commandchars=\\\{\}}
 \usepackage{tabularx}
 \usepackage{array}
 \usepackage{booktabs}
@@ -233,10 +235,9 @@
 \tableofcontents
 }
 
-上一讲我们走读了从 OpenVLA 到 \(\pi_0\) 家族的各类 VLA 模型，看清了一个
-VLA 长什么样、动作是怎么被生成出来的。但那时加载的都是别人训练好的
-checkpoint，跑的是通用能力。真正要把一个 VLA
-用到你自己的机器人、你自己的任务上，还差关键一步------微调。
+第11讲走读了从 OpenVLA 到 \(\pi_0\) 家族的各类 VLA 模型，看清了一个 VLA
+长什么样、动作是怎么被生成出来的。但那时加载的都是别人训练好的权重，跑的是通用能力。真正要把一个
+VLA 用到你自己的机器人、你自己的任务上，还差关键一步------微调。
 
 这一讲就把微调讲透：先建立''动多少参数 ×
 用什么信号''两个分类维度的全景图，再沿监督微调这条主线，从全量 SFT
@@ -253,9 +254,7 @@ Sim2Real 与 Real2Sim 讲清楚。
 \subsubsection{1.1.1
 大模型的生命周期}\label{ux5927ux6a21ux578bux7684ux751fux547dux5468ux671f}
 
-一个大模型从诞生到上线，通常会经历这样一个完整的生命周期：
-
-微调处于这个生命周期的核心位置------在预训练之后、部署之前。预训练给了模型''通识教育''，而微调就是''专业培训''。
+一个大模型从诞生到上线，要走完四步：先在海量无标注语料上\textbf{预训练}，拿到一个只会续写文字的基座；再用任务数据\textbf{微调}；然后\textbf{对齐}到人类偏好；最后\textbf{部署}上线。微调卡在这条链的中段------预训练给的是''通识教育''，微调给的是''专业培训''。
 
 \begin{figure}[H]
 
@@ -263,24 +262,20 @@ Sim2Real 与 Real2Sim 讲清楚。
 
 }
 
-\caption{图：微调的执行过程}
+\caption{图：一条从左到右的链------大规模 Web 数据经预训练得到 Base
+LLM，再经监督微调得到 fine-tuned
+LLM；微调那一步上方另有一支箭头，把特定的（私有）知识库喂进来}
 
 \end{figure}%
 
-这张图把流程压缩成三步：先用大规模 Web 数据做预训练，得到一个 Base
-LLM；再用特定领域或特定任务的数据做 supervised
-fine-tuning；最后得到一个面向该任务的 fine-tuned LLM。
+两条数据流的体量差得很远：左边那条是整个互联网量级的语料，右边那条常常只有几万条。规模差着好几个数量级，可决定模型在\textbf{你的}任务上好不好用的，是小的那条。
 
 \subsubsection{1.1.2
 预训练模型的根本问题}\label{ux9884ux8badux7ec3ux6a21ux578bux7684ux6839ux672cux95eeux9898}
 
 预训练模型在海量数据上学到了通用知识，但它本质上只学会了一件事：\textbf{给定前面的文字，预测下一个词}。
 
-这意味着，Base Model
-可能会给出语法上合理、但并不符合任务需求的回答。图中左侧的 Base Model
-面对 ``Joint pain, skin rash, sun sensitivity?'' 只给出很粗的
-``Allergy?''；右侧模型在加入相关领域数据微调后，能把症状和更具体的医学概念联系起来，回答中提到
-systemic lupus erythematosus (SLE) 以及进一步检查建议。
+于是它给出的回答可能语法通顺，却不是任务想要的东西。下面这组医学问答的对照就是一个例子。
 
 \begin{figure}[H]
 
@@ -288,12 +283,15 @@ systemic lupus erythematosus (SLE) 以及进一步检查建议。
 
 }
 
-\caption{图：微调对模型的改变}
+\caption{图：同一个医学问题下基座模型与微调后模型的回答对照，左侧只答
+``Allergy?''，右侧给出 systemic lupus erythematosus (SLE)
+及后续检查建议}
 
 \end{figure}%
 
-这张图想表达的是：微调不是简单把资料塞进
-prompt，而是让模型参数吸收一类新数据分布，从而在类似输入上给出更符合任务语境的输出。
+左边把三个症状当成互不相干的线索，只敢回一个最泛的猜测；右边把它们当成一组\textbf{同时出现}的证据，于是收敛到一个具体的诊断，还知道接下来该查什么。差别不在于右边''看过更多资料''------把同一份资料塞进
+prompt
+也做不到这一步；差别在于参数本身吸收了这类数据的分布，遇到同类输入时它默认就往那个语境上靠。
 
 \subsubsection{1.1.3
 微调前先想想：能不能不微调？}\label{ux5faeux8c03ux524dux5148ux60f3ux60f3ux80fdux4e0dux80fdux4e0dux5faeux8c03}
@@ -307,28 +305,22 @@ Learning（上下文学习）}。
 
 }
 
-\caption{图：In-Context Learning 示例}
+\caption{图：In-Context Learning 的 prompt 结构------先给两个 German →
+English 的示例，再让模型翻译一句没见过的新句子}
 
 \end{figure}%
 
 做法很简单：在 prompt
-里塞几个示例，模型就能''临时''学会新任务。图中的任务是德语翻译：先给模型两个
-German → English 的例子，如 ``Ich liebe Eis.'' → ``I love ice
-cream.''，再让它翻译新的句子 ``Wo ist der nächste Supermarkt?''。
+里塞几个示例，模型就能''临时''学会新任务。注意''临时''二字------上图那两个
+German → English
+的示例只活在这一次对话里，模型权重一个字节都没变，下一次提问还得把它们重新贴一遍。
 
-但这种方式有硬伤：示例占用上下文窗口、对小模型效果差、知识无法持久化。当
-In-Context Learning 搞不定的时候，就该微调上场了。
-
-\subsubsection{1.1.4
-微调前后的效果对比}\label{ux5faeux8c03ux524dux540eux7684ux6548ux679cux5bf9ux6bd4}
-
-同样的问题''为什么天空是蓝色的''，Base Model
-可能给一句话的简单回答，而微调后的模型能给出包含瑞利散射原理的详细科学解释。这就是微调的力量。
+硬伤也就在这里：示例要占上下文窗口、对小模型效果差、知识不进权重所以无法持久化。这三条一旦顶到，就该微调上场了。差别有多大？同样问''为什么天空是蓝色的''，基座模型常常一句话打发，微调过的模型会顺着瑞利散射把道理讲下来------不是它临时被提示了，而是它本来就带着这套语境。
 
 \subsection{1.2
 微调的两大分类维度}\label{ux5faeux8c03ux7684ux4e24ux5927ux5206ux7c7bux7ef4ux5ea6}
 
-在正式展开之前，我们先建立一个认知框架。微调方法虽然五花八门，但可以从两个维度来理解：
+微调方法五花八门，但只要问两个问题，任何一种都能被摆到确定的位置上：
 
 \textbf{维度一：你动了多少参数？}（参数更新范围）
 
@@ -341,11 +333,33 @@ In-Context Learning 搞不定的时候，就该微调上场了。
 这两个维度是\textbf{正交关系}：前者描述''更新哪些参数''，后者描述''用什么数据和
 loss 更新''。例如，SFT 可以用全量微调做，也可以用 LoRA 做；DPO
 可以全量训练，也可以只训练 LoRA
-adapter。它们不是互斥分类，而是可以组合的两个坐标轴。
+适配器。它们不是互斥分类，而是可以组合的两个坐标轴------记住这一点，后面遇到''LoRA
+DPO''这类看起来像新方法的名字，就能一眼拆成两个已知的坐标。
 
-微调的应用场景很广------从情感分析到对话代理，许多 NLP
-任务都可以通过微调来提升。
-接下来我们沿着这两个维度，一个一个把方法讲清楚。
+\begin{figure}[H]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/fig12-1-two-axes-map.png}
+
+}
+
+\caption{图：一张三行三列的方法地图。列是参数更新范围------全模型全参数
+/ 模块级全参数 /
+PEFT（LoRA、QLoRA），图下注明越往右被更新的参数越少；行是训练信号------自下而上为
+SFT、离线偏好 DPO 等、在线奖励 PPO /
+GRPO。九个格子里有六格填着本讲提到的组合：左列是全量 SFT 与全量
+DPO，中列只有''冻视觉编码器＋全参训语言骨干''一格，右列自下而上是 LoRA
+SFT 与 QLoRA SFT（上下叠在同一格）、LoRA DPO、标着第15讲的 LoRA
+GRPO；红框那格 LoRA SFT
+标着''本讲主线''。三个空格不是不能组合，只是本讲没走那条路（本书自绘）}
+
+\end{figure}%
+
+这张图要兑现的就是上面那句''正交、可组合''。看\textbf{列}：最右一列从下往上是
+LoRA SFT → LoRA DPO → LoRA
+GRPO------参数更新范围一个字没变，变的只是训练信号。看\textbf{行}：最下面一行从左往右是全量
+SFT → 冻视觉编码器的模块级训练 → LoRA/QLoRA
+SFT------训练信号一个字没变，变的只是动多少参数。所以''LoRA
+DPO''从来不是一个新方法，它就是这张图上的一个格子；同理，任何一个你没见过的组合词，先在这两条轴上各定一个坐标，基本就拆明白了。
 
 \subsection{1.3
 维度一：你动了多少参数？}\label{ux7ef4ux5ea6ux4e00ux4f60ux52a8ux4e86ux591aux5c11ux53c2ux6570}
@@ -365,10 +379,11 @@ Fine-Tuning）：更新所有参数}\label{ux5168ux91cfux5faeux8c03full-fine-tun
 \textbf{适用语境：} 计算资源充足（多张
 A100/H100）、高质量数据较多（几万条以上）、任务差异较大或需要显著改变模型行为------比如让一个通用模型变成专业医疗问答模型，或者训练一个新的机器人操作策略。
 
-\textbf{代价是什么？} 以 7B 模型为例，如果用 fp16 训练，仅模型权重就约
-14GB；再加上梯度、优化器状态、激活值、缓存和显存碎片，实际显存常常是数十
-GB 到 100GB 级别，需要 ZeRO / FSDP / gradient checkpointing
-等技术，通常也需要多张高端 GPU
+\textbf{代价是什么？} 以 7B 模型为例，如果用 fp16（半精度，每个数 2
+字节）训练，仅模型权重就约 14
+GB；再加上梯度、优化器状态、激活值、缓存和显存碎片，实际显存常常是数十
+GB 到 100 GB 级别，需要梯度检查点（4.3 节展开）、ZeRO / FSDP（4.4
+节展开）等技术，通常也需要多张高端 GPU
 才较容易稳定训练。而且每个任务都要存一份完整的模型权重，存储成本也很高。另一个风险是\textbf{灾难性遗忘}------模型在学新任务的时候，可能把原来会的东西忘掉。比如微调它做翻译后，它在摘要任务上的能力可能下降。
 
 \subsubsection{1.3.2 部分微调（Partial
@@ -383,7 +398,7 @@ Fine-Tuning）：冻住大部分，只动关键层}\label{ux90e8ux5206ux5faeux8c
 \textbf{适用语境：}
 新任务和预训练任务比较相似。比如模型已经会英文问答了，你想让它在医疗领域问答上更好一点------这时候底层的语言理解能力是通用的，只需要调整上层的任务特定表示。
 
-下面这张图比较的是几种''解冻哪些层来训练''的策略：
+``只动上面几层''到底该动几层？这是个要靠实验定的问题：
 
 \begin{figure}[H]
 
@@ -391,19 +406,13 @@ Fine-Tuning）：冻住大部分，只动关键层}\label{ux90e8ux5206ux5faeux8c
 
 }
 
-\caption{图：不同解冻范围的微调效果与训练时间}
+\caption{图：不同层解冻方案的对照------上半部分是训练/验证/测试准确率，下半部分是训练时间，横轴从只训练最后一层排到解冻全部层}
 
 \end{figure}%
 
-图里的每一组柱子对应一种层解冻方案：只训练最后一层、训练最后两层加最后几个
-transformer block，
-一直到解冻所有层。上半部分比较训练集、验证集和测试集准确率，
-下半部分比较训练时间。
-可以看到，解冻更多层通常会提高效果，但提升很快进入平台期；
-训练时间却会持续上升。找到这个''甜蜜点''是部分微调的关键。
+两半张图的趋势形状完全不同：准确率解冻到某一档之后就基本走平，训练时间却一路往上抬。部分微调要找的，就是这两条线\textbf{拉开最大}的那一档------再往右加层，买到的准确率越来越少、付出的时间越来越多。
 
-下面这张图来自传统 NLP
-分类任务语境，展示的是从''只把预训练模型当特征抽取器''到''全量更新模型''的性能/成本权衡：
+把视野再放宽一格，从''完全不动预训练模型''到''全量更新''，是一条连续的成本-性能带：
 
 \begin{figure}[H]
 
@@ -411,15 +420,16 @@ transformer block，
 
 }
 
-\caption{图：不同微调方式的性能与成本权衡}
+\caption{图：从 Feature-based 到 Finetuning I、Finetuning II
+三档的性能与成本权衡}
 
 \end{figure}%
 
-图中的 \textbf{Feature-based} 指冻结预训练 Transformer，只取输出
-embedding 训练一个分类器； \textbf{Finetuning I} 指冻结预训练
-Transformer，只训练顶部一个或多个任务层； \textbf{Finetuning II}
-指连预训练 Transformer 一起更新，也就是全量微调。
-所以它和这里的文字可以对应上：从''冻结主体''到''只动部分层''，再到''全量微调''，效果通常更好，但训练会更慢、更贵。
+图上三档正好对应这条带的三个位置。\textbf{Feature-based} 冻结整个预训练
+Transformer，只取它的输出 embedding 训一个分类器；\textbf{Finetuning I}
+仍冻结 Transformer，但训练顶部一到多个任务层；\textbf{Finetuning II} 连
+Transformer
+一起更新，也就是全量微调。越往右效果通常越好，代价是越慢越贵------这条带上没有免费的位置，只有适合你手头资源的位置。
 
 \subsubsection{1.3.3
 参数高效微调（PEFT）：不动原来的，加一点新的}\label{ux53c2ux6570ux9ad8ux6548ux5faeux8c03peftux4e0dux52a8ux539fux6765ux7684ux52a0ux4e00ux70b9ux65b0ux7684}
@@ -445,14 +455,13 @@ PEFT 的工程收益主要体现在三方面：
 \item
   \textbf{省显存}：只需要存储新增参数的梯度和优化器状态，原始模型权重冻结不动
 \item
-  \textbf{降低遗忘风险}：原始权重不被覆盖，adapter
-  卸载后可以恢复到基座模型行为
+  \textbf{降低遗忘风险}：原始权重不被覆盖，适配器卸载后可以恢复到基座模型行为
 \item
   \textbf{易部署}：同一个基座模型搭配不同的轻量适配器，就能服务不同任务，不用存
   N 份完整模型
 \end{enumerate}
 
-下面这张图展示了常见 PEFT 技术的分类：
+这些成员按''新增参数放在哪里''可以摆成三堆：
 
 \begin{figure}[H]
 
@@ -460,25 +469,34 @@ PEFT 的工程收益主要体现在三方面：
 
 }
 
-\caption{图：PEFT 技术分类}
+\caption{图：三个并排的紫色标题条把常见 PEFT 方法分成三栏。Prompt
+modifications 栏下列着 ``Hard'' prompt tuning、``Soft'' prompt tuning 与
+Prefix-tuning；Adapter methods 栏下列着 Adapters 与
+LLaMA-Adapter，并有一条连线把 Prefix-tuning 与 LLaMA-Adapter
+连起来；Reparameterization 栏下只有一项 Low rank adaptation (LoRA)}
 
 \end{figure}%
 
-图中把 PEFT 粗略分成三类：
+三堆分别对应''新参数进输入端''\,``新参数进层内''``不插新模块、改写权重更新量的表示形式''。要留神的是\textbf{第一堆里混着一个不属于
+PEFT 的成员}：
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{输入侧适配}：都是从输入端下手让模型适配任务，但要分清哪一类真的在训练参数。\textbf{Hard
-  prompt} 是人工写离散文本提示，\textbf{没有任何可训练参数}，严格说属于
-  prompt engineering，不是 PEFT；\textbf{Soft prompt tuning 和
-  Prefix-tuning} 学的是连续向量提示，有可训练参数，属于参数高效适配。
+  \textbf{提示类（Prompt
+  modifications）}：都是从输入端下手让模型适配任务，但要分清哪一类真的在训练参数。\textbf{硬提示（hard
+  prompt）}
+  是人工写的离散文本提示，\textbf{没有任何可训练参数}，严格说属于提示工程，不是
+  PEFT；\textbf{软提示（soft prompt）与 Prefix Tuning}
+  学的是连续向量提示，有可训练参数，属于参数高效适配。
 \item
-  \textbf{Adapter methods}：在 Transformer
-  内部插入小模块，冻结原始模型，只训练这些 adapter。
+  \textbf{适配器类（Adapter methods）}：在 Transformer
+  内部插入小模块，冻结原始模型，只训练这些适配器。图上那条把
+  Prefix-tuning 连到 LLaMA-Adapter
+  的线说明分栏不是硬边界------同一个方法可以同时带着两栏的性质。
 \item
-  \textbf{Reparameterization}：不直接训练完整权重变化，而是用更小的参数化形式表示它。LoRA
-  就属于这一类，用低秩矩阵近似权重更新量。
+  \textbf{重参数化类（Reparameterization）}：不直接训练完整的权重变化量，而是用一个更小的参数化形式来表示它------LoRA
+  用低秩矩阵近似 \(\Delta W\)，走的就是这条路。
 \end{itemize}
 
 下面先讲 LoRA / QLoRA，再回看更早的 Adapter 和软提示方法。
@@ -486,52 +504,43 @@ PEFT 的工程收益主要体现在三方面：
 \paragraph{（1）LoRA（Low-Rank Adaptation）------
 低秩适配方法}\label{loralow-rank-adaptation-ux4f4eux79e9ux9002ux914dux65b9ux6cd5}
 
-\textbf{解决什么问题？}
-在尽量保留效果的前提下，把可训练参数量降低到原始模型的很小一部分，常见配置只有
+\textbf{解决什么问题？} LoRA{[}1{]}
+要在尽量保留效果的前提下，把可训练参数量降低到原始模型的很小一部分，常见配置只有
 0.1\%\textasciitilde1\% 量级。
 
-\textbf{核心直觉：} 许多微调任务的有效更新量 ΔW
-可以被一个\textbf{较低秩的矩阵很好地近似}------虽然 ΔW
+\textbf{核心直觉：} 许多微调任务的有效更新量 \(\Delta W\)
+可以被一个\textbf{较低秩的矩阵很好地近似}------虽然 \(\Delta W\)
 本身是个巨大的矩阵，但真正起作用的方向不多，于是可以用两个小得多的矩阵相乘（\(\Delta W = BA\)）来参数化它。这是一个有效的建模假设，也有经验证据支持（3.2
-会讲''内在维度''这条线），但它不是对所有任务、所有层、任意 rank
+节会讲''内在维度''这条线），但它不是对所有任务、所有层、任意 rank
 都成立的事实。
 
-\begin{figure}[H]
-
-{\centering \includegraphics[width=0.8\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/files/Pasted-image-20241120171738-1024x434.png}
-
-}
-
-\caption{图：LoRA 原理图}
-
-\end{figure}%
-
-打个比方：原始权重矩阵 W 是一本百科全书，微调的变化量 ΔW
+打个比方：原始权重矩阵 \(W\) 是一本百科全书，微调的变化量 \(\Delta W\)
 就像是一张勘误表。LoRA
-的做法是，不直接写这张勘误表（太大了），而是用两个小表格相乘来生成它。
+的做法是，不直接写这张勘误表（太大了），而是用两个小表格相乘来生成它。结构长什么样、\(A\)
+和 \(B\) 各在哪一步起作用，3.3.1 节会配图逐条走一遍。
 
 \textbf{适用语境：} LoRA 常被用作 PEFT
-baseline。相对全量微调，它通常能用低得多的显存接近全量微调效果，但具体差距取决于任务、数据质量和
+的对照基线。相对全量微调，它通常能用低得多的显存接近全量微调效果，但具体差距取决于任务、数据质量和
 LoRA rank。
 
 \textbf{推理部署特性：} LoRA
 的旁路矩阵在推理时可以合并回原始权重，减少额外前向分支带来的开销。而且不同任务的
 LoRA 权重可以热切换------同一个基座模型，加载不同的 LoRA
-adapter，就得到不同任务的适配版本。
+适配器，就得到不同任务的适配版本。
 
 \paragraph{（2）QLoRA（Quantized LoRA）------
 显存友好的微调方案}\label{qloraquantized-lora-ux663eux5b58ux53cbux597dux7684ux5faeux8c03ux65b9ux6848}
 
 \textbf{解决什么问题？} LoRA
 减少了可训练参数，但基座模型本身仍要占显存。对于 33B、65B、70B
-这种大模型，光是加载模型权重就要几十 GB 甚至上百 GB 显存。QLoRA
+这种大模型，光是加载模型权重就要几十 GB 甚至上百 GB 显存。QLoRA{[}2{]}
 进一步压缩基座模型，让大模型微调的硬件门槛明显下降。
 
-\textbf{怎么做的？} QLoRA 可以理解为''量化基座模型 + LoRA
-训练''的组合方案：把冻结的基座模型用 4-bit
-精度加载，计算时再反量化到较高精度；LoRA adapter
-仍以较高精度训练。也就是说，QLoRA 不是和 LoRA 并列的全新 adapter
-结构，而是把 LoRA 放在量化加载的大模型上训练。
+\textbf{怎么做的？} QLoRA 是''量化基座模型 + LoRA
+训练''的组合：把冻结的基座模型用 4-bit
+精度加载，计算时再反量化到较高精度，LoRA
+适配器仍以较高精度训练。所以它不是和 LoRA 并列的另一种适配器结构，而是把
+LoRA 挂在一个被量化加载的大模型上。
 
 \textbf{适用语境：} QLoRA
 常见于显存主要受限于模型加载、但仍希望微调较大模型的场景。它的代价是量化和反量化会引入额外计算开销，不同实现、硬件和
@@ -541,7 +550,7 @@ LoRA / QLoRA 时再展开。
 \paragraph{（3）Adapter Tuning ------ PEFT
 的先驱}\label{adapter-tuning-peft-ux7684ux5148ux9a71}
 
-\textbf{解决什么问题？} 这是最早的 PEFT 方法之一（2019
+\textbf{解决什么问题？} 这是最早的 PEFT 方法之一{[}3{]}（2019
 年），证明了''不动原始权重也能达到接近全量微调的效果''这个思路是可行的。
 
 \textbf{怎么做的？} 在 Transformer
@@ -550,22 +559,27 @@ Adapter 模块，原始模型完全冻结。
 
 \begin{figure}[H]
 
-{\centering \includegraphics[width=0.6\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/adapter.png}
+{\centering \includegraphics[width=0.6\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/adapter_arxiv-1902.00751.png}
 
 }
 
-\caption{图：Adapter Tuning 结构示意}
+\caption{图：左侧是一个 Transformer 层，两个 Adapter
+分别插在多头注意力之后和前馈层之后，各自紧接一个 Layer
+Norm；右侧把其中一个 Adapter
+放大------输入先经前馈下投影压到很窄的中间层（图上只画了两个圆点），过非线性，再经前馈上投影回到原宽度，并有一条跳连从入口直接加到出口。（图取自参考文献
+{[}3{]}）}
 
 \end{figure}%
 
-图中左侧展示 Adapter 插入到 Transformer 层中的位置，右侧展开了 Adapter
-内部结构：先 down-project 到低维瓶颈空间，经过非线性层，再 up-project
-回原维度，并通过残差连接并回主干。
+关键在那个残差连接：Adapter
+初始化时输出接近零，加回主干等于什么都没改，所以插进去的一瞬间模型行为和原来一样------这和后面
+LoRA 把 \(B\)
+初始化为零是同一个思路，都是让训练从预训练状态起步而不是从一次随机扰动起步。中间那个瓶颈维度就是它的容量旋钮，越窄参数越少、表达力越弱。
 
 \textbf{适用语境：} 现在用得比 LoRA
 少了，但在多任务场景下仍有优势------每个任务一套
-Adapter，切换任务就是切换 Adapter。原始论文报告，在特定 NLP 任务上仅训练
-3.6\% 的参数也能接近全量微调性能。
+Adapter，切换任务就是切换 Adapter。原始论文{[}3{]}报告，在它测的那批 NLP
+任务上，仅训练 3.6\% 的参数就能接近全量微调性能。
 
 \paragraph{（4）Prefix Tuning / Prompt Tuning ------
 用''软提示''来微调}\label{prefix-tuning-prompt-tuning-ux7528ux8f6fux63d0ux793aux6765ux5faeux8c03}
@@ -588,7 +602,7 @@ LLM 场景里，它们的效果和稳定性通常不如 LoRA，所以现在用�
 简单总结：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2149\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1783\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6068\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2206\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1804\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5990\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 条件 & 常见方法 & 说明 \\
 \midrule\noalign{}
@@ -596,7 +610,7 @@ LLM 场景里，它们的效果和稳定性通常不如 LoRA，所以现在用�
 需要降低可训练参数量 & LoRA & 只训练低秩旁路矩阵，常用于 LLM / VLA 适配 \\
 显存主要卡在加载大模型 & QLoRA & 在 LoRA 基础上量化加载基座模型 \\
 数据很少（几百条） & LoRA / QLoRA & 可训练参数少、容量受限，通常能降低过拟合风险------但不是免疫（见下方备注） \\
-需要一个模型服务多个任务 & LoRA / Adapter & 同一基座模型加载不同 adapter \\
+需要一个模型服务多个任务 & LoRA / Adapter & 同一基座模型加载不同适配器 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -614,13 +628,13 @@ LLM 场景里，它们的效果和稳定性通常不如 LoRA，所以现在用�
 trainable / frozen）：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1845\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.8155\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1875\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.8125\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 名称 & 含义 \\
 \midrule\noalign{}
 全模型全参数微调 & 目标模型的\textbf{所有}参数都可训练 \\
 模块级全参数微调 & 只解冻部分模块（如冻结视觉编码器、全参训练语言骨干与动作头），被解冻模块内是全参数训练 \\
-PEFT & 冻结原权重，只训练新增的少量参数（LoRA / Adapter / soft prompt 等） \\
+PEFT & 冻结原权重，只训练新增的少量参数（LoRA / 适配器 / 软提示等） \\
 混合策略 & 上面几种按模块组合，例如冻结视觉编码器 + 语言骨干加 LoRA + 动作头全参训练 \\
 \bottomrule\noalign{}
 \end{tabular}
@@ -639,8 +653,8 @@ PEFT & 冻结原权重，只训练新增的少量参数（LoRA / Adapter / soft 
 \textbf{解决什么问题？} 预训练模型只会续写文本，SFT
 教它遵循指令、完成任务。
 
-\textbf{怎么做的？} 准备一批 (指令, 回答)
-对，让模型看着指令学习生成对应的回答。
+\textbf{怎么做的？}
+准备一批（指令，回答）对，让模型看着指令学习生成对应的回答。
 本质上就是监督学习------给正确答案，让模型去拟合。
 
 \begin{figure}[H]
@@ -649,20 +663,20 @@ PEFT & 冻结原权重，只训练新增的少量参数（LoRA / Adapter / soft 
 
 }
 
-\caption{图：指令微调的 prompt-completion 数据格式示意}
+\caption{图：指令微调的数据格式------每条样本由
+PROMPT（指令或任务描述）与 COMPLETION（希望模型学会的标准回答）配对组成}
 
 \end{figure}%
 
 \textbf{举个例子：} 你想让模型学会做摘要，就准备一批数据，
 每条都是''请总结以下文章：{[}文章内容{]}``配上一个高质量的摘要。
 模型看了几千条这样的数据后，就学会了''看到'请总结'就输出摘要''这个模式。
-这张图里的 \texttt{PROMPT} 对应输入给模型的指令或任务描述，
-\texttt{COMPLETION} 对应希望模型学会输出的标准回答； 下面的
-summarization、translation 只是两类任务示例，不是新的微调阶段。
+图下面那两行 summarization、translation
+容易看岔：它们只是同一种数据格式下的两类任务示例，\textbf{不是两个新的微调阶段}。
 
 训练过程和预训练类似：前向传播算
-loss，反向传播更新权重，多轮迭代直到收敛。 区别在于数据是标注好的 (指令,
-回答) 对，而不是无标注的文本。
+loss，反向传播更新权重，多轮迭代直到收敛。
+区别在于数据是标注好的（指令，回答）对，而不是无标注的文本。
 
 \textbf{SFT 的几种常见组织方式：}
 
@@ -670,7 +684,7 @@ loss，反向传播更新权重，多轮迭代直到收敛。 区别在于数据
 数据。例如，一个医疗助手数据集可以同时是''指令微调''、``领域适配''和''多任务微调''。
 
 \textbf{指令微调（Instruction Tuning）：} 最常见的 SFT 形式。
-用各种各样的指令-回答对来训练，让模型学会遵循指令。 InstructGPT
+用各种各样的指令-回答对来训练，让模型学会遵循指令。 InstructGPT{[}4{]}
 一类对话模型的后训练流程中，第一步通常就是指令微调。数据格式通常是：
 
 \begin{Shaded}
@@ -706,15 +720,22 @@ loss，反向传播更新权重，多轮迭代直到收敛。 区别在于数据
 用人类的偏好来进一步优化模型，让它的回答更有用、更安全、更符合人类期望。
 
 \textbf{这是 ChatGPT 背后的核心技术。} OpenAI 的 InstructGPT
-论文详细描述了这个三步流程：
+论文{[}4{]}详细描述了这个三步流程：
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture12/files/httpssubstack-post-media.s3.amazonaws.compublicimages7dfa415c-da9c-4d6f-8de8-ffc9f92272db_1602x952.png}}
+{\centering \includegraphics[width=0.85\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/files/httpssubstack-post-media.s3.amazonaws.compublicimages7dfa415c-da9c-4d6f-8de8-ffc9f92272db_1602x952.png}
 
 }
 
-\caption{图：InstructGPT RLHF 流程}
+\caption{图：InstructGPT
+的三步流程，图上分三栏。第一栏：从提示集抽一条提示（``Explain the moon
+landing to a 6 year old''），标注员写出期望回答，用它监督微调出 SFT
+模型。第二栏：同一条提示采样出 A--D 四个模型输出，标注员排出 D
+\textgreater{} C \textgreater{} A = B
+的顺序，用这批比较数据训练奖励模型。第三栏：抽一条新提示（``Write a
+story about frogs''），策略生成输出，奖励模型给出分数 \(r_k\)，再用 PPO
+回过头更新策略。（图取自参考文献 {[}4{]}）}
 
 \end{figure}%
 
@@ -748,7 +769,8 @@ PPO（Proximal Policy Optimization）算法来优化 SFT 模型。模型生成�
   算法对超参数非常敏感，配置不当会导致训练退化
 \item
   \textbf{模型副本多}：概念上会涉及 SFT
-  模型、奖励模型、正在训练的策略模型、参考模型；实际工程会通过共享权重、offload、缓存等方式降低显存压力
+  模型、奖励模型、正在训练的策略模型、参考模型；实际工程会通过共享权重、offload（卸载，4.3.5
+  节展开）、缓存等方式降低显存压力
 \item
   \textbf{奖励黑客（Reward
   Hacking）}：模型可能学会''骗''奖励模型拿高分，而不是真正变好。比如学会输出冗长但空洞的回答，因为奖励模型误以为长回答
@@ -765,13 +787,13 @@ PPO（Proximal Policy Optimization）算法来优化 SFT 模型。模型生成�
 \textbf{解决什么问题？} RLHF 工程复杂度高。DPO
 的目标是：在离线偏好数据场景中，用更简单的监督式目标表达偏好优化。
 
-\textbf{核心突破：} DPO 的作者指出，在特定偏好建模和 KL
+\textbf{核心突破：} DPO 论文{[}5{]}指出，在特定偏好建模和 KL
 约束假设下，可以把 RLHF 中''奖励建模 +
 策略优化''的目标改写成一个简单的偏好分类损失。也就是说，在很多离线偏好数据场景里，你可以跳过显式奖励模型和
 PPO，直接用偏好数据来优化语言模型。
 
-\textbf{怎么做的？} 准备三元组数据：(prompt, 好的回答,
-差的回答)。训练目标很直觉------让模型在''好的回答''上的生成概率升高，在''差的回答''上的生成概率降低，同时不要偏离参考模型太远。
+\textbf{怎么做的？}
+准备三元组数据：（prompt，好的回答，差的回答）。训练目标很直觉------让模型在''好的回答''上的生成概率升高，在''差的回答''上的生成概率降低，同时不要偏离参考模型太远。
 
 \textbf{适用语境：} DPO 常见于已经有离线偏好数据（同一个 prompt
 下的好/差回答对）的场景。它训练更稳定（类似监督学习，不需要调 PPO
@@ -802,27 +824,25 @@ DPO
 / ORPO / SimPO / IPO 更接近 DPO 的离线偏好优化家族；GRPO 更接近在线 RL /
 奖励优化家族。
 
-\textbf{KTO（Kahneman-Tversky Optimization）：} 属于离线偏好优化。DPO
+\textbf{KTO（Kahneman-Tversky Optimization）：} DPO
 需要成对的偏好数据（好回答 vs 差回答）， 但实际中收集成对数据很麻烦。
 KTO
 只需要''这个回答好''或''这个回答差''的二元标签就行，数据收集成本大幅降低。
 名字来源于行为经济学的前景理论------人对损失比收益更敏感。
 
-\textbf{ORPO（Odds Ratio Preference Optimization）：}
-属于离线偏好优化。它把 SFT 和偏好优化合并到同一个训练目标里，
-无需额外参考模型。
+\textbf{ORPO（Odds Ratio Preference Optimization）：} 它把 SFT
+和偏好优化合并到同一个训练目标里， 无需额外参考模型。
 
-\textbf{SimPO：} 属于离线偏好优化。它进一步简化 DPO，
+\textbf{SimPO：} 它进一步简化 DPO，
 用序列的平均对数概率来代替参考模型的作用，减少一个模型的显存开销。
 
-\textbf{IPO（Identity Preference Optimization）：}
-属于离线偏好优化。它修正了 DPO 在偏好数据上容易过拟合的问题，
-理论上更鲁棒。
+\textbf{IPO（Identity Preference Optimization）：} 它修正了 DPO
+在偏好数据上容易过拟合的问题， 理论上更鲁棒。
 
-\textbf{GRPO（Group Relative Policy Optimization）：} 属于在线奖励优化 /
-RL 方法。 它让模型对同一个 prompt 生成一组回答，用组内相对分数来估计
-advantage， 从而省掉 PPO 里常见的 value / critic 模型。 注意：GRPO
-省掉的主要是 critic，不是所有奖励信号；
+\textbf{GRPO（Group Relative Policy Optimization）：} 它让模型对同一个
+prompt 生成一组回答，用组内相对分数来估计优势（advantage）， 从而省掉
+PPO 里常见的价值网络（value / critic）。 注意：GRPO
+省掉的主要是价值网络，不是所有奖励信号；
 奖励仍然可以来自规则、验证器或奖励模型。
 
 \subsubsection{1.4.5
@@ -867,21 +887,21 @@ LLM 来说，一个常见的后训练流程是：
 \end{tabular}
 \end{center}
 
-实际工程中，LLM 后训练经常把参数更新方式和训练信号组合起来。例如，用
-LoRA 做 SFT，或者用 LoRA 做 DPO；这表示''只训练 LoRA
-adapter''，而训练目标分别是监督学习或偏好优化。
+表里''用什么方法''和''参数更新方式''这两列可以自由配对：``用 LoRA 做
+SFT''``用 LoRA 做 DPO''这类说法，``用 LoRA''那半交代的是只训练 LoRA
+适配器，``做 SFT / 做 DPO''那半交代的是训练目标取监督学习还是偏好优化。
 
 但 VLA 的流程要单独看。VLA
 微调的核心通常不是''聊天偏好对齐''，而是让策略在新机器人、新场景或新任务上更会动作：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0679\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1889\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4918\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2514\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0698\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1275\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5403\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2624\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 阶段 & 做什么 & 常见训练信号 & 关注点 \\
 \midrule\noalign{}
 阶段 1 & 轨迹适配 & 图像观测 + 语言指令 + 动作轨迹 & 动作表示、机器人本体、相机视角。 \\
-阶段 2 & 策略训练 / 微调 & 行为克隆、动作 token 预测、连续动作回归、扩散或 flow matching 损失 & 成功率、稳定性、控制频率。 \\
-阶段 3 & Rollout 评估与迭代 & 仿真或真实机器人执行结果 & 失败案例、数据补采、超参和冻结策略。 \\
+阶段 2 & 策略训练 / 微调 & 行为克隆、动作 token 预测、连续动作回归、扩散或 flow matching（流匹配）损失 & 成功率、稳定性、控制频率。 \\
+阶段 3 & 推演评估与迭代 & 仿真或真实机器人执行结果 & 失败案例、数据补采、超参和冻结策略。 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -911,8 +931,10 @@ VLA 模型的输入通常是图像观测 +
 \item
   \textbf{动作表示 / 动作头}：这是 VLA 与普通 VLM
   最大的区别。有些模型把动作离散化成 token
-  来预测，有些模型使用连续动作头、扩散模型或 flow matching
-  模块。不同机器人本体、动作维度和控制频率不同，这部分往往最需要适配。
+  来预测，有些模型使用连续动作头、扩散模型或 flow
+  matching（流匹配，把一段噪声沿着学出来的''流''连续变形成动作，第11讲第
+  3
+  节讲过）模块。不同机器人本体、动作维度和控制频率不同，这部分往往最需要适配。
 \end{itemize}
 
 \subsubsection{1.6.2 典型 VLA
@@ -922,14 +944,14 @@ VLA 模型的输入通常是图像观测 +
 / 语言骨干 / 动作头''三列一刀切：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1203\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3492\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5305\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1364\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3098\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5538\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 模型 & 动作表示 & 微调时要关注什么 \\
 \midrule\noalign{}
-\textbf{RT-2} & 把机器人动作离散化成文本 token，由 VLM 直接生成 & 更像把 Web/VQA 数据和机器人轨迹一起做 co-fine-tuning；不适合说成有一个独立动作头。 \\
-\textbf{OpenVLA} & 基于 VLM 输出离散化动作 token & 官方支持端到端微调和 LoRA 微调；小数据适配时 LoRA 更常用。 \\
-\textbf{\(\pi_0\)} & 连续动作 chunk，由 flow matching 动作专家生成 & 重点在动作专家 / action expert 与机器人数据适配，而不是只调语言模型。 \\
-\textbf{GR00T} & 多模态骨干 + 连续动作策略模块 & 更像机器人基础模型的策略适配；具体冻结哪些模块取决于任务、数据量和实现配置。 \\
+\textbf{RT-2}{[}6{]} & 把机器人动作离散化成文本 token，由 VLM 直接生成 & 更像把网页规模的视觉问答（VQA）数据和机器人轨迹混在一起共同微调（co-fine-tuning）；不适合说成有一个独立动作头。 \\
+\textbf{OpenVLA}{[}7{]} & 基于 VLM 输出离散化动作 token & 官方支持端到端微调和 LoRA 微调；小数据适配时 LoRA 更常用。 \\
+\textbf{\(\pi_0\)}{[}8{]} & 连续动作块，由 flow matching 动作专家生成 & 重点在动作专家（action expert）与机器人数据的适配，而不是只调语言模型。 \\
+\textbf{GR00T N1}{[}9{]} & 多模态骨干 + 连续动作策略模块 & 更像机器人基础模型的策略适配；具体冻结哪些模块取决于任务、数据量和实现配置。 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -940,16 +962,15 @@ VLA 模型的输入通常是图像观测 +
 这里说的数据量主要指\textbf{下游任务适配}。VLA
 基础模型预训练可能使用大规模、多机器人、多任务的混合数据；但把一个已有
 VLA
-适配到某个新机器人或新任务时，常见数据是几百到几千条机器人操作轨迹。每条轨迹包含一系列的
-(图像观测, 语言指令, 动作) 三元组。
+适配到某个新机器人或新任务时，常见数据是几百到几千条机器人操作轨迹。每条轨迹包含一系列的（图像观测，语言指令，动作）三元组。
 
 数据来源主要有三种：遥操作采集（人类操控机器人录制）、仿真环境生成、跨机器人迁移。其中''仿真环境生成''这一路，除了在仿真里遥操作，还能\textbf{完全不靠人}------让视觉强化学习策略在仿真里从零学会任务、自动跑出成功轨迹当数据。本讲用来微调
-SO-101 的那批仿真数据就是这么来的，第16讲会把这套''视觉 RL
+SO-101 的那批仿真数据就是这么来的，第16讲 6.3 节会把这套''视觉 RL
 生成数据''的流程从头讲透。
 
 正因为下游适配数据通常较少，LoRA 等 PEFT 方法在 VLA
 微调中经常出现------可训练参数少通常能降低过拟合风险（但仍要靠验证集和早停把住，见
-1.3.4 的备注），也便于在同一基座模型上维护多个任务或机器人适配器。
+1.3.4 节的备注），也便于在同一基座模型上维护多个任务或机器人适配器。
 
 \subsection{1.7
 微调工具生态}\label{ux5faeux8c03ux5de5ux5177ux751fux6001}
@@ -972,7 +993,7 @@ SO-101 的那批仿真数据就是这么来的，第16讲会把这套''视觉 RL
 \end{center}
 
 在这门课里，我们主要使用 \textbf{LeRobot} 作为实践框架：
-用它来组织机器人数据集、加载策略、训练和微调 VLA / robot policy。
+用它来组织机器人数据集、加载策略、训练和微调 VLA 与其他机器人策略。
 LLaMA-Factory、PEFT、TRL 这些工具更适合理解通用 LLM
 微调和对齐训练的工具链， 在本节里作为背景知识出现。
 
@@ -1018,7 +1039,7 @@ SFT。
 \subsection{2.1
 什么时候该全量微调}\label{ux4ec0ux4e48ux65f6ux5019ux8be5ux5168ux91cfux5faeux8c03}
 
-全量微调解冻模型的\textbf{所有参数}，在任务数据上继续训练（机制见第 1
+全量微调解冻模型的\textbf{所有参数}，在任务数据上继续训练（机制见 1.3.1
 节）。它给的参数更新自由度最高，代价是显存、训练和存储成本也最高。什么时候值得付这个代价？
 
 \begin{itemize}
@@ -1031,8 +1052,9 @@ SFT。
   模型本身不大，全参更新的显存还扛得住。
 \end{itemize}
 
-对 VLA 来说，第三条尤其关键：像 VLA-0、SmolVLA
-这类小体量模型，全参数微调的显存压力有限，往往可以直接全量
+对 VLA 来说，第三条尤其关键：像 VLA-0（第11讲第 6
+节）、SmolVLA（第11讲第 7
+节）这类小体量模型，全参数微调的显存压力有限，往往可以直接全量
 SFT，把视觉-语言骨干和动作模块一起更新到新机器人上。而对 \(\pi_0\)
 这种大模型，单卡全量微调常常放不下，要么换 LoRA（见第 3
 节），要么上多卡（见第 4 节）。
@@ -1040,8 +1062,8 @@ SFT，把视觉-语言骨干和动作模块一起更新到新机器人上。而�
 \subsection{2.2
 小模型怎么全参更新}\label{ux5c0fux6a21ux578bux600eux4e48ux5168ux53c2ux66f4ux65b0}
 
-实践中 VLA 各模块的处理方式常常不一刀切。这里要注意术语（口径见
-1.3.4）：\textbf{一旦冻结了某个模块，严格说就不再是''全模型全参数微调''，而是''模块级全参数微调''}。两者复现起来差别很大，所以配置表要逐模块写清
+实践中 VLA 各模块的处理方式常常不一刀切。这里要注意术语（口径见 1.3.4
+节）：\textbf{一旦冻结了某个模块，严格说就不再是''全模型全参数微调''，而是''模块级全参数微调''}。两者复现起来差别很大，所以配置表要逐模块写清
 trainable / frozen：
 
 \begin{center}
@@ -1059,22 +1081,71 @@ trainable / frozen：
 三个模块全部 trainable
 才是全模型全参数微调；冻掉视觉编码器的那一版应当叫模块级全参数微调。
 
-\subsection{2.3 实验：在 SO-101 上全量微调 VLA-0 与
-SmolVLA}\label{ux5b9eux9a8cux5728-so-101-ux4e0aux5168ux91cfux5faeux8c03-vla-0-ux4e0e-smolvla}
+\subsection{2.3 实验：把 SmolVLA 全量微调到
+SO-101}\label{ux5b9eux9a8cux628a-smolvla-ux5168ux91cfux5faeux8c03ux5230-so-101}
 
-这是一个在 SO-101
-真机上完成的实验：用前面采集到的语言指令抓取轨迹（例如''把方块放进篮子''），分别对
-\textbf{VLA-0} 和 \textbf{SmolVLA} 做全参数 SFT。训练时观察 loss
-下降，再到机器人上跑 rollout
-统计成功率，对比两个小模型在同一任务上的表现。没有真机时，可以用 SO-101
-仿真器采出格式一致的数据，做同样的全量微调。
+配套代码给了两条路线，一条不需要真机、一条用公开真机数据。
+
+\textbf{路线一：纯仿真闭环}（\texttt{code/vla/5\_vla\_finetune/5\_2\_smolvla\_full\_sft/}）。数据是第16讲
+6.3 节那条''视觉 RL 生成数据''链路的产物------SAC 专家在 SO-101
+仿真里自己练成，再把成功推演转成 LeRobot 数据集；微调从社区预训练权重
+\texttt{lerobot/smolvla\_base}
+出发，全参数更新，不挂任何适配器。三个入口分别是：
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{code/vla/5\_vla\_finetune/5\_2\_smolvla\_full\_sft/train\_smolvla.sh}：微调本体，一条
+  \texttt{lerobot-train}；
+\item
+  \texttt{code/vla/5\_vla\_finetune/5\_2\_smolvla\_full\_sft/smolvla\_eval.sh}：\texttt{lerobot-eval}
+  跑多局，报 \texttt{pc\_success} 并自动录像；
+\item
+  \texttt{code/vla/5\_vla\_finetune/5\_2\_smolvla\_full\_sft/plot\_loss.py}：把训练日志里的
+  loss 抓出来画成收敛曲线。
+\end{itemize}
+
+这条线上真正卡人的不是训练本身，而是\textbf{观测特征对齐}：\texttt{smolvla\_base}
+是按三路相机 \texttt{camera1/2/3} 预训练的，而这份仿真数据只有一路
+\texttt{base\_camera}，不改名直接跑会抛
+\texttt{Feature\ mismatch}。\texttt{train\_smolvla.sh} 里那个
+\texttt{-\/-rename\_map}
+就是干这件事的------把数据集的相机键映射到权重期望的键。缺
+\texttt{camera2/3}
+是允许的，特征校验只要求数据提供的相机是权重期望相机的\textbf{子集}。
+
+\textbf{路线二：公开真机数据}（\texttt{code/vla/5\_vla\_finetune/5\_4\_so101\_real\_sft/train\_so101\_real.sh}）。同一个脚本按
+\texttt{MODEL} 变量在 \(\pi_0\) / SmolVLA / ACT 之间切换，对一批公开的
+SO-101
+遥操作数据做全参微调；\texttt{code/vla/5\_vla\_finetune/5\_4\_so101\_real\_sft/verify\_checkpoint.py}
+负责在每个存点上验一遍''这个 checkpoint
+到底学没学到东西''。它的判据值得单独看一眼：不用
+\texttt{corr(pred,\ action)}，因为这批数据里 \texttt{action}
+是主臂目标位姿、\texttt{state}
+是从臂实测位姿，两者天然贴在一起------什么都不学、原样照抄
+\texttt{state}，逐关节相关系数就能到 0.9 以上。换成''模型误差 /
+照抄误差''这个比值，照抄基线恒为 1，模型必须明显低于 1 才算学到了东西。
+
+\textbf{该盯什么。} loss
+下降只说明拟合在进行，不说明任务做得成；先看评测里的
+\texttt{pc\_success}，再看上面那个验收脚本报出的比值有没有稳定压到 1
+以下。但这个比值本身也有边界，脚本的说明里写得很清楚：它做的是\textbf{开环逐帧比对}------每一帧都先把策略状态清空再独立预测一次。真机上动作是连着下发的，误差会一步步累积，所以比值压到
+1
+以下只证明模型学到了非平凡的东西，\textbf{不等于它在真机上能把任务做完}；闭环那一步得有真机才能验。仿真那条线还有一个前提要先知道：训练数据所在的
+ReachCube 任务在 \texttt{so101\_sim}
+重构后已经下线，\texttt{smolvla\_eval.sh} 只能把这个 checkpoint
+放进现存的 PickPlaceCube40
+场景里评，属于任务不匹配，\texttt{pc\_success} 接近 0
+是预期结果、不代表微调失败------脚本注释与 \texttt{5\_2} 的 README
+都写明了这一点。想拿到一个真能读的成功率，得让训练与评测落在同一个现存任务上。
 
 \subsection{2.4 本节小结}\label{ux672cux8282ux5c0fux7ed3-1}
 
 \textbf{核心创新：} 全量 SFT
 解冻模型的全部参数，在新机器人的数据上一起更新视觉-语言骨干与动作头，给出最高的参数更新自由度；对
 VLA-0、SmolVLA 这类小体量
-VLA，单卡就能把整模型适配到新本体上，是最直接、最不绕弯子的微调路线。
+VLA，单卡就能把整模型适配到新本体上，是最直接、最不绕弯子的微调路线。2.3
+节那条仿真闭环还说明了一件事：微调命令本身只有一行，真正会把人挡在门外的是\textbf{观测特征对齐}。
 
 \textbf{局限性：}
 自由度的代价是显存、训练与存储成本都最高------每个任务都要存一份完整权重；一旦模型放大到
@@ -1086,12 +1157,11 @@ LoRA（第 3 节），要么把训练摊到多卡上（第 4 节）。
 \subsection{3.1 为什么需要
 LoRA？}\label{ux4e3aux4ec0ux4e48ux9700ux8981-lora}
 
-第 1 节我们已经把微调的全景图铺开，知道了
-PEFT（参数高效微调）是当前最主流的范式。而在所有 PEFT
-方法中，\textbf{LoRA（Low-Rank Adaptation）}
-是使用最广泛的一类方法------Hugging Face
-PEFT、Unsloth、LLaMA-Factory、LeRobot 等主流框架都围绕 LoRA
-提供了成熟支持。
+上一节的全量 SFT
+把所有参数都解冻了，代价是显存、训练和存储成本都顶到最高。1.3.3 节提过的
+PEFT 家族就是冲着这三项成本去的，而其中被用得最多的是
+\textbf{LoRA（Low-Rank Adaptation）}------Hugging Face
+PEFT、Unsloth、LLaMA-Factory、LeRobot 都为它提供了成熟支持。
 
 但 LoRA
 到底是怎么工作的？为什么用两个小矩阵就能在很多任务上接近全量微调的效果？本节把这个问题讲清楚。
@@ -1102,15 +1172,15 @@ PEFT、Unsloth、LLaMA-Factory、LeRobot 等主流框架都围绕 LoRA
 先回忆一下全量微调的代价。以一个 7B 参数的模型为例：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.5938\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2656\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.4810\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5190\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 项目 & 显存占用 \\
 \midrule\noalign{}
 模型权重（fp16） & \textasciitilde14 GB \\
 梯度 & \textasciitilde14 GB \\
-优化器状态（Adam，两份 fp32 moment） & \textasciitilde56 GB \\
+优化器状态（Adam，一阶 + 二阶两份 fp32 矩） & \textasciitilde56 GB \\
 激活值 / 缓存 & 数 GB \textasciitilde{} 数十 GB \\
-\textbf{合计} & \textbf{80\textasciitilde120+ GB} \\
+\textbf{合计} & \textbf{前三项 \(14+14+56 = 84\) GB，再叠上激活值只会更多} \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -1130,9 +1200,9 @@ LoRA
 \subsubsection{3.2.1
 预训练模型的''过度参数化''}\label{ux9884ux8badux7ec3ux6a21ux578bux7684ux8fc7ux5ea6ux53c2ux6570ux5316}
 
-LoRA 的理论根基来自 Aghajanyan 等人 2020
-年的一篇重要论文：\emph{``Intrinsic Dimensionality Explains the
-Effectiveness of Language Model Fine-Tuning''}。
+LoRA 的理论根基来自 Aghajanyan 等人 2020 年的一篇论文《Intrinsic
+Dimensionality Explains the Effectiveness of Language Model
+Fine-Tuning》{[}10{]}。
 
 这篇论文的核心发现是：\textbf{预训练模型的参数空间是高度冗余的}。虽然一个模型可能有数十亿个参数，但在微调的时候，真正需要改变的''有效维度''远远小于参数总数。
 
@@ -1176,7 +1246,8 @@ RoBERTa-large & 355M & \textasciitilde200 \\
 \(B \in \mathbb{R}^{d \times r}\)，\(A \in \mathbb{R}^{r \times k}\)，\(r \ll \min(d, k)\)。
 \end{quote}
 
-这就是 LoRA 的全部精髓。
+LoRA
+的全部内容就是这一步替换：把''更新一个大矩阵''换成''学两个小矩阵''。
 
 \subsection{3.3 LoRA
 的数学原理}\label{lora-ux7684ux6570ux5b66ux539fux7406}
@@ -1224,16 +1295,21 @@ LoRA 的做法是，\textbf{冻结 \(W_0\)}，用两个低秩矩阵来参数化
 
 }
 
-\caption{图：LoRA 原理图：冻结预训练权重 \(W\)，只训练旁路的低秩矩阵
-\(A\) 和 \(B\)}
+\caption{图：左半标注''训练中''------输入 \(x\) 兵分两路，一路过冻结的
+\(W \in \mathbb{R}^{d \times d}\)，一路经下投影 \(A\)（图上标
+\(\mathcal{N}(0,\sigma^2)\)）压到 \(r\) 维、再由上投影 \(B\)（图上标
+\(B=0\)）抬回原维度，两路输出相加；右半标注''训练后''------\(W\) 与
+\(BA\) 已合并成单块 \(W_{merged}\)，旁路不再出现}
 
 \end{figure}%
 
-上图展示了 LoRA 的核心结构。图中为了便于展示，把权重画成了方阵
-\(W \in \mathbb{R}^{d \times d}\)；一般线性层中也可以是
-\(W_0 \in \mathbb{R}^{d \times k}\)。右边新增的旁路分支让输入 \(x\)
-先经过下投影矩阵 \(A\)，再经过上投影矩阵 \(B\)，最后乘以缩放系数
-\(\frac{\alpha}{r}\)，与原始输出相加。
+这张图一次交代了三件后面要分开讲的事。\textbf{旁路两个矩阵的初始值不对称}：\(A\)
+取小随机数、\(B\)
+取全零，所以训练第一步的旁路输出恰好是零，模型从''和原模型完全一样''起步（3.3.4
+节）。\textbf{右半那块合并后的方块}说明训练结束后旁路可以被吸收进权重，推理时不多一条分支（3.3.7
+节）。最后一点是画法上的：图上为了对称把权重画成了方阵
+\(W \in \mathbb{R}^{d \times d}\)，一般线性层里它可以是
+\(W_0 \in \mathbb{R}^{d \times k}\)，不影响这条旁路的结构。
 
 \subsubsection{3.3.2
 参数量对比：为什么这么省？}\label{ux53c2ux6570ux91cfux5bf9ux6bd4ux4e3aux4ec0ux4e48ux8fd9ux4e48ux7701}
@@ -1254,8 +1330,9 @@ LoRA（\(r=64\)） & \(4096 \times 64 + 64 \times 4096 = 524{,}288\) & \textbf{3
 \end{tabular}
 \end{center}
 
-在很多任务里，用不到 1\%
-的新增参数量就能接近全量微调的效果------这就是低秩分解的威力。
+注意占比是随 \(r\) 线性涨的，而效果不是：\(r\) 从 8 加到
+64，参数量翻了八倍，收益却远不成比例------这正是 3.5.1 节要讨论''\(r\)
+取多少''的原因。
 
 \subsubsection{3.3.3 与 SVD 的关系}\label{ux4e0e-svd-ux7684ux5173ux7cfb}
 
@@ -1291,7 +1368,7 @@ LoRA 的初始化非常讲究：
 \tightlist
 \item
   \textbf{矩阵 \(A\)}：原始 LoRA
-  论文使用高斯随机初始化；很多工程实现会采用 Kaiming
+  论文{[}1{]}使用高斯随机初始化；很多工程实现会采用 Kaiming
   初始化一类的随机初始化
 \item
   \textbf{矩阵 \(B\)}：初始化为全零
@@ -1329,11 +1406,12 @@ LoRA 引入了一个缩放因子 \(\alpha\)，实际的权重更新是：
   常见设置之一是 \(\alpha = 2r\)（比如 \(r=16, \alpha=32\)），这样
   \(\alpha/r\) 保持为 2
 \item
-  也有不少设置固定 \(\alpha\)：原始 LoRA 论文提到可以把 \(\alpha\)
-  设为最先尝试的 \(r\)，QLoRA 论文的部分实验则使用 \(\alpha=16\)
+  也有不少设置固定 \(\alpha\)：原始 LoRA 论文{[}1{]}提到可以把
+  \(\alpha\) 设为最先尝试的 \(r\)，QLoRA 论文{[}2{]}的部分实验则使用
+  \(\alpha=16\)
 \item
   因此增大 \(r\) 时不一定必须同比例增大 \(\alpha\)；关键是把
-  \(\alpha/r\)、学习率和 dropout 一起调
+  \(\alpha/r\)、学习率和 Dropout 一起调
 \end{itemize}
 
 \subsubsection{3.3.6
@@ -1341,7 +1419,7 @@ LoRA 引入了一个缩放因子 \(\alpha\)，实际的权重更新是：
 
 Transformer 中有很多线性层，LoRA 应该加在哪里？
 
-原始 LoRA 论文（Hu et al., 2021）在 GPT-3 上的实验发现，只对注意力层的
+原始 LoRA 论文{[}1{]}在 GPT-3 上的实验发现，只对注意力层的
 \(W_q\)（Query）和 \(W_v\)（Value）投影矩阵加 LoRA
 就能取得不错的效果。后续很多实践会把 LoRA
 扩展到更多线性层，以换取更高的适配容量；但效果仍取决于任务、数据量、rank
@@ -1353,14 +1431,16 @@ Transformer 中有很多线性层，LoRA 应该加在哪里？
 
 }
 
-\caption{图：LoRA 在 Transformer 中的应用位置}
+\caption{图：一个 Transformer 层里可以挂 LoRA
+旁路的线性层------注意力侧的 Query / Key / Value 与输出投影，以及
+MLP/FFN 侧的各个投影矩阵}
 
 \end{figure}%
 
-上图展示了 LoRA 在一个 Transformer 层中的常见注入位置。注意力层的
-Query、Key、Value、输出投影，以及 MLP/FFN 中的投影矩阵都可以附加 LoRA
-旁路。对于 LLaMA/Qwen 这类门控 MLP，常见名称是 gate、up、down；传统
-Transformer FFN 通常只有 up/down 两个线性层。
+名字会随架构变------LLaMA/Qwen 这类门控 MLP 是 gate、up、down 三个，传统
+Transformer FFN 只有 up、down
+两个------但挂法完全一样：\textbf{每一个独立的线性层都是一个可以单独决定挂不挂的旁路点}。所以''LoRA
+加在哪''不是一个二选一的开关，而是一张按层勾选的清单。
 
 具体来说，一个 LLaMA-style Transformer 层中可以加 LoRA 的位置包括：
 
@@ -1377,7 +1457,8 @@ Transformer FFN 通常只有 up/down 两个线性层。
 \end{tabular}
 \end{center}
 
-QLoRA 论文把 LoRA 加到所有线性层上，并在附录中报告：当覆盖所有层时，rank
+QLoRA 论文{[}2{]}把 LoRA
+加到所有线性层上，并在附录中报告：当覆盖所有层时，rank
 对最终表现的影响并不总是显著。实际项目中要结合数据量、过拟合风险和显存选择目标层。像
 Hugging Face PEFT 这类框架会按模型类型匹配常见模块，也支持通过
 \texttt{target\_modules} 显式指定，必要时可以设为 \texttt{"all-linear"}
@@ -1407,9 +1488,8 @@ LoRA
 \end{itemize}
 
 这里所谓''无额外计算开销''有一个前提：LoRA
-已经合并到同精度基座权重中。如果推理时动态挂载 adapter、频繁切换多个
-adapter，或者基座模型是 4-bit
-量化格式而不能直接合并，仍可能存在额外开销或工程限制。
+已经合并到同精度基座权重中。如果推理时动态挂载适配器、频繁切换多个适配器，或者基座模型是
+4-bit 量化格式而不能直接合并，仍可能存在额外开销或工程限制。
 
 而且，如果你需要切换任务，只需要：卸载当前 LoRA 权重 → 加载新的 LoRA
 权重 → 重新合并。整个过程通常只涉及几 MB 到数百 MB
@@ -1421,7 +1501,8 @@ adapter，或者基座模型是 4-bit
 \subsubsection{3.4.1
 完整的训练步骤}\label{ux5b8cux6574ux7684ux8badux7ec3ux6b65ux9aa4}
 
-用 LoRA 微调一个模型的完整流程如下：
+用 LoRA
+微调一个模型一共五步：加载并冻结基座、注入旁路、训练、保存适配器、推理时合并回去。
 
 下面的代码示例使用 \textbf{Hugging Face Transformers + PEFT}。其中
 \texttt{AutoModelForCausalLM.from\_pretrained} 来自 Transformers 的 Auto
@@ -1440,7 +1521,7 @@ checkpoint loading guide}。
 \begin{Highlighting}[]
 \ImportTok{from}\NormalTok{ transformers }\ImportTok{import}\NormalTok{ AutoModelForCausalLM}
 
-\NormalTok{model }\OperatorTok{=}\NormalTok{ AutoModelForCausalLM.from\_pretrained(}\StringTok{"meta{-}llama/Llama{-}2{-}7b"}\NormalTok{)}
+\NormalTok{model }\OperatorTok{=}\NormalTok{ AutoModelForCausalLM.from\_pretrained(}\StringTok{"meta{-}llama/Llama{-}2{-}7b{-}hf"}\NormalTok{)}
 \ControlFlowTok{for}\NormalTok{ param }\KeywordTok{in}\NormalTok{ model.parameters():}
 \NormalTok{    param.requires\_grad }\OperatorTok{=} \VariableTok{False}
 \end{Highlighting}
@@ -1459,7 +1540,7 @@ checkpoint loading guide}。
 \NormalTok{    r}\OperatorTok{=}\DecValTok{16}\NormalTok{,                }\CommentTok{\# 秩}
 \NormalTok{    lora\_alpha}\OperatorTok{=}\DecValTok{32}\NormalTok{,       }\CommentTok{\# 缩放因子}
 \NormalTok{    target\_modules}\OperatorTok{=}\NormalTok{[}\StringTok{"q\_proj"}\NormalTok{, }\StringTok{"k\_proj"}\NormalTok{, }\StringTok{"v\_proj"}\NormalTok{, }\StringTok{"o\_proj"}\NormalTok{,}
-                     \StringTok{"gate\_proj"}\NormalTok{, }\StringTok{"up\_proj"}\NormalTok{, }\StringTok{"down\_proj"}\NormalTok{],}
+                    \StringTok{"gate\_proj"}\NormalTok{, }\StringTok{"up\_proj"}\NormalTok{, }\StringTok{"down\_proj"}\NormalTok{],}
 \NormalTok{    lora\_dropout}\OperatorTok{=}\FloatTok{0.05}\NormalTok{,   }\CommentTok{\# Dropout 防过拟合}
 \NormalTok{)}
 \NormalTok{model }\OperatorTok{=}\NormalTok{ get\_peft\_model(model, lora\_config)}
@@ -1491,7 +1572,7 @@ checkpoint loading guide}。
 \ImportTok{from}\NormalTok{ peft }\ImportTok{import}\NormalTok{ PeftModel}
 \ImportTok{from}\NormalTok{ transformers }\ImportTok{import}\NormalTok{ AutoModelForCausalLM}
 
-\NormalTok{model }\OperatorTok{=}\NormalTok{ AutoModelForCausalLM.from\_pretrained(}\StringTok{"meta{-}llama/Llama{-}2{-}7b"}\NormalTok{)}
+\NormalTok{model }\OperatorTok{=}\NormalTok{ AutoModelForCausalLM.from\_pretrained(}\StringTok{"meta{-}llama/Llama{-}2{-}7b{-}hf"}\NormalTok{)}
 \NormalTok{model }\OperatorTok{=}\NormalTok{ PeftModel.from\_pretrained(model, }\StringTok{"my\_lora\_adapter"}\NormalTok{)}
 \NormalTok{model }\OperatorTok{=}\NormalTok{ model.merge\_and\_unload()  }\CommentTok{\# 合并后减少推理时的额外计算}
 \end{Highlighting}
@@ -1507,22 +1588,22 @@ LoRA 为什么能省这么多显存？关键在于\textbf{梯度和优化器状�
 优化器状态，不包含激活值、临时 buffer、梯度检查点策略和框架开销。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2216\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2161\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5622\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2237\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2081\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5682\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
-项目 & 全量微调（7B） & LoRA 微调（7B, \(r=16\)） \\
+项目 & 全量微调（7B） & LoRA 微调（7B，\(r=16\)） \\
 \midrule\noalign{}
-模型权重 & 14 GB (fp16) & 14 GB (fp16, 冻结) \\
+模型权重 & 14 GB（fp16） & 14 GB（fp16，冻结） \\
 可训练参数 & 7B & \textasciitilde40M（约 0.57\%，覆盖 Q/K/V/O + MLP，\(r=16\)） \\
-LoRA 参数本身 & - & \textasciitilde80 MB (fp16) \\
+LoRA 参数本身 & - & \textasciitilde80 MB（fp16） \\
 梯度 & 14 GB & \textasciitilde80 MB \\
-Adam 优化器状态 & 56 GB & \textasciitilde320 MB（两个 FP32 moment） \\
+Adam 优化器状态 & 56 GB & \textasciitilde320 MB（一阶 + 二阶两个 fp32 矩） \\
 \textbf{静态小计} & \textbf{\textasciitilde84 GB+} & \textbf{\textasciitilde14.5 GB+} \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
-真正训练时还要加上激活值和实现开销；如果使用混合精度 Adam 并额外保留
-fp32 master weights，全量微调还会再多一份权重拷贝。所以 24 GB
+真正训练时还要加上激活值和实现开销；如果使用混合精度 Adam 并额外保留一份
+fp32 主副本，全量微调还会再多一份权重拷贝。所以 24 GB
 显卡能否跑起来取决于 batch
 size、序列长度、梯度检查点、优化器实现和是否使用量化。但相比全量微调，LoRA
 最大的节省来自：不再为 7B 基座权重保存梯度和优化器状态。
@@ -1546,12 +1627,13 @@ size、序列长度、梯度检查点、优化器实现和是否使用量化。�
   \textbf{甜蜜点}：通常在 8\textasciitilde64 之间
 \end{itemize}
 
-不同任务对 \(r\) 的需求不同：
+不同任务对 \(r\)
+的需求不同。下面这张表是社区常见的起手档位，\textbf{不是论文结论}，真正的取值要用验证集扫出来：
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.4375\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1250\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3438\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
-任务类型 & 推荐 \(r\) & 理由 \\
+任务类型 & 起手 \(r\) & 理由 \\
 \midrule\noalign{}
 简单适配（格式、风格） & 4\textasciitilde16 & 变化量小，低秩就够 \\
 领域适配（医疗、法律） & 16\textasciitilde64 & 需要学习新知识 \\
@@ -1574,15 +1656,15 @@ size、序列长度、梯度检查点、优化器实现和是否使用量化。�
 \(\alpha = 16\)，然后只调 \(r\)。这样当 \(r\) 增大时，\(\alpha / r\)
 会自动减小，起到正则化的效果。
 
-原始 LoRA 论文并没有要求 \(\alpha\) 必须随 \(r\) 同比增长；QLoRA
-论文在一组实验中使用了 \(\alpha=16\)、\texttt{r=64}，并把 LoRA
+原始 LoRA 论文{[}1{]}并没有要求 \(\alpha\) 必须随 \(r\) 同比增长；QLoRA
+论文{[}2{]}在一组实验中使用了 \(\alpha=16\)、\(r=64\)，并把 LoRA
 加到所有线性层上。也就是说，\(r\)、\(\alpha\)
 和目标层覆盖范围要一起看：覆盖层数越多，单层所需的 rank 未必越高。
 
 \subsubsection{3.5.3 Dropout}\label{dropout}
 
 LoRA 通常在旁路分支中加一个 Dropout 层（常见实现是在输入进入 LoRA
-矩阵前做 dropout），防止过拟合。常见值是
+矩阵前做 Dropout），防止过拟合。常见值是
 0.05\textasciitilde0.1。数据量越少，Dropout 越重要。
 
 \subsubsection{3.5.4
@@ -1590,36 +1672,36 @@ LoRA 通常在旁路分支中加一个 Dropout 层（常见实现是在输入进
 
 把原始 LoRA 论文、QLoRA
 论文和一些第三方复现实验放在一起看，可以得到几条更稳妥的经验。第三方博客实验可以作为工程经验引用，但需要标注来源和实验边界。下面涉及
-Raschka 的结论均来自 Sebastian Raschka 的 \emph{Practical Tips for
-Finetuning LLMs Using LoRA}（2023），原文基于 LLaMA-2 7B、Alpaca/LIMA
-等设置做了多组实验。来源：\href{https://magazine.sebastianraschka.com/p/practical-tips-for-finetuning-llms}{Raschka,
-2023}
+Raschka 的结论均来自《Practical Tips for Finetuning LLMs Using
+LoRA》{[}11{]}，原文基于 LLaMA-2 7B、Alpaca/LIMA 等设置做了多组实验。
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  原始 LoRA 论文多数实验只在注意力层上做 LoRA，常用 \(W_q/W_v\)；QLoRA
-  论文则把 LoRA 加到所有线性层上，作为大模型指令微调的默认设置
+  原始 LoRA 论文{[}1{]}多数实验只在注意力层上做 LoRA，常用
+  \(W_q/W_v\)；QLoRA 论文{[}2{]}则把 LoRA
+  加到所有线性层上，作为大模型指令微调的默认设置
 \item
-  Rank 不是越大越稳定地更好。QLoRA 论文报告：当 LoRA
+  Rank 不是越大越稳定地更好。QLoRA 论文{[}2{]}报告：当 LoRA
   覆盖所有线性层时，最终效果和 rank 的关系并不强；Raschka
   的博客实验中也有高 rank 表现较好的案例，但这取决于模型、数据和训练预算
 \item
-  LoRA 应用位置很重要。Raschka 的博客实验建议把 LoRA
-  应用到所有层，而不只是 Key/Value
-  矩阵；但他也明确说明自己只比较了``Q/V''与``all
+  LoRA 应用位置很重要。Raschka 的博客实验{[}11{]}建议把 LoRA
+  应用到所有层，而不只是 Query/Value
+  那两个矩阵；但他也明确说明自己只比较了''Q/V''与''all
   layers''两个设置，其他组合没有系统穷举
 \item
-  QLoRA 的显存收益和速度代价都依赖实现。Raschka 的一次 LLaMA-2 7B
-  对比中，显存约从 21.3 GB 降到 14.2 GB，训练时间从 1.85 小时增加到 2.79
-  小时；按这组数字换算，显存省了约 33\%，训练时间多了约
-  51\%（与本节表格里``约 0.66× 相对吞吐''一致），但这不是一个固定规律
+  QLoRA 的显存收益和速度代价都依赖实现。Raschka{[}11{]} 的一次 LLaMA-2
+  7B 对比中，显存约从 21.3 GB 降到 14.2 GB，训练时间从 1.85 小时增加到
+  2.79 小时；按这组数字换算，显存省了约 33\%，训练时间多了约 51\%（与
+  3.6.5 节那张表里''约 0.66× 相对吞吐''一致），但这不是一个固定规律
 \item
-  优化器和学习率调度没有统一最佳。原始 LoRA 论文常用 AdamW + linear
-  decay；QLoRA 论文在指令微调实验中使用 constant schedule；Raschka
-  的博客实验观察到 cosine scheduler 对 SGD 的帮助更明显，对 Adam/AdamW
-  影响较小
+  优化器和学习率调度没有统一最佳。原始 LoRA 论文{[}1{]}常用 AdamW
+  配线性衰减（linear decay）；QLoRA
+  论文{[}2{]}在指令微调实验中使用常数调度（constant schedule）；Raschka
+  的博客实验{[}11{]}观察到余弦调度（cosine scheduler）对 SGD
+  的帮助更明显，对 Adam/AdamW 影响较小
 \item
   小数据指令微调中要谨慎增加
   epoch------训练过久更容易过拟合或削弱原模型能力
@@ -1656,20 +1738,26 @@ LoRA）的核心思想是：\textbf{既然基座模型是冻结的，我们可�
 
 }
 
-\caption{图：QLoRA 架构示意：4-bit 量化基座模型 + 高精度 LoRA 旁路}
+\caption{图：输入 \(x\) 分成两条支路------上支是冻结基座 \(W_0\)，标注为
+NF4 / 4-bit 存储、计算时反量化到 BF16；下支是 LoRA 旁路，标注为
+BF16/FP16 的 \(A\)、\(B\)
+矩阵，并注明''只有这里接收梯度''；两支输出相加得到
+\(h = W_0x + \frac{\alpha}{r}BAx\)。右下角另有一个分页优化器方框，用虚线指向
+LoRA 旁路，标注''显存峰值时 CPU 分页''}
 
 \end{figure}%
 
-上图展示了 QLoRA 的整体架构。基座模型以 4-bit NF4
-格式存储并保持冻结，前向传播时临时反量化到 BFloat16 参与计算；LoRA
-适配器作为并联旁路保留在 BFloat16/FP16 精度中训练，最终输出是基座分支和
-LoRA 分支的相加。
+图上要盯住的是两条分支各自处在什么精度：基座那条以 4-bit NF4
+躺在显存里、冻结不动，只在前向经过它时临时反量化到 bf16（另一种 16
+位半精度，动态范围比 fp16 宽得多，4.3.2 节展开）参与计算；LoRA
+那条旁路从头到尾都是
+bf16/fp16，因为它是唯一要接收梯度的部分。两条分支的输出最后相加------量化只发生在不训练的那一侧，这正是
+QLoRA 敢压到 4-bit 的底气。
 
 \subsubsection{3.6.2 QLoRA
 的三大技术创新}\label{qlora-ux7684ux4e09ux5927ux6280ux672fux521bux65b0}
 
-QLoRA 论文（Dettmers et al.,
-2023）提出了三个关键技术，每一个都值得深入理解。
+QLoRA 论文{[}2{]}提出了三个关键技术，每一个都值得深入理解。
 
 \paragraph{（1）创新一：4-bit
 NormalFloat（NF4）量化}\label{ux521bux65b0ux4e004-bit-normalfloatnf4ux91cfux5316}
@@ -1698,14 +1786,14 @@ NF4
 为什么 NF4 比 INT4 好？因为正态分布的权重大部分集中在零附近，NF4
 在零附近分配了更密集的量化级别，而在尾部（极端值）分配较少的级别。这样，\textbf{大多数权重的量化误差都很小}。
 
-QLoRA 论文从信息论角度说明：在权重近似服从正态分布的假设下，NF4
+QLoRA 论文{[}2{]}从信息论角度说明：在权重近似服从正态分布的假设下，NF4
 是非常合适的 4-bit 量化方案。
 
 \paragraph{（2）创新二：双重量化（Double
 Quantization）}\label{ux521bux65b0ux4e8cux53ccux91cdux91cfux5316double-quantization}
 
 量化过程需要为每个量化块存储一个缩放常数（scaling constant）。如果用
-FP32 存储这些常数，它们本身也会占用不少显存。
+fp32 存储这些常数，它们本身也会占用不少显存。
 
 双重量化的做法是：\textbf{对这些缩放常数再做一次量化}，用更低比特的表示来存储它们。
 
@@ -1714,10 +1802,10 @@ FP32 存储这些常数，它们本身也会占用不少显存。
 \begin{itemize}
 \tightlist
 \item
-  第一次量化：将 FP16 权重量化为 NF4，每 64 个权重共享一个 FP32 缩放常数
+  第一次量化：将 fp16 权重量化为 NF4，每 64 个权重共享一个 fp32 缩放常数
 \item
-  第二次量化：将这些 FP32 缩放常数量化为 8-bit floating point
-  表示（论文中记为 FP8），每 256 个缩放常数共享一个 FP32 二级缩放常数
+  第二次量化：将这些 fp32 缩放常数量化为 8-bit floating point
+  表示（论文中记为 FP8），每 256 个缩放常数共享一个 fp32 二级缩放常数
 \end{itemize}
 
 这额外节省了约 \textbf{0.37 bit/参数}。对于 65B 模型，这意味着节省约 3
@@ -1755,14 +1843,14 @@ CPU-GPU 数据传输延迟。
 \tightlist
 \item
   \textbf{加载模型}：将预训练权重以 NF4
-  格式加载（双重量化），显存占用约为 FP16 的 1/4
+  格式加载（双重量化），显存占用约为 fp16 的 1/4
 \item
-  \textbf{注入 LoRA}：在目标层添加 BFloat16 精度的 LoRA 旁路
+  \textbf{注入 LoRA}：在目标层添加 bf16 精度的 LoRA 旁路
 \item
-  \textbf{前向传播}：NF4 权重临时反量化为 BFloat16 → 与输入相乘 → 加上
-  LoRA 旁路输出
+  \textbf{前向传播}：NF4 权重临时反量化为 bf16 → 与输入相乘 → 加上 LoRA
+  旁路输出
 \item
-  \textbf{反向传播}：梯度只流过 LoRA 参数（BFloat16），基座模型不更新
+  \textbf{反向传播}：梯度只流过 LoRA 参数（bf16），基座模型不更新
 \item
   \textbf{优化器更新}：使用分页优化器更新 LoRA
   参数，显存不足时自动卸载到 CPU
@@ -1770,7 +1858,7 @@ CPU-GPU 数据传输延迟。
 
 下面的代码示例使用 \textbf{Hugging Face Transformers 的 bitsandbytes
 量化接口}，并通过 \texttt{BitsAndBytesConfig} 配置 4-bit NF4、双重量化和
-BF16 计算
+bf16 计算
 dtype。官方来源：\href{https://huggingface.co/docs/transformers/en/quantization/bitsandbytes}{Transformers
 bitsandbytes quantization
 guide}、\href{https://huggingface.co/docs/transformers/en/main_classes/quantization\#transformers.BitsAndBytesConfig}{Transformers
@@ -1785,11 +1873,11 @@ BitsAndBytesConfig API}。
 \NormalTok{    load\_in\_4bit}\OperatorTok{=}\VariableTok{True}\NormalTok{,}
 \NormalTok{    bnb\_4bit\_quant\_type}\OperatorTok{=}\StringTok{"nf4"}\NormalTok{,          }\CommentTok{\# 使用 NF4 量化}
 \NormalTok{    bnb\_4bit\_use\_double\_quant}\OperatorTok{=}\VariableTok{True}\NormalTok{,      }\CommentTok{\# 启用双重量化}
-\NormalTok{    bnb\_4bit\_compute\_dtype}\OperatorTok{=}\NormalTok{torch.bfloat16 }\CommentTok{\# 计算时用 BF16}
+\NormalTok{    bnb\_4bit\_compute\_dtype}\OperatorTok{=}\NormalTok{torch.bfloat16 }\CommentTok{\# 计算时用 bf16}
 \NormalTok{)}
 
 \NormalTok{model }\OperatorTok{=}\NormalTok{ AutoModelForCausalLM.from\_pretrained(}
-    \StringTok{"meta{-}llama/Llama{-}2{-}70b"}\NormalTok{,}
+    \StringTok{"meta{-}llama/Llama{-}2{-}70b{-}hf"}\NormalTok{,}
 \NormalTok{    quantization\_config}\OperatorTok{=}\NormalTok{bnb\_config}
 \NormalTok{)}
 \CommentTok{\# 然后像普通 LoRA 一样注入适配器并训练}
@@ -1801,37 +1889,42 @@ BitsAndBytesConfig API}。
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture12/files/qlora_memory.png}}
+{\centering \includegraphics[width=0.85\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/files/qlora_memory.png}
 
 }
 
-\caption{图：QLoRA 显存对比}
+\caption{图：基座模型权重显存的粗略对比，四根柱子分两组------7B 在 fp16
+下约 14 GB、压到 4-bit 后约 3.5 GB；65B 在 fp16 下约 130 GB、压到 4-bit
+后约 32.5 GB（本书自绘；四个数的来源是按 fp16 每参数 2 字节、4-bit
+每参数 0.5 字节直接折算）}
 
 \end{figure}%
 
-上图直观展示的是\textbf{基座模型权重}在不同精度下的显存占用。从 FP32 到
-FP16 减半，从 FP16 到 NF4 再减约 3/4。对于 70B 模型，仅权重显存可以从
-140 GB（FP16）降到约 35 GB（NF4）；再加上双重量化的额外节省，就给 LoRA
-参数、激活值和框架开销留下了空间。
+要注意这张图量的\textbf{只有基座权重那一块}，不含梯度、优化器状态和激活值。即便如此，落差已经很可观：65B
+那一组从约 130 GB 掉到约 32.5 GB，正好跨过单张 48 GB
+卡的容量线------本节后面那个''单卡微调
+65B''的结论，起点就是这一格。同样的账换成 3.6.1 节那个 70B 的例子，是从
+140 GB 降到约 35 GB；再加上双重量化省下的 0.37 bit/参数，才腾出了放 LoRA
+参数、激活值和框架开销的空间。
 
 如果把训练时的梯度、优化器状态和常见额外开销也纳入粗略估算，可以得到下面这种量级对比。注意这些数字不是硬件承诺，实际显存会随
 batch size、序列长度、梯度检查点和实现细节变化。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1260\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3078\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2868\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2795\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1267\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2877\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2963\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2893\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
-模型 & 全量微调（FP16）粗略训练显存 & LoRA（FP16 基座）粗略训练显存 & QLoRA（NF4 基座）粗略训练显存 \\
+模型 & 全量微调（fp16）粗略训练显存 & LoRA（fp16 基座）粗略训练显存 & QLoRA（NF4 基座）粗略训练显存 \\
 \midrule\noalign{}
 7B & \textasciitilde84 GB & \textasciitilde15 GB & \textasciitilde6 GB \\
 13B & \textasciitilde156 GB & \textasciitilde27 GB & \textasciitilde10 GB \\
 33B & \textasciitilde396 GB & \textasciitilde67 GB & \textasciitilde18 GB \\
-65B/70B & \textasciitilde780--840 GB & \textasciitilde140 GB & \textasciitilde36 GB \\
+65B/70B & \textsubscript{780}840 GB & \textasciitilde140 GB & \textasciitilde36 GB \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
-QLoRA 论文的标志性成果：\textbf{在单张 48 GB GPU 上微调 65B
-参数的模型}，这在之前是不可想象的。
+QLoRA 论文{[}2{]}的标志性成果就落在这张表的最后一行：\textbf{单张 48 GB
+的卡微调 65B 参数的模型}------同一个模型走全量微调要 780 GB 以上。
 
 \begin{figure}[H]
 
@@ -1839,53 +1932,59 @@ QLoRA 论文的标志性成果：\textbf{在单张 48 GB GPU 上微调 65B
 
 }
 
-\caption{图：标准微调、LoRA 与 QLoRA 对比}
+\caption{图：标准微调、LoRA、QLoRA
+三种方式的显存构成对照------基座权重、适配器与优化器状态各占多少、各处在什么精度}
 
 \end{figure}%
 
-上图对比了标准微调、LoRA 和 QLoRA 三种方式。图中的
-\texttt{Adapter\ (16-bit)} 指的是 LoRA 适配器参数，而不是传统 Adapter
-层。LoRA 保持基座模型为 FP16/BF16 精度，只训练低秩适配器；QLoRA
-进一步将基座模型量化为 4-bit，在尽量保持效果的同时大幅降低显存需求。
+三行摆在一起，能看清每一步省的是哪一块：标准微调整条都要训、都要存优化器状态；LoRA
+把基座那一大块冻在 fp16/bf16，只留一小条适配器可训；QLoRA
+再把已经冻住的那一大块压成 4-bit。图上的 \texttt{Adapter\ (16-bit)}
+指的是 LoRA 的低秩旁路，不是 1.3.3 节讲的传统 Adapter
+层------两者名字撞了，结构不是一回事。
 
 \subsubsection{3.6.5 QLoRA 的代价}\label{qlora-ux7684ux4ee3ux4ef7}
 
 QLoRA 不是免费的午餐，它有明确的代价：
 
 \textbf{训练速度通常会下降。} 每次前向传播都需要将 NF4 权重反量化为
-BFloat16，这个额外步骤会拖慢训练，但具体幅度取决于模型、batch
-size、kernel 实现和硬件。下面是一组第三方博客实验中的 LLaMA-2 7B
-对比数据，来源为 Raschka（2023）：
+bf16，这个额外步骤会拖慢训练，但具体幅度取决于模型、batch size、kernel
+实现和硬件。下面是一组第三方博客实验中的 LLaMA-2 7B 对比数据，来源为
+Raschka{[}11{]}：
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2969\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1406\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3281\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 配置 & 显存 & 训练时间 / 相对吞吐 \\
 \midrule\noalign{}
-LoRA（FP16 基座） & 21.3 GB & 1.85 小时 / 1.0x \\
+LoRA（fp16 基座） & 21.3 GB & 1.85 小时 / 1.0x \\
 QLoRA（NF4 基座） & 14.2 GB & 2.79 小时 / \textasciitilde0.66x \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
 \textbf{精度可能略有损失，但不是必然。} 量化本身会引入误差。NF4
-对近似正态分布的权重很友好，QLoRA 论文在多组实验中报告它能匹配 16-bit
-LoRA 或全量微调的效果；但在具体业务任务上，QLoRA 仍可能略逊于未量化
-LoRA，需要用验证集确认。
+对近似正态分布的权重很友好，QLoRA 论文{[}2{]}在多组实验中报告它能匹配
+16-bit LoRA 或全量微调的效果；但在具体业务任务上，QLoRA
+仍可能略逊于未量化 LoRA，需要用验证集确认。
 
-\textbf{经验法则：如果你的 GPU 显存够用 LoRA，优先用 LoRA
-可以减少量化带来的额外复杂度；如果显存不够，QLoRA
-是目前最常用、最成熟的替代方案之一。}
+\textbf{经验法则：显存够用 LoRA 就用
+LoRA，少一层量化就少一处不确定；显存不够再上
+QLoRA，它是这种情况下最成熟的一条退路。}
 
 \subsection{3.7 LoRA
 的变体与演进}\label{lora-ux7684ux53d8ux4f53ux4e0eux6f14ux8fdb}
 
 LoRA 自 2021
-年提出以来，研究者们发现了它的一些局限性，并提出了多种改进方案。通过低秩矩阵分解，将大矩阵的更新压缩为两个小矩阵的乘积，这个核心思想衍生出了多种变体；每种变体都针对
-LoRA 的某个具体局限性进行改进。
+年提出以来，陆续暴露出一些局限，也因此长出了一批变体。下面五个各针对一处：\(BA\)
+只管方向管不了幅度、所有层共用一个 \(r\)、\(A\) 与 \(B\)
+的更新步长不匹配、高秩时 \(\alpha/r\)
+把梯度压得太狠、以及零初始化让训练从头学起。
 
-本节提到的变体结论主要来自对应论文：DoRA（\href{https://arxiv.org/abs/2402.09353}{arXiv:2402.09353}）、AdaLoRA（\href{https://arxiv.org/abs/2303.10512}{arXiv:2303.10512}）、LoRA+（\href{https://arxiv.org/abs/2402.12354}{arXiv:2402.12354}）、rsLoRA（\href{https://arxiv.org/abs/2312.03732}{arXiv:2312.03732}）和
-PiSSA（\href{https://arxiv.org/abs/2404.02948}{arXiv:2404.02948}）。这些论文里的提升都发生在各自实验设置下，不能直接当作所有任务的固定收益。
+本节提到的变体结论分别来自
+DoRA{[}12{]}、AdaLoRA{[}13{]}、LoRA+{[}14{]}、rsLoRA{[}15{]} 和
+PiSSA{[}16{]}
+五篇论文。这些提升都发生在各自的实验设置下，不能直接当作所有任务的固定收益。
 
 \subsubsection{3.7.1
 DoRA：分解权重的幅度和方向}\label{doraux5206ux89e3ux6743ux91cdux7684ux5e45ux5ea6ux548cux65b9ux5411}
@@ -1904,7 +2003,7 @@ Adaptation）将权重矩阵分解为\textbf{幅度向量 \(m\)} 和\textbf{方�
 表示按列求范数，\(\odot\) 是逐元素乘法。LoRA 的 \(BA\)
 只负责更新方向，幅度由 \(m\) 单独控制。
 
-\textbf{效果如何？} DoRA 论文报告，在
+\textbf{效果如何？} DoRA 论文{[}12{]}报告，在
 LLM、视觉-语言模型和文本生成图像模型等多个测试设置中，DoRA 通常优于标准
 LoRA；但提升幅度依赖任务、rank
 和训练预算，实际项目中仍需要按任务和数据验证。
@@ -1918,7 +2017,7 @@ AdaLoRA：自适应分配秩}\label{adaloraux81eaux9002ux5e94ux5206ux914dux79e9}
 \textbf{怎么做的？} AdaLoRA
 在训练过程中\textbf{动态调整每一层的秩}。它通过监控每层的奇异值和损失敏感度，自动给重要的层分配更高的秩，给不重要的层降低秩，同时保持总参数量不变。
 
-\textbf{效果如何？} AdaLoRA 论文报告，在若干 NLU/NLG
+\textbf{效果如何？} AdaLoRA 论文{[}13{]}报告，在若干 NLU/NLG
 任务中，它能在相似参数预算下优于固定 rank 的
 LoRA。但它的收益来自动态秩分配和重要性评估，训练流程也更复杂。
 
@@ -1929,10 +2028,15 @@ LoRA+：不对称学习率}\label{loraux4e0dux5bf9ux79f0ux5b66ux4e60ux7387}
 使用相同的学习率，但由于 \(B\)
 初始化为零，它在训练初期需要更大的更新步长才能''追上'' \(A\)。
 
-\textbf{怎么做的？} LoRA+ 给矩阵 \(B\) 设置比 \(A\) 高 16 倍的学习率。
+\textbf{怎么做的？} LoRA+ 给 \(A\) 和 \(B\) 设不同的学习率，两者的比值
+\(\lambda = \eta_B / \eta_A\) 是要选的超参。这个比值没有万能取值：论文在
+RoBERTa 上找到的好取值在 16 量级，换到 LLaMA 上最优只剩
+2\textasciitilde4 量级。
 
 \textbf{效果如何？} LoRA+
-论文报告，在他们的理论分析和实验设置中，不对称学习率能改善收敛，并在部分任务上带来更快训练或更高准确率。这里的``加速''和``提升''不是通用常数，迁移到新任务时仍要调学习率比例。
+论文{[}14{]}报告，在他们的实验设置里不对称学习率改善了收敛，效果提升
+1\%\textasciitilde2\%、微调速度最高约 2
+倍，且不增加计算开销。这些幅度不是通用常数，换模型换任务都要重新扫这个比值。
 
 \subsubsection{3.7.4
 rsLoRA：秩稳定化缩放}\label{rsloraux79e9ux7a33ux5b9aux5316ux7f29ux653e}
@@ -1944,7 +2048,7 @@ rsLoRA：秩稳定化缩放}\label{rsloraux79e9ux7a33ux5b9aux5316ux7f29ux653e}
 \textbf{怎么做的？} rsLoRA 将缩放因子从 \(\alpha / r\) 改为
 \(\alpha / \sqrt{r}\)，保证不同秩下的梯度范数和输出范数保持稳定。
 
-\textbf{效果如何？} rsLoRA 论文报告，在较高 rank
+\textbf{效果如何？} rsLoRA 论文{[}15{]}报告，在较高 rank
 设置下，\(\alpha/\sqrt{r}\) 比 \(\alpha/r\) 更稳定，更容易发挥高 rank
 的容量。它主要适合你确实想用高 rank 的场景。
 
@@ -1965,7 +2069,7 @@ rsLoRA：秩稳定化缩放}\label{rsloraux79e9ux7a33ux5b9aux5316ux7f29ux653e}
 \(W_{residual}\)（而不是原始的 \(W_0\)）。
 
 \textbf{效果如何？} PiSSA
-论文报告，这种初始化通常能加速收敛，并在一些任务上优于标准
+论文{[}16{]}报告，这种初始化通常能加速收敛，并在一些任务上优于标准
 LoRA；代价是初始化阶段需要对目标权重做 SVD 或近似 SVD。
 
 \subsubsection{3.7.6
@@ -2003,7 +2107,8 @@ VLA（Vision-Language-Action）模型的微调场景天然适合 LoRA，原因�
 \tightlist
 \item
   \textbf{数据量小}：机器人操作轨迹的采集成本很高，通常只有几百到几千条。LoRA
-  的低参数量天然抗过拟合。
+  可训练参数少、容量受限，通常能压低过拟合风险------但不是免疫，1.3.4
+  节那条备注仍然成立。
 \item
   \textbf{模型大}：VLA 模型通常基于大型 VLM（如
   LLaMA-7B、Qwen-7B），全量微调的显存需求很高。
@@ -2016,12 +2121,12 @@ VLA（Vision-Language-Action）模型的微调场景天然适合 LoRA，原因�
 策略}\label{ux4e0dux540c-vla-ux6a21ux578bux7684-lora-ux7b56ux7565}
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1285\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2183\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2721\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3811\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1378\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2031\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3125\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3466\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
-模型 & 动作表示 & LoRA 应用位置 & 典型配置 \\
+模型 & 动作表示 & LoRA 应用位置 & 常见做法 \\
 \midrule\noalign{}
-\textbf{OpenVLA} & 离散动作 token & 语言模型骨干 & \(r=32\)，全层 LoRA \\
-\textbf{SmolVLA} & 连续动作（flow matching） & Action Expert / 语言骨干按需选择 & 小模型通常优先全量训练动作模块，必要时对 VLM 加 LoRA \\
+\textbf{OpenVLA}{[}7{]} & 离散动作 token & 论文把 LoRA 加到\textbf{所有线性层}上，不是只挂语言骨干 & 默认 \(r=32\)；论文实测 rank 取多少对最终成功率影响很小 \\
+\textbf{SmolVLA} & 连续动作（flow matching） & 动作专家 / 语言骨干按需选择 & 小模型通常优先全量训练动作模块，必要时对 VLM 加 LoRA \\
 \textbf{\(\pi_0\)} & 连续动作（flow matching） & 动作专家模块 & 任务特定适配 \\
 \textbf{GR00T N1} & 连续动作策略 & 多模态骨干 & 取决于任务和数据量 \\
 \bottomrule\noalign{}
@@ -2034,26 +2139,61 @@ VLA（Vision-Language-Action）模型的微调场景天然适合 LoRA，原因�
 \textbf{视觉编码器通常冻结。} 预训练的视觉编码器（如
 SigLIP、DINOv2）已经学到了很好的视觉表征，在小数据上微调容易过拟合。常见做法是完全冻结视觉编码器，或者用极小的学习率微调。
 
-\textbf{语言模型骨干用 LoRA。} 这是最常见的配置。对语言模型的注意力层和
-FFN 层加 LoRA，让模型学会将视觉-语言理解映射到动作输出。
+\textbf{骨干这一侧通常靠 LoRA 适配。} 对语言 / 多模态骨干的注意力层和
+FFN 层加
+LoRA，让模型学会把视觉-语言理解映射到动作输出。但''到底覆盖哪几层''各家差别很大------上表的
+OpenVLA 索性挂满所有线性层，3.9 节会看到 LeRobot 给 \(\pi_0\)
+的默认名单又是另一种选法。
 
-\textbf{动作头通常全量训练。} 对于连续动作 VLA，动作头（action head）或
-action expert
-通常是新增模块，参数量相对较小，常见做法是直接全量训练而不用 LoRA。对于
-OpenVLA 这类把动作离散化为 token 的模型，动作输出往往复用语言模型的
-token 预测头，不一定存在单独的 \texttt{action\_head}。
+\textbf{动作头通常全量训练。} 对于连续动作 VLA，动作头（action
+head）或动作专家通常是新增模块，参数量相对较小，常见做法是直接全量训练而不用
+LoRA。对于 OpenVLA 这类把动作离散化为 token
+的模型，动作输出往往复用语言模型的 token 预测头，不一定存在单独的
+\texttt{action\_head}。
 
-\subsection{\texorpdfstring{3.9 实验：用 LoRA 把 \(\pi_0\) 微调到
-SO-101}{3.9 实验：用 LoRA 把 \textbackslash pi\_0 微调到 SO-101}}\label{ux5b9eux9a8cux7528-lora-ux628a-pi_0-ux5faeux8c03ux5230-so-101}
+\subsection{\texorpdfstring{3.9 在 LeRobot 里给 \(\pi_0\) 挂
+LoRA}{3.9 在 LeRobot 里给 \textbackslash pi\_0 挂 LoRA}}\label{ux5728-lerobot-ux91ccux7ed9-pi_0-ux6302-lora}
 
-这同样是一个面向 SO-101 真机的实验：\(\pi_0\)
-体量大、全量微调成本高，正适合用
-LoRA------冻结视觉-语言骨干，只训练注意力 / FFN
-上的低秩旁路，配合动作专家对新机器人做适配。实验目标是在 SO-101
-上完成一条语言指令抓取（例如''把方块放进篮子''）------用前面采集到的轨迹做
-LoRA SFT，训练时看 loss 下降，再在机器人上跑 rollout
-看成功率。没有真机时，可以在 LIBERO 仿真里对 \(\pi_0\) 做同一套 LoRA
-微调，流程与口径完全一致。
+\(\pi_0\) 体量大、全量微调成本高，正是 LoRA
+的典型场景。好消息是不用自己写注入代码：LeRobot v0.5.1 已经把 PEFT
+接进了训练入口，2.3 节那条 \texttt{lerobot-train} 命令加几个
+\texttt{-\/-peft.*} 参数就切换成 LoRA 微调。
+
+命令面上只多三样东西：\texttt{-\/-policy.use\_peft=true}
+打开适配器路径，\texttt{-\/-peft.method\_type=LORA}
+选方法，\texttt{-\/-peft.r} 给秩（默认 16，正好落在 3.5.1
+节说的那个常用区间）。\textbf{注意 \texttt{use\_peft=true} 必须配
+\texttt{-\/-policy.path} 一起用}------LeRobot 明确拒绝''从零初始化 +
+挂适配器''这种组合，因为 LoRA 的前提就是有一个值得冻结的基座。
+
+真正值得读一眼的是 LoRA 挂在哪。LeRobot
+给每个策略预置了默认的注入位置，\texttt{lerobot/policies/pi0/modeling\_pi0.py}
+里 \(\pi_0\) 那份写成一个正则：
+
+\begin{verbatim}
+(.*\.gemma_expert\..*\.self_attn\.(q|v)_proj
+ |model\.(state_proj|action_in_proj|action_out_proj
+         |action_time_mlp_in|action_time_mlp_out))
+\end{verbatim}
+
+拆开看是两段。第一段是\textbf{动作专家内部注意力的 \(W_q\) 与
+\(W_v\)}------正好是 3.3.6 节说的、原始 LoRA
+论文最早验证的那两个投影矩阵；第二段是\textbf{状态与动作的几个投影层}。视觉塔和语言骨干整个不在名单里，一个适配器都不挂。SmolVLA
+的默认名单（\texttt{lerobot/policies/smolvla/modeling\_smolvla.py}）是同一个模子，只把第一段换成它自己的
+\texttt{lm\_expert}。
+
+3.8.3
+节说过''覆盖哪几层各家差别很大''，这份名单就是一个具体答案，而且答案有点反直觉：\textbf{LeRobot
+的默认配置并没有把 LoRA
+加到语言骨干上}，而是压在动作专家那一侧------毕竟需要适配到新机器人的是动作，不是语言理解。另外这两份默认配置都把
+\texttt{modules\_to\_save}
+设成空列表，也就是说连动作投影层都走低秩旁路、不做全参保存；想让某些新增层全参训练，得自己用
+\texttt{-\/-peft.full\_training\_modules} 指定。
+
+想改注入范围就覆盖它：\texttt{-\/-peft.target\_modules=\textquotesingle{}all-linear\textquotesingle{}}
+是把所有线性层都挂上（QLoRA
+论文{[}2{]}那套做法），也可以给一个自己的模块名列表。改完之后先确认可训练参数量确实降下来了------这是
+LoRA 有没有真正生效的最直接证据。
 
 \subsection{3.10 本节小结}\label{ux672cux8282ux5c0fux7ed3-2}
 
@@ -2062,42 +2202,59 @@ LoRA SFT，训练时看 loss 下降，再在机器人上跑 rollout
 \(\Delta W = \frac{\alpha}{r} BA\)
 把更新参数化成两个小矩阵------冻结原始权重、只训练 \(A\) 和
 \(B\)，可训练参数压到基座的 1\%
-以内，推理前还能把旁路合并回权重做到零额外开销；QLoRA 再叠加 NF4
-量化、双重量化、分页优化器三件套，把基座以 4-bit
+以内，推理前还能把旁路合并回权重、省掉运行时的额外分支（前提见 3.3.7
+节）；QLoRA 再叠加 NF4 量化、双重量化、分页优化器三件套，把基座以 4-bit
 装下，让大模型微调走进消费级硬件。
 
 \textbf{局限性：} 低秩是一种近似，当任务与预训练分布差异极大、或秩 \(r\)
 取得过低时，旁路的表达力可能不够，效果不及全量微调；而且
 \(r\)、\(\alpha\)、学习率都需要按任务调。QLoRA 用量化与 offload
-换显存，代价是一定的精度损失与训练变慢------显存够时优先用
+换显存，代价是训练变慢，精度则多出一层不确定（3.6.5
+节：可能略有损失，但不是必然，要用验证集确认）------显存够时优先用
 LoRA，显存紧张才上 QLoRA。具体怎么选，可对照下表：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3380\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2078\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4543\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2739\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1776\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5486\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 你的情况 & 推荐方法 & 理由 \\
 \midrule\noalign{}
-GPU 显存充足（\(\geq\) 24 GB for 7B） & LoRA & 训练更快，精度更高 \\
-GPU 显存有限（\textless24 GB for 7B） & QLoRA & 显存省 \textasciitilde40\%，精度损失很小 \\
+GPU 显存充足（7B 模型 \(\geq\) 24 GB） & LoRA & 训练更快，也少一层量化带来的不确定 \\
+GPU 显存有限（7B 模型不足 24 GB） & QLoRA & 3.6.5 节那组对照里显存降了约三分之一，代价是训练变慢、精度需用验证集确认 \\
 想微调 33B+ 模型，单卡 & QLoRA & 通常是最现实的方案 \\
 想进一步提高效果 & LoRA + DoRA & 多个实验设置中优于标准 LoRA，但要按任务验证 \\
 高秩设置（\(r \geq 64\)） & LoRA + rsLoRA & 避免高秩时的学习率衰减 \\
-VLA 小数据微调 & LoRA（\(r=16\sim32\)） & 抗过拟合，保留预训练能力 \\
+VLA 小数据微调 & LoRA（\(r=16\sim32\)） & 过拟合风险低，也保留预训练能力 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
 \textbf{一句话总结：} LoRA
-是当前大模型微调中非常常用的默认选择。理解了它的低秩分解原理和超参数调优方法，你就掌握了大模型微调的一项核心技术。QLoRA
-在此基础上通过量化进一步降低了硬件门槛，让更多普通硬件也能参与大模型微调。
+用一对小矩阵接管了''微调该改什么''，把可训练参数压到基座的百分之一量级，QLoRA
+再用量化把基座本身塞进消费级显存；落到 LeRobot 上，这一整套只是
+\texttt{lerobot-train} 后面多挂几个 \texttt{-\/-peft.*}
+参数，而值得你花时间的是\textbf{看清适配器被挂在了哪几层}。
 
 \section{4 多卡训练指南}\label{ux591aux5361ux8badux7ec3ux6307ux5357}
 
 第 2、3 节把 VLA 微调到了自己的机器人上。小模型全量微调、或者给大模型挂
 LoRA，单张卡大多还扛得住；可一旦要全量微调 \(\pi_0\) 这种 3B
-量级、甚至更大的
-VLA，单卡就会直接撞墙。这一节把多卡训练从头讲到尾：先算清训练显存被谁吃掉，再依次讲数据并行、省显存四件套、ZeRO/FSDP
+量级、甚至更大的 VLA，单卡立刻开始吃紧------2.3
+节那个真机微调脚本默认还是单卡在训 \(\pi_0\)，代价是权重压到
+bf16、批量只敢给
+8；想把批量放大、想再换大一档的模型，或者手上的卡再小一号，就会直接撞墙。这一节把多卡训练从头讲到尾：先算清训练显存被谁吃掉，再依次讲数据并行、省显存四件套、ZeRO/FSDP
 分片、模型并行，最后落到双卡实战。
+
+\textbf{先说清这一节的定位和读法。}
+它是本讲篇幅最大的一节，接近全讲的三分之一，而且到 4.6
+节之前讲的都是\textbf{与 VLA 无关的通用分布式训练知识}------同一套
+DDP、ZeRO、FSDP，训语言模型、训视觉模型、训 VLA
+完全一样。这么安排是有意的：全量微调 \(\pi_0\)
+是本书第一次真正撞上显存墙，而撞墙之后要用的那套工具与 VLA
+本身无关，索性在这里一次讲透。相应地，读法可以分两种------\textbf{只想把
+\(\pi_0\) 在两张卡上跑起来的，直接跳到 4.6 节}，那里是完整的
+\texttt{accelerate\ launch}
+命令和必须手动处理的坑；\textbf{想搞懂命令背后每个参数在做什么的}，从
+4.1 节的显存账本按顺序读下来。
 
 \subsection{4.1
 多卡训练总览与显存账本}\label{ux591aux5361ux8badux7ec3ux603bux89c8ux4e0eux663eux5b58ux8d26ux672c}
@@ -2105,7 +2262,7 @@ VLA，单卡就会直接撞墙。这一节把多卡训练从头讲到尾：先�
 \subsubsection{4.1.1
 开篇：为什么要专门讲多卡训练}\label{ux5f00ux7bc7ux4e3aux4ec0ux4e48ux8981ux4e13ux95e8ux8bb2ux591aux5361ux8badux7ec3}
 
-前面几个多卡训练里，我们训练的策略大多还能塞进一张卡：BC、ACT、扩散策略，参数量从几百万到几千万，单张消费级显卡轻松拿下。但
+到目前为止，本书训过的策略大多还能塞进一张卡：行为克隆、ACT、扩散策略（第10讲）的参数量从几百万到几千万，单张消费级显卡轻松拿下。但
 VLA 这条线一路走下来，模型越做越大：
 
 \begin{itemize}
@@ -2113,10 +2270,10 @@ VLA 这条线一路走下来，模型越做越大：
 \item
   \textbf{OpenVLA} 直接把一个 7B 的视觉-语言主干当骨架；
 \item
-  \textbf{\(\pi_0\)} 这一代流匹配策略，主干带上 VLM 后参数量也到了 3B
-  量级；
+  \textbf{\(\pi_0\)} 这一代 flow matching 策略，主干带上 VLM
+  后参数量也到了 3B 量级；
 \item
-  \textbf{GR00T} 这类通用人形基础模型，规模还在继续往上走。
+  \textbf{GR00T N1} 这类通用人形基础模型，规模还在继续往上走。
 \end{itemize}
 
 模型一旦跨过某个体量，单卡训练就会撞上两堵墙：
@@ -2189,7 +2346,16 @@ GB 的模型绰绰有余。
 \end{center}
 
 也就是说，混合精度 + Adam 下，\textbf{每个参数要占 \(2+2+12 = 16\)
-字节}。这正是 ZeRO 论文里反复用的那个''16 字节/参数''基准账本。
+字节}。这正是 ZeRO 论文{[}17{]}里反复用的那个''16 字节/参数''基准账本。
+
+\begin{quote}
+备注（\textbf{和 3.1.1 节的口径对一下}）：3.1.1 与 3.4.2 节那两张表把 7B
+的优化器状态记作 56 GB，这里记作 84 GB，差的正是\textbf{那份 fp32
+参数主副本}。那两张表只算了 Adam 的两个 fp32 矩（\(8\) 字节/参数
+\(\times\) 7B = 56 GB），本节按 ZeRO
+论文的完整口径把主副本也算进来（\(12\) 字节/参数 \(\times\) 7B = 84
+GB）。两个数都对，只是口径不同；本节之后一律用 16 字节/参数这套账。
+\end{quote}
 
 代入 7B：
 
@@ -2208,8 +2374,8 @@ GB 的模型绰绰有余。
 注意这 \textbf{112 GB
 还不包含激活值}------激活值随批量和序列长度另算，叠上去只会更多。
 
-\paragraph{（3）为什么 24G / 40G
-的卡轻易就爆}\label{ux4e3aux4ec0ux4e48-24g-40g-ux7684ux5361ux8f7bux6613ux5c31ux7206}
+\paragraph{（3）为什么 24 GB / 40 GB
+的卡轻易就爆}\label{ux4e3aux4ec0ux4e48-24-gb-40-gb-ux7684ux5361ux8f7bux6613ux5c31ux7206}
 
 把这个数字摆到常见显卡边上，结论一目了然：
 
@@ -2240,7 +2406,7 @@ GB）}------它一个人就占了大头。这也解释了为什么后面省显�
 \paragraph{（1）数据并行：复制模型，切分数据}\label{ux6570ux636eux5e76ux884cux590dux5236ux6a21ux578bux5207ux5206ux6570ux636e}
 
 第一条轴叫\textbf{数据并行（data
-parallelism）}。思路非常朴素：每张卡上放一份\textbf{完整的模型副本}，把一个大批量的数据\textbf{切成几份}，每张卡各算一份，最后把各卡的梯度汇总（all-reduce）对齐，保证所有副本始终一致。
+parallelism）}{[}18{]}。思路非常朴素：每张卡上放一份\textbf{完整的模型副本}，把一个大批量的数据\textbf{切成几份}，每张卡各算一份，最后把各卡的梯度汇总（all-reduce）对齐，保证所有副本始终一致。
 
 \begin{figure}[H]
 
@@ -2265,12 +2431,12 @@ Copy），数据集被切成若干份分别喂给不同的卡，各卡独立算�
   N 遍。
 \end{itemize}
 
-换句话说，数据并行解决的是''太慢''那堵墙，\textbf{对''放不下''那堵墙毫无帮助}。
+所以它只拆得动''太慢''那堵墙；``放不下''那堵墙原封不动。
 
 \paragraph{（2）模型并行：切分模型本身}\label{ux6a21ux578bux5e76ux884cux5207ux5206ux6a21ux578bux672cux8eab}
 
 第二条轴叫\textbf{模型并行（model
-parallelism）}。当一份模型副本本身就装不进一张卡时，数据并行无能为力，这时只能把\textbf{模型本身切开}，不同部分放到不同卡上。
+parallelism）}{[}18{]}。当一份模型副本本身就装不进一张卡时，数据并行无能为力，这时只能把\textbf{模型本身切开}，不同部分放到不同卡上。
 
 切法又分两种（后面会细讲）：
 
@@ -2309,7 +2475,7 @@ N 份------这其实是巨大的浪费：明明有 N 张卡，同一份优化器
 \textbf{ZeRO / FSDP}
 做的就是把这份浪费切掉：它仍然站在\textbf{数据并行这条轴上}（每张卡还是处理不同的数据），但不再让每张卡都存完整的一份，而是把参数、梯度、优化器状态\textbf{沿数据并行的若干张卡切开分摊}，用到哪片临时聚合哪片。于是它既保留了数据并行''切数据、易扩展''的好处，又把''复制掉的显存''省了回来------相当于在数据并行轴上，顺手解决了一部分''放不下''。这一块是后面
 4.4
-的主角，这里只先把它在地图上的位置钉住：\textbf{它不是第三条轴，而是数据并行轴上的省显存升级。}
+节的主角，这里只先把它在地图上的位置钉住：\textbf{它不是第三条轴，而是数据并行轴上的省显存升级。}
 
 \subsubsection{4.1.4
 全景地图：后面几节在讲什么}\label{ux5168ux666fux5730ux56feux540eux9762ux51e0ux8282ux5728ux8bb2ux4ec0ux4e48}
@@ -2318,15 +2484,15 @@ N 份------这其实是巨大的浪费：明明有 N 张卡，同一份优化器
 两条并行轴''这套坐标，多卡训练这一节的结构就清晰了。后面每一节，都是在这张地图上解决一个具体问题：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1569\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.8431\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1418\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.8582\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
-讲次 & 在地图上的位置 \\
+小节 & 在地图上的位置 \\
 \midrule\noalign{}
 4.2 DDP & 数据并行轴的标准实现。让多卡同时跑、把吞吐拉满，但\textbf{不省显存}------专门打''太慢''那堵墙。 \\
 4.3 省显存四件套 & 不切模型、不加卡，直接对四类吃货下手：混合精度（压参数/激活）、梯度累积（小批量换大批量）、梯度检查点（用算力换激活值显存）、offload（把状态挪到 CPU/内存）。 \\
 4.4 ZeRO / FSDP & 数据并行轴上的分片升级。把复制掉的参数、梯度、优化器状态切开分摊到各卡，省回第 4.1.2 小节里那 84 GB 的大头。 \\
 4.5 张量 / 流水线并行 & 模型并行轴。当一份模型副本本身都装不下时，把模型横切（张量并行）或纵切（流水线并行）。属于进阶与边界情形。 \\
-4.6 双卡实战 & 把上面这些落到实操：用真实的启动方式（torchrun）和训练框架开关，在两张卡上把一次完整训练真正跑起来。 \\
+4.6 双卡实战 & 把上面这些落到实操：先讲通用启动器 \texttt{torchrun}，再落到 LeRobot 真正用的 \texttt{accelerate\ launch}，在两张卡上把一次完整训练跑起来。 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -2370,12 +2536,6 @@ ZeRO / FSDP 的定位 & 数据并行轴上的状态分片，省回复制掉的�
 \end{tabular}
 \end{center}
 
-\paragraph{（3）接下来：从地图走向实操}\label{ux63a5ux4e0bux6765ux4eceux5730ux56feux8d70ux5411ux5b9eux64cd}
-
-这张地图先把''显存被谁吃、并行走哪条轴''两件事讲清。接下来 4.2
-会从最常用、最基础的一格出发------数据并行的标准实现
-DDP，看清楚多卡是怎么各算各的、又怎么把梯度对齐同步的；它只解决''太慢''、不解决''放不下''，正好为后面省显存和切模型的几节留出问题。
-
 \begin{quote}
 一句话总结：训练显存被参数、梯度、优化器状态、激活值四类吃掉，优化器状态是大头、7B
 仅前三类就要 112
@@ -2413,7 +2573,7 @@ GB；多卡训练沿''数据并行（省时间）``和''模型并行（攻放不
 \subsubsection{4.2.2 老 DataParallel
 的死穴}\label{ux8001-dataparallel-ux7684ux6b7bux7a74}
 
-PyTorch 早期提供过一个非常好用的接口：把模型包一层
+PyTorch 早期提供过一个非常好用的接口{[}19{]}：把模型包一层
 \texttt{nn.DataParallel}，一行代码就能多卡训练，不用改其它任何东西。好用归好用，它有几个结构性的毛病，重到今天官方文档明确建议\textbf{即使单机多卡也别再用它}。
 
 \paragraph{（1）单进程多线程，被 GIL
@@ -2541,7 +2701,7 @@ N 倍。
 小节批判过的瓶颈：中心卡要接收其它所有卡的数据，再把结果发给所有卡，它的通信量随卡数线性增长，又一次成了独木桥。卡越多，这张中心卡越堵。我们好不容易用多进程去掉了主卡，可不能在通信这一步又把它请回来。
 
 需要一种\textbf{没有中心、负载均摊}的做法。这就是
-\textbf{ring-allreduce（环形全规约）}。
+\textbf{ring-allreduce（环形全规约）}{[}20{]}。
 
 \paragraph{（3）ring-allreduce：环形传递，带宽友好}\label{ring-allreduceux73afux5f62ux4f20ux9012ux5e26ux5bbdux53cbux597d}
 
@@ -2614,7 +2774,7 @@ all-reduce 把它们同步掉。
 \paragraph{（2）分桶 +
 重叠：一边算一边传}\label{ux5206ux6876-ux91cdux53e0ux4e00ux8fb9ux7b97ux4e00ux8fb9ux4f20}
 
-DDP 的做法是把两件事\textbf{重叠}起来：
+DDP 的做法是把两件事\textbf{重叠}起来{[}19{]}：
 
 \begin{itemize}
 \tightlist
@@ -2639,13 +2799,14 @@ all-reduce，与此同时反向还在继续计算更靠前的层的梯度。计�
 
 直觉上，理想情况下当最后一个桶（最靠前那些层的梯度）也算完时，前面那些桶的
 all-reduce
-已经基本传完了。整场梯度同步的时间，被尽可能多地塞进了反向计算的缝隙里，几乎不额外占用
-wall-clock 时间。这就是 DDP 能做到''多卡近线性加速''的工程底气。
+已经基本传完了。整场梯度同步的时间，被尽可能多地塞进了反向计算的缝隙里，几乎不额外占用墙钟时间。这就是
+DDP 能做到''多卡近线性加速''的工程底气。
 
 \begin{quote}
 备注：桶的大小是个权衡------桶太小，发起的 all-reduce
 次数多、每次启动有固定开销；桶太大，又要等很久才凑齐一桶、重叠的机会变少。框架给了默认桶大小（PyTorch
-默认 25 MB 量级），一般不用手动调。
+的 \texttt{DistributedDataParallel} 默认 25
+MB{[}19{]}），一般不用手动调。
 \end{quote}
 
 \subsubsection{4.2.6 DDP
@@ -2686,9 +2847,7 @@ DDP
   白白复制掉的显存省回来。
 \end{itemize}
 
-换句话说，DDP
-是数据并行轴上最干净、最基础的一格；省显存的两条路，都是从''DDP
-只提速不省显存''这个缺口长出来的。
+省显存的两条路，都是从''DDP 只提速不省显存''这个缺口长出来的。
 
 \subsubsection{4.2.7 小结}\label{ux5c0fux7ed3-1}
 
@@ -2736,13 +2895,6 @@ DDP 的定位 & 数据并行轴；只攻''太慢''，每卡仍存整份状态、
 \end{tabular}
 \end{center}
 
-\paragraph{（3）接下来：从提速走向省显存}\label{ux63a5ux4e0bux6765ux4eceux63d0ux901fux8d70ux5411ux7701ux663eux5b58}
-
-DDP
-把''太慢''这堵墙拆得很干净，但它也把''放不下''原封不动地留在了那里------每张卡照样得扛下完整的一份参数、梯度、优化器状态。接下来两讲就顺着这个缺口走：4.3
-不加卡、不切模型，直接压缩单卡的四类显存吃货；4.4 则把 DDP 里复制了 N
-遍的状态沿各卡切开分摊，在数据并行轴上把省显存这件事做到底。
-
 \begin{quote}
 一句话总结：DDP 用''每卡一进程、各持完整副本、各算数据子集、再用
 ring-allreduce
@@ -2761,15 +2913,13 @@ ZeRO/FSDP。
 ring-allreduce
 把梯度对齐------多卡近线性提速。但它的边界也钉得很死：每张卡都要原样存下整份参数、梯度、优化器状态，\textbf{只提速，不省显存}。
 
-这就留下一个尴尬的处境：如果一份完整副本本身就塞不进单卡，DDP
-一点忙都帮不上------你加再多卡，每张卡的显存压力都纹丝不动。换句话说，DDP
-攻的是''太慢''那堵墙，对''放不下''那堵墙束手无策。
+这就留下一个尴尬的处境：如果一份完整副本本身就塞不进单卡，加再多卡也没用------每张卡的显存压力纹丝不动。
 
 那''放不下''怎么办？一条路是把模型切开摊到多卡上（后面 4.4、4.5
-的活）；但在动用多卡分片这种重武器之前，还有一整套\textbf{单卡就能用、每张卡都能用}的省显存工具，门槛低、即插即用，往往先把它们用满，问题就解决了一大半。这一节讲的就是这套工具箱里最常用的四件------\textbf{混合精度、梯度累积、梯度检查点、offload}。
+两节的活）；但在动用多卡分片这种重武器之前，还有一整套\textbf{单卡就能用、每张卡都能用}的省显存工具，门槛低、即插即用，往往先把它们用满，问题就解决了一大半。这一节讲的就是这套工具箱里最常用的四件------\textbf{混合精度、梯度累积、梯度检查点、offload}。
 
 为什么是这四件、它们各自管用在哪？还是回到 4.1
-立下的那本\textbf{显存账本}。训练显存有四类吃货：
+节立下的那本\textbf{显存账本}。训练显存有四类吃货：
 
 \begin{itemize}
 \tightlist
@@ -2815,8 +2965,8 @@ GPU 的半精度算力，又快又省。
 
 \end{figure}%
 
-看上图 fp16 那一行：它的指数只有 5 位，能表示的最小正数大约到
-\(6\times10^{-8}\)。训练里有两个地方会撞上这个下限：
+指数位宽决定的是\textbf{能表示多小}，而训练里恰好有两个地方会撞上 fp16
+那个 \(6\times10^{-8}\) 的下限：
 
 \begin{itemize}
 \tightlist
@@ -2846,10 +2996,9 @@ fp16''，而是\textbf{该用低精度的地方用低精度、该保高精度的
   下做。这一步既省下激活值的显存（激活以半精度存，体积对折），又用上 GPU
   的半精度算力，是省与快的主要来源。
 \item
-  \textbf{保留一份 fp32 主权重}：优化器手里始终攥着一份 fp32
-  的参数主副本（master
-  copy）。每一步参数更新都作用在这份高精度副本上，半精度副本只是从它派生出来供前向用。这样''微小更新被尾数吃掉''的问题就被挡在
-  fp32 这一侧------这正是 4.1 账本里那份 fp32 主副本的来历。
+  \textbf{保留一份 fp32 主副本（master
+  copy）}：优化器手里始终攥着一份高精度的参数副本，每一步参数更新都作用在它身上，半精度副本只是从它派生出来供前向用。这样''微小更新被尾数吃掉''的问题就被挡在
+  fp32 这一侧------这正是 4.1 节账本里那份 fp32 主副本的来历。
 \item
   \textbf{loss scaling（损失缩放）对付下溢}：这是专门治 fp16
   小梯度下溢的巧招。
@@ -2867,7 +3016,7 @@ loss scaling 的直觉很简单。既然小梯度会下溢到
 \begin{quote}
 备注：这里要分清''精度''和''范围''两件事。loss scaling
 解决的是\textbf{范围}问题（小梯度别下溢到 0），不是精度问题；fp32
-主权重解决的是\textbf{精度}问题（微小更新别被尾数吃掉）。两件事分别由两个机制兜住，缺一不可。
+主副本解决的是\textbf{精度}问题（微小更新别被尾数吃掉）。两件事分别由两个机制兜住，缺一不可。
 \end{quote}
 
 \paragraph{（3）bf16：用精度换范围，省掉 loss
@@ -2875,7 +3024,7 @@ scaling}\label{bf16ux7528ux7cbeux5ea6ux6362ux8303ux56f4ux7701ux6389-loss-scaling
 
 fp16
 的麻烦根子在于范围太窄。于是有了另一种半精度格式------\textbf{bf16（bfloat16，Brain
-Floating Point）}，它换了个权衡思路。
+Floating Point）}{[}21{]}，它换了个权衡思路。
 
 回到上面那张图最下面一行：bf16 同样是 16 位、同样每个数 2
 字节，但它把位宽\textbf{重新分配}了------保留\textbf{完整的 8
@@ -2953,7 +3102,7 @@ all-reduce，攒到要更新那一步再同步，免得白费通信。
 梯度检查点：反向时按需重算激活}\label{ux68afux5ea6ux68c0ux67e5ux70b9ux53cdux5411ux65f6ux6309ux9700ux91cdux7b97ux6fc0ux6d3b}
 
 第三件，\textbf{梯度检查点（gradient checkpointing，也叫 activation
-checkpointing）}，直接冲着激活值这块最大的可压缩项下手，思路是\textbf{用算力换显存}。
+checkpointing）}{[}22{]}，直接冲着激活值这块最大的可压缩项下手，思路是\textbf{用算力换显存}。
 
 \paragraph{（1）激活为什么非存不可}\label{ux6fc0ux6d3bux4e3aux4ec0ux4e48ux975eux5b58ux4e0dux53ef}
 
@@ -2968,6 +3117,8 @@ checkpointing）}，直接冲着激活值这块最大的可压缩项下手，思
 \caption{图：梯度检查点的前向计算图：一条很长的前向链上，绝大多数中间节点的激活都不保存，只在少数选定的''检查点（checkpoint，图中双圈节点）``处保留激活。其余节点的激活在前向阶段算完即丢，等反向需要时再临时重算}
 
 \end{figure}%
+
+图上那条长链就是一次前向：每个节点是一层的中间输出。标准训练里这一整条都得留着等反向来取，链有多长、显存就压多少。图里只有双圈那几个节点是被保留的检查点，其余单圈节点算完就丢------\textbf{丢掉的部分才是这一招省下来的显存}。
 
 \paragraph{（2）只存少量检查点，其余反向时重算}\label{ux53eaux5b58ux5c11ux91cfux68c0ux67e5ux70b9ux5176ux4f59ux53cdux5411ux65f6ux91cdux7b97}
 
@@ -2990,9 +3141,10 @@ checkpointing）}，直接冲着激活值这块最大的可压缩项下手，思
 
 代价一目了然：\textbf{多做了一遍（局部的）前向计算}。省显存靠的就是''不全程存激活，需要时重算''，重算就是额外的算力开销。
 
-\paragraph{（3）√N 的甜点}\label{n-ux7684ux751cux70b9}
+\paragraph{\texorpdfstring{（3）\(\sqrt{N}\)
+的甜点}{（3）\textbackslash sqrt\{N\} 的甜点}}\label{sqrtn-ux7684ux751cux70b9}
 
-那省多少、亏多少？有一个很经典的结论：如果把一个 N 层（或 N
+那省多少、亏多少？有一个很经典的结论{[}22{]}：如果把一个 N 层（或 N
 段）的网络，\textbf{每隔 \(\sqrt{N}\)
 层放一个检查点}，可以把激活的显存占用从正比于 \(N\) 压到正比于
 \(\sqrt{N}\)，而额外的前向重算大约只多花一倍前向的算力。
@@ -3014,7 +3166,7 @@ block 包一层 checkpoint），是把单卡能塞下的模型做大的常用手
 offload：把暂时不用的搬下卡}\label{cpu-nvme-offloadux628aux6682ux65f6ux4e0dux7528ux7684ux642cux4e0bux5361}
 
 前面三件，混合精度和梯度检查点主要压\textbf{激活}，梯度累积压\textbf{激活峰值}。但
-4.1 那本账里最大的一块------\textbf{优化器状态（84 GB
+4.1 节那本账里最大的一块------\textbf{优化器状态（84 GB
 那个大头）}和参数本身，前三件几乎没碰。第四件 \textbf{offload（卸载）}
 就是冲着它们去的。
 
@@ -3054,7 +3206,7 @@ CPU/盘之间来回搬，会拖慢每一步训练。所以 offload
 \begin{quote}
 备注：offload
 解决的是优化器状态/参数''放不下''，靠的是把它们挪出显存------这和后面
-4.4 ZeRO
+4.4 节 ZeRO
 的思路（把这些状态沿多卡切开分摊）其实是同一类问题的两种解法：一个往\textbf{纵向}挪（搬到
 CPU/盘），一个往\textbf{横向}切（分摊到多卡）。事实上 offload 正是
 DeepSpeed ZeRO 体系里的一个组成部分（ZeRO-Offload /
@@ -3069,7 +3221,7 @@ PCIe / 盘的搬运带宽。
 四件套对账：各打哪类吃货}\label{ux56dbux4ef6ux5957ux5bf9ux8d26ux5404ux6253ux54eaux7c7bux5403ux8d27}
 
 把四件套放回 4.1
-的显存账本上，每一件的''打击目标''和''代价''就一清二楚了：
+节的显存账本上，每一件的''打击目标''和''代价''就一清二楚了：
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2202\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2955\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4844\linewidth - 2\tabcolsep\relax}@{}}
@@ -3093,7 +3245,7 @@ offload，是把单卡能塞下的模型做到最大的常规组合拳。它们�
 盘带宽就成了瓶颈，慢到不可接受。当一份完整副本里的参数、梯度、优化器状态实在大到连''挪''都挪不动时，就该换思路了------既然有
 N
 张卡，与其每张都存一整份再各自想办法压，不如干脆把这一整份\textbf{沿多卡切开分摊}，谁都不存全份。这正是下一节
-4.4 \textbf{ZeRO / FSDP} 的主场；而 offload
+\textbf{ZeRO / FSDP} 的主场；而 offload
 把状态''往卡外挪''的思路，也会作为 ZeRO
 的一个组成部分，在那里和''沿卡切开''合流。
 
@@ -3103,12 +3255,12 @@ N
 
 DDP
 只提速不省显存，于是这一节转向\textbf{单卡、每卡都能用}的四件省显存工具，逐个对着
-4.1 那四类显存吃货下手：
+4.1 节那四类显存吃货下手：
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{混合精度 AMP}：前向反向用 fp16/bf16 算、保留 fp32 主权重、用
+  \textbf{混合精度 AMP}：前向反向用 fp16/bf16 算、保留 fp32 主副本、用
   loss scaling 防小梯度下溢；bf16 用精度换范围、通常省掉 loss
   scaling。主要压\textbf{激活}与计算精度。
 \item
@@ -3134,7 +3286,7 @@ DDP
 维度 & 要点 \\
 \midrule\noalign{}
 四件套共同特点 & 不切模型、不靠多卡，单卡/每卡原地可用，可层层叠加 \\
-混合精度 AMP & 半精度算 + fp32 主权重 + loss scaling；范围归 loss scaling、精度归主副本 \\
+混合精度 AMP & 半精度算 + fp32 主副本 + loss scaling；范围归 loss scaling、精度归主副本 \\
 fp16 vs bf16 & fp16 范围窄需 loss scaling；bf16 范围同 fp32、通常免 loss scaling，但要新硬件 \\
 梯度累积 & 累积 N 步再 step，等效大批量；峰值由单个小批量决定，省激活峰值、费时间 \\
 梯度检查点 & 前向存少量检查点、反向重算；\(\sqrt N\) 布点→激活降到 \(\sqrt N\)、多约一遍前向 \\
@@ -3144,17 +3296,9 @@ offload & 优化器状态/参数搬到 CPU/NVMe、用到再取回；省显存大
 \end{tabular}
 \end{center}
 
-\paragraph{（3）通向沿卡切开}\label{ux901aux5411ux6cbfux5361ux5207ux5f00}
-
-四件套把单卡能榨的显存基本榨干了：激活换成低精度、换成峰值、换成重算，优化器状态搬下了卡。但它们始终绕着一个事实------每张卡上仍然假设要\textbf{存得下一整份状态}，只是想办法把这一整份压小、挪开。当这一整份大到连压带挪都顶不住时，唯一的出路是承认''一张卡就是存不下完整一份''，转而让
-N 张卡\textbf{各存一部分}。接下来 4.4 的 ZeRO / FSDP，就是把 DDP
-里复制了 N
-遍的参数、梯度、优化器状态沿数据并行的各卡切开分摊，把省显存这件事从单卡做到多卡；其中''用到再取回''的搬运思路，也会以
-offload 的形式回到那张全景图里。
-
 \begin{quote}
 一句话总结：省显存四件套不切模型、不加卡，逐个击破四类显存吃货------混合精度（半精度算+fp32
-主权重+loss
+主副本+loss
 scaling，压激活与精度）、梯度累积（小批量凑大批量，压激活峰值）、梯度检查点（反向重算，\(\sqrt N\)
 换激活）、offload（优化器状态/参数搬下卡，换带宽），可层层叠加用满单卡，再大就交给下一节沿多卡切开的
 ZeRO/FSDP。
@@ -3184,7 +3328,7 @@ ring-allreduce
   梯度：all-reduce 之后人手一份相同的平均梯度，还是复制了 N 遍。
 \end{itemize}
 
-也就是说，4.1 那笔''7B 模型前三类就要 112 GB''的账，DDP
+也就是说，4.1 节那笔''7B 模型前三类就要 112 GB''的账，DDP
 下\textbf{每张卡都要原样付一遍}，而且付的还是\textbf{同一份内容}。加到 8
 张卡，这份内容就在显存里躺了 8
 个一模一样的拷贝。这不是必需的并行开销，纯粹是冗余。
@@ -3196,8 +3340,8 @@ Optimizer，零冗余优化器）的核心想法，一句话就能说清：\text
 
 这一招的精妙在于它\textbf{仍站在数据并行这条轴上}------还是 N
 张卡各算各的数据子集，还是 all-reduce
-那一套通信骨架，模型本身没有被切成几段塞到不同卡（那是后面 4.5
-张量/流水线并行的活）。它动的只是''每张卡到底要不要存全份冗余状态''这一件事。所以可以把
+那一套通信骨架，模型本身没有被切成几段塞到不同卡（那是后面 4.5 节张量 /
+流水线并行的活）。它动的只是''每张卡到底要不要存全份冗余状态''这一件事。所以可以把
 ZeRO 理解成''\textbf{给 DDP 做减法}''：DDP 是 ZeRO 的零分片版本，ZeRO
 在它之上一层层把冗余切掉。
 
@@ -3224,7 +3368,7 @@ ZeRO
 的做法是：\textbf{临时把各卡手里那一片对应的状态广播汇集起来，在每张卡上拼出当下需要的完整一份，算完立刻把不属于自己那片的部分丢掉}，显存重新回落。
 
 ``每张卡都把自己那一片发出去、最终每张卡都集齐完整一份''------这个集合通信操作叫
-\textbf{all-gather（全收集）}。它和 DDP 的 all-reduce
+\textbf{all-gather（全收集）}{[}23{]}。它和 DDP 的 all-reduce
 是一对近亲：all-reduce
 是把各卡的数据\textbf{规约}（求和/平均）成同一份，all-gather
 是把各卡的分片\textbf{拼接}成同一份完整体，不做求和。
@@ -3267,7 +3411,7 @@ all-gather 临时拼回完整参数、用 reduce-scatter
 \subsubsection{4.4.3 ZeRO Stage
 1：先切最大的那块------优化器状态}\label{zero-stage-1ux5148ux5207ux6700ux5927ux7684ux90a3ux5757ux4f18ux5316ux5668ux72b6ux6001}
 
-切谁先切？回到 4.1 的账本：混合精度 + Adam
+切谁先切？回到 4.1 节的账本：混合精度 + Adam
 下，\textbf{优化器状态是前三类里最大的一块}。
 
 把一个参数量为 \(\Psi\) 的模型摊开（以下都按每个参数算）：
@@ -3279,7 +3423,7 @@ all-gather 临时拼回完整参数、用 reduce-scatter
 \midrule\noalign{}
 参数（半精度） & 2 & 前向反向用的 fp16/bf16 权重 \\
 梯度（半精度） & 2 & 与参数一一对应 \\
-优化器状态 \(K\) & 12 & fp32 主权重 4 + Adam 一阶矩 4 + 二阶矩 4 \\
+优化器状态 \(K\) & 12 & fp32 主副本 4 + Adam 一阶矩 4 + 二阶矩 4 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -3310,7 +3454,7 @@ Stage 1 往往也是稳赚的第一步。
 2\Psi + 2\Psi + \frac{K\Psi}{N_d} = \left(4 + \frac{K}{N_d}\right)\Psi \;\text{字节}.
 \]
 
-卡多时这一项趋近于 0，每卡从 16Ψ 直奔 4Ψ。
+卡多时这一项趋近于 0，每卡从 \(16\Psi\) 直奔 \(4\Psi\)。
 
 \subsubsection{4.4.4 ZeRO Stage
 2：再切梯度}\label{zero-stage-2ux518dux5207ux68afux5ea6}
@@ -3338,7 +3482,7 @@ all-reduce 后半段的 all-gather，所以\textbf{通信量和 DDP
 2\Psi + \frac{(2+K)\Psi}{N_d} = \left(2 + \frac{2+K}{N_d}\right)\Psi \;\text{字节}.
 \]
 
-卡多时趋近 2Ψ------只剩那份半精度参数没切。
+卡多时趋近 \(2\Psi\)------只剩那份半精度参数没切。
 
 \subsubsection{4.4.5 ZeRO Stage
 3：连参数本身也切}\label{zero-stage-3ux8fdeux53c2ux6570ux672cux8eabux4e5fux5207}
@@ -3372,7 +3516,7 @@ parameters）把参数也沿各卡切开：每张卡平时只保管 1/N
 \frac{(2+2+K)\Psi}{N_d} = \frac{(4+K)\Psi}{N_d}\;\text{字节},
 \]
 
-也就是把基线那 16Ψ
+也就是把基线那 \(16\Psi\)
 整个除以卡数。下面这张图把三个阶段并排画在一起，能一眼看清''切得越多、每卡那根柱子越矮''。
 
 \begin{figure}[H]
@@ -3389,13 +3533,14 @@ DDP）每张卡存满整份 \((4+K)\Psi\)；\(P_{os}\)（Stage
 \((4+K/N)\Psi\)；\(P_{os+g}\)（Stage 2）再切橙色梯度，降到
 \((2+(2+K)/N)\Psi\)；\(P_{os+g+p}\)（Stage 3）连蓝色参数也切，每卡只剩
 \((4+K)\Psi/N\)。图中 \(K\) 为优化器状态系数（混合精度 Adam
-\(K{=}12\)），\(\Psi\) 为参数量，\(N\) 为数据并行度}
+\(K{=}12\)），\(N\) 为数据并行度（正文写作 \(N_d\)）；图上把参数量记成
+\(M\)，就是正文的 \(\Psi\)}
 
 \end{figure}%
 
 \begin{quote}
-备注：论文里给的直觉例子------一个 7.5B 参数的模型，混合精度 Adam
-下基线每卡约
+备注：ZeRO 论文{[}17{]}给的直觉例子------一个 7.5B 参数的模型，混合精度
+Adam 下基线每卡约
 \((4+12)\times 7.5\text{B} \approx 120\,\text{GB}\)，单卡根本放不下；用
 Stage 3 摊到 \(N_d=64\) 张卡，每卡那一份分片状态降到约
 \(120/64 \approx 1.9\,\text{GB}\)。数量级上看，分片把''放不下''直接变成了''绰绰有余''。记住趋势即可：阶段越高、卡越多，每卡那根柱子越矮。
@@ -3408,11 +3553,11 @@ Stage 3 摊到 \(N_d=64\) 张卡，每卡那一份分片状态降到约
 摆在一起，规律非常清爽：\textbf{阶段越高，越省显存，但通信量越大。}
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2656\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3594\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2344\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2375\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2672\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4953\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
-方案 & 每卡显存（字节/参数） & 通信量 vs DDP \\
+方案 & 每卡显存（字节） & 通信量 vs DDP \\
 \midrule\noalign{}
-DDP（Stage 0） & \((4+K)\Psi\) & 基准（约 2Ψ） \\
+DDP（Stage 0） & \((4+K)\Psi\) & 基准（一次 all-reduce，约 2 倍梯度） \\
 Stage 1 \(P_{os}\) & \(\left(4+\dfrac{K}{N_d}\right)\Psi\) & 同量级 \\
 Stage 2 \(P_{os+g}\) & \(\left(2+\dfrac{2+K}{N_d}\right)\Psi\) & 同量级 \\
 Stage 3 \(P_{os+g+p}\) & \(\dfrac{(4+K)\Psi}{N_d}\) & 约 1.5 倍 \\
@@ -3426,15 +3571,15 @@ Stage 3 \(P_{os+g+p}\) & \(\dfrac{(4+K)\Psi}{N_d}\) & 约 1.5 倍 \\
 \tightlist
 \item
   \textbf{Stage 1/2 是几乎白赚的省。} 它们的通信量和 DDP
-  同量级（不显著增加），却把每卡显存从 16Ψ 一路压到趋近 2Ψ。所以只要在用
-  DDP，开到 Stage 2 通常是默认值得做的。
+  同量级（不显著增加），却把每卡显存从 \(16\Psi\) 一路压到趋近
+  \(2\Psi\)。所以只要在用 DDP，开到 Stage 2 通常是默认值得做的。
 \item
   \textbf{Stage 3 用 1.5 倍通信换''完全分片''。} 它把每卡显存压成
   \((4+K)\Psi/N_d\)------卡越多越省，理论上能靠堆卡装下任意大的模型。代价是参数要前向反向各
   all-gather 一遍，通信约 1.5 倍。当模型大到 Stage 2
   都装不下时才动用它。
 \item
-  \textbf{省显存的来源是''分摊''，不是''消失''。} 那 16Ψ
+  \textbf{省显存的来源是''分摊''，不是''消失''。} 那 \(16\Psi\)
   字节并没有变少，只是从''每卡各存一份''摊成了''N
   张卡合起来存一份''。所以 ZeRO
   省的是\textbf{单卡}显存，总显存占用没降------这和
@@ -3453,9 +3598,9 @@ ZeRO-3}\label{fsdppytorch-ux539fux751fux7684-zero-3}
 
 ZeRO 最初是 DeepSpeed（微软）那套库里的实现。PyTorch
 后来把同一思路做成了\textbf{原生}功能------\textbf{FSDP（Fully Sharded
-Data Parallel，完全分片数据并行）}。名字里的''Fully Sharded''就是 ZeRO
-Stage 3 的精神：参数、梯度、优化器状态\textbf{全部分片}，每张卡只存
-1/N。
+Data Parallel，完全分片数据并行）}{[}23{]}。名字里的''Fully
+Sharded''就是 ZeRO Stage 3
+的精神：参数、梯度、优化器状态\textbf{全部分片}，每张卡只存 1/N。
 
 所以可以一句话对上号：\textbf{FSDP 约等于 PyTorch 原生的
 ZeRO-3，同一思路、不同实现。} 它的工作流和第 4.4.2
@@ -3489,7 +3634,7 @@ FSDP
 \begin{quote}
 备注：DeepSpeed ZeRO 和 PyTorch FSDP
 解决的是同一个问题、给的是同一类答案，差别主要在工程实现与生态（配置方式、与
-offload/混合精度的衔接、和训练框架的集成）。4.6 实战里会看到，在
+offload/混合精度的衔接、和训练框架的集成）。4.6 节的实战里会看到，在
 Lightning 里 \texttt{strategy="fsdp"} 和 \texttt{strategy="deepspeed"}
 就是这两条路的入口，底层都是''沿数据并行各卡切开冗余状态''这同一件事。
 \end{quote}
@@ -3502,7 +3647,7 @@ Lightning 里 \texttt{strategy="fsdp"} 和 \texttt{strategy="deepspeed"}
 张卡各算各的数据子集、靠集合通信对齐------它们真正的分水岭只有一个词：\textbf{对那份冗余状态，是复制，还是分片。}
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2208\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3269\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4524\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2015\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3761\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4223\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 维度 & DDP（ZeRO Stage 0） & ZeRO / FSDP \\
 \midrule\noalign{}
@@ -3511,20 +3656,20 @@ Lightning 里 \texttt{strategy="fsdp"} 和 \texttt{strategy="deepspeed"}
 参数/梯度/优化器 & 三者都各存整份 & 按阶段逐层切（Stage 1/2/3） \\
 用完整状态时 & 本来就在手边 & 临时 all-gather 拼回、用完即弃 \\
 加卡的效果 & 提速，单卡显存不变 & 提速 + 单卡显存摊薄 \\
-通信量 & 基准（all-reduce 约 2Ψ） & Stage1/2 同量级；Stage3 约 1.5 倍 \\
+通信量 & 基准（all-reduce，约 2 倍梯度） & Stage1/2 同量级；Stage3 约 1.5 倍 \\
 一句话定位 & 数据并行最干净的基线 & 给 DDP 做减法，切掉 N 份冗余 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
-把这张表读顺，多卡训练 5 数据并行这条轴的故事就闭环了：4.2 的 DDP
+把这张表读顺，数据并行这条轴的故事就闭环了：4.2 节的 DDP
 是这条轴的起点，用''复制整份''换来最简单的近线性提速；ZeRO/FSDP
 是这条轴的终点，用''分片 + 临时拼回''把 DDP 复制掉的 N
 份冗余一层层切回来，让单卡显存随卡数摊薄。两者不是二选一的对立，而是同一条轴上''零分片''到''完全分片''的两端------DDP
 就是 ZeRO 的 Stage 0。
 
 到这里，数据并行轴能做的省显存已经做到了头：它能把\textbf{复制的冗余}切干净，却切不动模型本身------前向某一层那份临时拼出来的完整参数、那一层的激活，终究要落在一张卡上。如果\textbf{单独一层}就已经大到一张卡放不下，分片冗余也救不了。那就得离开数据并行这条轴，转到另一条正交轴上，把\textbf{模型本身}切开摊到多卡------这正是下一节
-4.5 \textbf{张量并行 / 流水线并行} 的主场。
+\textbf{张量并行 / 流水线并行} 的主场。
 
 \subsubsection{4.4.9 小结}\label{ux5c0fux7ed3-3}
 
@@ -3578,12 +3723,6 @@ FSDP & PyTorch 原生 ZeRO-3，完全分片；可退化到 Stage 2 行为 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
-
-\paragraph{（3）通向切开模型本身}\label{ux901aux5411ux5207ux5f00ux6a21ux578bux672cux8eab}
-
-数据并行这条轴，从 DDP 的''复制整份''走到 ZeRO/FSDP
-的''完全分片''，已经把所有\textbf{重复的冗余}榨干了。但它有一道天然边界：前向反向终究要在某张卡上临时拼出\textbf{完整的一层}来算，这一层的参数和激活躲不开。当单独一层就大到一张卡装不下时，沿数据并行切冗余已经无能为力，唯一的出路是换一条正交的轴，把\textbf{模型本身}------一层的权重矩阵、或整个网络的层序列------切开摊到多卡。这正是下一节
-4.5 张量并行 / 流水线并行要进的门。
 
 \begin{quote}
 一句话总结：ZeRO 把 DDP 里复制了 N
@@ -3641,14 +3780,16 @@ N 份''，救不了''单独一份就放不下''。
 Parallelism，TP）针对的就是''单独一层太大''这个最棘手的情形。它的思路非常直接：既然一层就是一次大矩阵乘
 \(Y = XA\)，那就把权重矩阵 \(A\)
 切成几块，分给几张卡，每张卡只算其中一块，最后把各块结果拼起来，等价于算了完整的一层。它最早在
-Megatron-LM 里把 Transformer 的两个核心子层（MLP
+Megatron-LM{[}24{]} 里把 Transformer 的两个核心子层（MLP
 与注意力）切开，所以常被叫作 \textbf{Megatron 式}张量并行。
 
 \paragraph{（1）MLP：按列切权重，各算一块再拼}\label{mlpux6309ux5217ux5207ux6743ux91cdux5404ux7b97ux4e00ux5757ux518dux62fc}
 
 拿 Transformer 里的 MLP 子层举例，它是两个连续的矩阵乘：先 \(XA\) 过一个
-GeLU 激活，再乘 \(B\)。关键的切法是把第一个权重矩阵 \(A\)
-\textbf{按列}切成 \([A_1, A_2]\)，分给两张卡：
+GeLU 激活，再乘 \(B\)（这里的 \(A\)、\(B\) 沿用 Megatron 原图的记号，指
+MLP 自己那两个权重矩阵，和 3.3 节 LoRA 的低秩矩阵 \(A\)、\(B\)
+只是重名）。关键的切法是把第一个权重矩阵 \(A\) \textbf{按列}切成
+\([A_1, A_2]\)，分给两张卡：
 
 \begin{itemize}
 \tightlist
@@ -3671,11 +3812,11 @@ GeLU 激活，再乘 \(B\)。关键的切法是把第一个权重矩阵 \(A\)
 
 }
 
-\caption{图：Megatron 把 MLP
-子层做张量并行的切法。第一个权重矩阵按列切成 \(A=[A_1,A_2]\)，输入 \(X\)
-完整复制给两条支路，各算 \(XA_1\)、\(XA_2\) 并各过一个
-GeLU（逐元素激活，无需通信）；第二个权重矩阵按行切成
-\(B=[B_1;B_2]\)，两条支路各算 \(Y_1B_1\)、\(Y_2B_2\)
+\caption{图：Megatron 把 MLP 子层做张量并行的切法。第一个权重矩阵 \(A\)
+按列切成 \(A_1\)、\(A_2\)，输入 \(X\) 完整复制给两条支路，各算
+\(XA_1\)、\(XA_2\) 并各过一个
+GeLU（逐元素激活，无需通信）；第二个权重矩阵 \(B\) 按行切成
+\(B_1\)、\(B_2\)，两条支路各算 \(Y_1B_1\)、\(Y_2B_2\)
 得到部分和，最后那个 \(g\)
 把两个部分和规约（求和）成完整输出。整层只在末尾汇总处发生一次跨卡通信}
 
@@ -3781,9 +3922,10 @@ Update。绝大部分时间各卡都在空转，多卡几乎没换来加速}
 \paragraph{（2）micro-batch
 把流水线填满}\label{micro-batch-ux628aux6d41ux6c34ux7ebfux586bux6ee1}
 
-救法是 \textbf{micro-batch（微批）}：别让一整个 batch
-作为一个不可分的整体串行流过，把它切成若干个\textbf{小份}（micro-batch），一份接一份地连续喂进流水线。这样当卡
-0 算完第 1 个 micro-batch、把它交给卡 1 时，卡 0 立刻就能接着算第 2 个
+救法是 \textbf{micro-batch（微批）}{[}25{]}：别让一整个 batch
+作为一个不可分的整体串行流过，把它切成若干个
+micro-batch，一份接一份地连续喂进流水线。这样当卡 0 算完第 1 个
+micro-batch、把它交给卡 1 时，卡 0 立刻就能接着算第 2 个
 micro-batch，不必干等。几个 micro-batch
 错峰流动起来，流水线就被\textbf{填满}了------理想状态下每张卡都在同时处理不同的
 micro-batch，算力被利用起来。
@@ -3802,6 +3944,9 @@ micro-batch（流水线被填满）；只有最左侧填充阶段和最右侧排
 ``Bubble''（气泡）。micro-batch 切得越多，气泡占比越小}
 
 \end{figure}%
+
+把这张图和上一张并排看，差别一眼就出来：上一张每一列时间片里只有一个方块（一张卡在算、三张在等），这一张中段每一列都被填满了（四张卡各在处理不同的
+micro-batch）。变的不是硬件，只是喂进去的数据被切细了。
 
 \paragraph{（3）气泡：流水线填充与排空时的空转}\label{ux6c14ux6ce1ux6d41ux6c34ux7ebfux586bux5145ux4e0eux6392ux7a7aux65f6ux7684ux7a7aux8f6c}
 
@@ -3824,7 +3969,9 @@ micro-batch（流水线被填满）；只有最左侧填充阶段和最右侧排
 \item
   \textbf{更聪明的调度也能缩气泡。} 朴素 GPipe 是''先把所有 micro-batch
   的前向做完，再统一做反向''，反向阶段开始前会空出一截。后来的
-  \textbf{1F1B}（one-forward-one-backward）调度让每张卡一旦能做反向就\textbf{前向、反向交替着做}（做一个前向紧接做一个能做的反向），把前向和反向更紧密地咬合在一起，从而减少各卡积压的激活、也把气泡进一步压平。直觉上：1F1B
+  \textbf{1F1B}（one-forward-one-backward）调度------它出自
+  PipeDream{[}49{]} 那条流水线并行线，不是 GPipe
+  原文的调度------让每张卡一旦能做反向就\textbf{前向、反向交替着做}（做一个前向紧接做一个能做的反向），把前向和反向更紧密地咬合在一起，从而减少各卡积压的激活、也把气泡进一步压平。直觉上：1F1B
   不再''先全前向再全反向''，而是''算一个、还一个''，让流水线更早进入稳定的满负荷状态。
 \end{itemize}
 
@@ -3966,10 +4113,11 @@ offload，大概率用不到这条进阶的轴。
 \subsubsection{4.6.1
 原理讲完了，怎么真把它跑起来}\label{ux539fux7406ux8bb2ux5b8cux4e86ux600eux4e48ux771fux628aux5b83ux8dd1ux8d77ux6765}
 
-前面几节，把多卡训练的道理从头到尾铺了一遍：4.1 算清显存账本、4.2 讲 DDP
-怎么靠 all-reduce 近线性提速、4.3 用省显存四件套在单卡里抠空间、4.4 用
-ZeRO/FSDP 沿各卡分片冗余状态、4.5
-把模型本身横切纵切到多卡。这些都是''它为什么省、为什么快''的原理。
+前面几节，把多卡训练的道理从头到尾铺了一遍：4.1 节算清显存账本、4.2 节讲
+DDP 怎么靠 all-reduce 近线性提速、4.3
+节用省显存四件套在单卡里抠空间、4.4 节用 ZeRO/FSDP
+沿各卡分片冗余状态、4.5
+节把模型本身横切纵切到多卡。这些都是''它为什么省、为什么快''的原理。
 
 但原理懂了，离真把训练跑在两张卡上还差关键一步：\textbf{到底敲哪条命令，单脚本才会变成多进程、各占一张卡跑起来？}
 这一节就落到地面，用\textbf{双卡}这个最小可复现的规模，把''启动''这件事说清楚，再落到一次真实的
@@ -3981,8 +4129,9 @@ LeRobot 训练。
 这个\textbf{通用启动器}怎么把单脚本拉成多进程（第 4.6.2 小节），再看
 PyTorch Lightning 怎么用一个 \texttt{strategy} 开关把前面几节的 DDP /
 FSDP 原理对上代码（第 4.6.3 小节），最后落到 LeRobot------它的多卡入口是
-HuggingFace 的 \texttt{accelerate\ launch}，给出双卡命令并逐参数拆解（第
-4.6.4 小节）。收尾给一棵选型决策树（第 4.6.5
+Hugging Face 的
+\texttt{accelerate\ launch}，给出双卡命令并逐参数拆解（第 4.6.4
+小节）。收尾给一棵选型决策树（第 4.6.5
 小节），把多卡训练这一节该怎么选串成一条线。
 
 \subsubsection{4.6.2
@@ -3994,7 +4143,8 @@ torchrun：单脚本怎么变成多进程}\label{torchrunux5355ux811aux672cux600
 
 \paragraph{（1）一条命令拉起两个进程}\label{ux4e00ux6761ux547dux4ee4ux62c9ux8d77ux4e24ux4e2aux8fdbux7a0b}
 
-假设你有一个普通训练脚本 \texttt{train.py}，平时单卡就是
+假设你手上有一份自己写的单卡训练脚本（下面的命令里记作
+train.py，是个占位名，本书仓库里没有这个文件），平时就是
 \texttt{python\ train.py}。要它在双卡上跑，命令换成：
 
 \begin{Shaded}
@@ -4004,14 +4154,12 @@ torchrun：单脚本怎么变成多进程}\label{torchrunux5355ux811aux672cux600
 \end{Shaded}
 
 \texttt{-\/-nproc\_per\_node=2} 的意思是''在这台机器上起 2 个进程''（per
-node = 每台机器，这里就一台）。torchrun 会\textbf{把同一份
-\texttt{train.py} 同时启动两遍}，得到两个独立的 Python 进程，分别绑到
-GPU 0 和 GPU 1 上。
+node = 每台机器，这里就一台）。torchrun
+会\textbf{把同一份脚本同时启动两遍}，得到两个独立的 Python
+进程，分别绑到 GPU 0 和 GPU 1 上。
 
 这里最反直觉的一点要先说透：\textbf{这两个进程跑的是一模一样的代码。}
-不是一个进程当''主''、另一个当''从''分别执行不同脚本，而是同一份
-\texttt{train.py}
-被原样跑了两遍。那它们怎么做到''各算各的数据子集、只在一处打日志''而不互相打架？靠的是
+不是一个进程当''主''、另一个当''从''分别执行不同脚本，而是同一份脚本被原样跑了两遍。那它们怎么做到''各算各的数据子集、只在一处打日志''而不互相打架？靠的是
 torchrun
 给每个进程注入的一组\textbf{环境变量}，让每个进程知道''我是第几个''。
 
@@ -4046,8 +4194,8 @@ torchrun 拉起每个进程时，会往它的环境里塞进几个关键变量�
 \item
   \textbf{分数据}：每个进程按 \texttt{RANK}
   取数据集里不同的一份子集（这正是 DDP 数据并行的入口，对上 4.2
-  讲的''各算各的数据''）。PyTorch 的 \texttt{DistributedSampler} 就是读
-  \texttt{RANK} / \texttt{WORLD\_SIZE} 自动切分的。
+  节讲的''各算各的数据''）。PyTorch 的 \texttt{DistributedSampler}
+  就是读 \texttt{RANK} / \texttt{WORLD\_SIZE} 自动切分的。
 \item
   \textbf{定主卡日志}：打印进度、存 checkpoint、上报 wandb
   这种''只该做一次''的事，用 \texttt{if\ RANK\ ==\ 0:}
@@ -4111,13 +4259,13 @@ Lightning 的训练入口永远是那一句
 的取值正好把多卡训练这一节前面几节讲的原理一一对上一个代码开关：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1865\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4187\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3948\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1860\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4297\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3843\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
-strategy & 它是什么（对应讲次） & 什么时候用 \\
+strategy & 它是什么（对应小节） & 什么时候用 \\
 \midrule\noalign{}
-\texttt{"ddp"} & 数据并行，每卡一份完整副本（4.2） & 模型单卡\textbf{放得下}、只想靠多卡提速 \\
-\texttt{"fsdp"} & 完全分片数据并行，参数/梯度/优化器全切（4.4） & 模型单卡\textbf{放不下}，要沿各卡分片 \\
-\texttt{"deepspeed"} & DeepSpeed ZeRO 各 stage + offload（4.4） & 要 ZeRO 分阶段、或要把分片 offload 到 CPU/盘 \\
+\texttt{"ddp"} & 数据并行，每卡一份完整副本（4.2 节） & 模型单卡\textbf{放得下}、只想靠多卡提速 \\
+\texttt{"fsdp"} & 完全分片数据并行，参数/梯度/优化器全切（4.4 节） & 模型单卡\textbf{放不下}，要沿各卡分片 \\
+\texttt{"deepspeed"} & DeepSpeed ZeRO 各 stage + offload（4.4 节） & 要 ZeRO 分阶段、或要把分片 offload 到 CPU/盘 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -4131,8 +4279,8 @@ strategy & 它是什么（对应讲次） & 什么时候用 \\
   这是数据并行最干净的一档，每张卡存整份模型、各算各的数据、all-reduce
   同步梯度。只要模型塞得进一张卡，加卡就近线性提速，没有任何分片开销，是默认首选。
 \item
-  \textbf{\texttt{fsdp}：放不下就分片。} 对应 4.4 的 FSDP（PyTorch 原生
-  ZeRO-3），把参数/梯度/优化器状态沿各卡切开，每卡只存
+  \textbf{\texttt{fsdp}：放不下就分片。} 对应 4.4 节的 FSDP（PyTorch
+  原生 ZeRO-3），把参数/梯度/优化器状态沿各卡切开，每卡只存
   1/N，前向反向按层临时 all-gather 拼回。模型大到单卡装不下时换它。
 \item
   \textbf{\texttt{deepspeed}：要 ZeRO 各 stage / offload 时用。}
@@ -4140,8 +4288,8 @@ strategy & 它是什么（对应讲次） & 什么时候用 \\
   1/2/3，还能把分片进一步 offload 到 CPU 或 NVMe，用主存换显存顶住峰值。
 \end{itemize}
 
-可以这样记：\textbf{这三个开关，就是把 4.2(DDP) 和 4.4(ZeRO/FSDP)
-的原理，落到了 \texttt{Trainer(strategy=...)} 这一行上。}
+可以这样记：\textbf{这三个开关，就是把 4.2 节（DDP）和 4.4
+节（ZeRO/FSDP）的原理，落到了 \texttt{Trainer(strategy=...)} 这一行上。}
 懂了前面几节，选哪个 strategy 就是一句话的判断。
 
 \subsubsection{4.6.4 落到 LeRobot：用 accelerate launch
@@ -4150,7 +4298,12 @@ strategy & 它是什么（对应讲次） & 什么时候用 \\
 前面 torchrun 和 Lightning 讲的是''自己写训练循环时怎么上多卡''。但 VLA
 这门课真正要训的 ACT、\(\pi_0\) 这些策略，跑的是 \textbf{LeRobot}
 这套现成框架。它的多卡入口既不是 torchrun，也不是 Lightning 的
-strategy，而是 HuggingFace 的 \textbf{\texttt{accelerate\ launch}}。
+strategy，而是 Hugging Face 的 \textbf{\texttt{accelerate\ launch}}。
+
+下面的命令与参数名都以 \textbf{LeRobot v0.5.1} 为准（本书
+\texttt{code/pyproject.toml}
+钉的就是这个版本）。这个框架迭代很快，换版本前先对一遍
+\texttt{lerobot-train\ -\/-help}。
 
 \paragraph{（1）accelerate
 扮演什么角色}\label{accelerate-ux626eux6f14ux4ec0ux4e48ux89d2ux8272}
@@ -4189,6 +4342,7 @@ torchrun 是讲''通用启动机制''时用的通用工具；到了 LeRobot
   \VariableTok{$(}\FunctionTok{which}\NormalTok{ lerobot{-}train}\VariableTok{)} \DataTypeTok{\textbackslash{}}
   \AttributeTok{{-}{-}dataset.repo\_id}\OperatorTok{=}\VariableTok{$\{HF\_USER\}}\NormalTok{/my\_dataset }\DataTypeTok{\textbackslash{}}
   \AttributeTok{{-}{-}policy.type}\OperatorTok{=}\NormalTok{act }\DataTypeTok{\textbackslash{}}
+  \AttributeTok{{-}{-}policy.push\_to\_hub}\OperatorTok{=}\NormalTok{false }\DataTypeTok{\textbackslash{}}
   \AttributeTok{{-}{-}output\_dir}\OperatorTok{=}\NormalTok{outputs/train/act\_multi\_gpu }\DataTypeTok{\textbackslash{}}
   \AttributeTok{{-}{-}job\_name}\OperatorTok{=}\NormalTok{act\_multi\_gpu }\DataTypeTok{\textbackslash{}}
   \AttributeTok{{-}{-}wandb.enable}\OperatorTok{=}\NormalTok{true}
@@ -4199,7 +4353,7 @@ torchrun 是讲''通用启动机制''时用的通用工具；到了 LeRobot
 lerobot-train 的（控制训什么）：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3688\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6312\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3614\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6386\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 参数 & 含义 \\
 \midrule\noalign{}
@@ -4207,8 +4361,9 @@ lerobot-train 的（控制训什么）：
 \texttt{-\/-multi\_\allowbreak gpu} & 开启多卡模式 \\
 \texttt{-\/-num\_\allowbreak processes=2} & 用几张卡（= 进程数），双卡就填 2 \\
 \texttt{\$(which\ lerobot-train)} & 被启动的程序：LeRobot 的训练入口脚本的真实路径 \\
-\texttt{-\/-dataset.repo\_\allowbreak id=...} & 训练用的数据集（HuggingFace 仓库 id） \\
+\texttt{-\/-dataset.repo\_\allowbreak id=...} & 训练用的数据集（Hugging Face 仓库 id） \\
 \texttt{-\/-policy.type=act} & 训哪种策略，这里是 ACT；换 \(\pi_0\) 改成对应类型 \\
+\texttt{-\/-policy.push\_\allowbreak to\_\allowbreak hub=false} & 不往 Hugging Face Hub 推权重。这一项\textbf{不能省}：它默认是 \texttt{true}，而一旦为真又没给 \texttt{-\/-policy.repo\_\allowbreak id}，\texttt{lerobot-train} 启动时就直接报''\texttt{policy.repo\_\allowbreak id} argument missing''退出 \\
 \texttt{-\/-output\_\allowbreak dir=...} & 输出（checkpoint、日志）落盘目录 \\
 \texttt{-\/-job\_\allowbreak name=...} & 这次任务的名字 \\
 \texttt{-\/-wandb.enable=true} & 打开 wandb 记录 \\
@@ -4222,25 +4377,38 @@ lerobot-train 的（控制训什么）：
 \texttt{accelerate\ launch\ \$(which\ lerobot-train)\ ...}
 不用每次重复写。
 
+2.3 节那条真机微调脚本
+\texttt{code/vla/5\_vla\_finetune/5\_4\_so101\_real\_sft/train\_so101\_real.sh}
+里就有这个分支：脚本顶部一个 \texttt{NUM\_GPUS} 变量，填 1 时直接调
+\texttt{lerobot-train}，大于 1 时换成上面这条
+\texttt{accelerate\ launch\ -\/-multi\_gpu}
+的写法，训练参数一个字都不用改------单卡与多卡的差别只在最外面那层启动器。
+
 \paragraph{（3）混合精度交给 accelerate
 控}\label{ux6df7ux5408ux7cbeux5ea6ux4ea4ux7ed9-accelerate-ux63a7}
 
-LeRobot 单卡训练时，混合精度是用 \texttt{lerobot-train} 自己的
-\texttt{-\/-policy.use\_amp} 开的。但走 accelerate
-多卡后，\textbf{混合精度改由 accelerate 接管}，用启动器的
-\texttt{-\/-mixed\_precision} 参数控制：
+这里有个容易记反的地方：\textbf{\texttt{lerobot-train}
+的混合精度从头到尾都由 accelerate 接管，单卡也一样。} LeRobot v0.5.1 的
+\texttt{lerobot/scripts/lerobot\_train.py} 里，训练步整个包在
+\texttt{accelerator.autocast()} 下（源码注释就写着 \emph{Let accelerator
+handle mixed precision}），而策略配置里那个 \texttt{-\/-policy.use\_amp}
+在这个文件里一次都没被读到------它只在推理侧的
+\texttt{lerobot-eval}、\texttt{lerobot-record}
+里生效。所以不论单卡多卡，训练精度都用启动器的
+\texttt{-\/-mixed\_precision} 控：
 
 \begin{Shaded}
 \begin{Highlighting}[]
 \ExtensionTok{accelerate}\NormalTok{ launch }\AttributeTok{{-}{-}multi\_gpu} \AttributeTok{{-}{-}num\_processes}\OperatorTok{=}\NormalTok{2 }\AttributeTok{{-}{-}mixed\_precision}\OperatorTok{=}\NormalTok{bf16 }\DataTypeTok{\textbackslash{}}
-  \VariableTok{$(}\FunctionTok{which}\NormalTok{ lerobot{-}train}\VariableTok{)} \AttributeTok{{-}{-}dataset.repo\_id}\OperatorTok{=}\VariableTok{$\{HF\_USER\}}\NormalTok{/my\_dataset }\AttributeTok{{-}{-}policy.type}\OperatorTok{=}\NormalTok{act}
+  \VariableTok{$(}\FunctionTok{which}\NormalTok{ lerobot{-}train}\VariableTok{)} \AttributeTok{{-}{-}dataset.repo\_id}\OperatorTok{=}\VariableTok{$\{HF\_USER\}}\NormalTok{/my\_dataset }\DataTypeTok{\textbackslash{}}
+  \AttributeTok{{-}{-}policy.type}\OperatorTok{=}\NormalTok{act }\AttributeTok{{-}{-}policy.push\_to\_hub}\OperatorTok{=}\NormalTok{false}
 \end{Highlighting}
 \end{Shaded}
 
 \texttt{-\/-mixed\_precision} 取 \texttt{fp16} 或 \texttt{bf16}（对应
-4.3 讲的两种半精度）。一旦由 accelerate 控混合精度，就不再走 lerobot
-那边的
-\texttt{-\/-policy.use\_amp}------精度这件事统一交给启动器一处管。
+4.3 节讲的两种半精度）。不填就是 fp32
+全精度训练------\texttt{accelerator.autocast()}
+在没有指定精度时是个空壳，不会自动帮你开半精度。
 
 \paragraph{（4）一个必须手动处理的坑：学习率要自己缩}\label{ux4e00ux4e2aux5fc5ux987bux624bux52a8ux5904ux7406ux7684ux5751ux5b66ux4e60ux7387ux8981ux81eaux5df1ux7f29}
 
@@ -4260,16 +4428,26 @@ LeRobot 单卡训练时，混合精度是用 \texttt{lerobot-train} 自己的
 训练里的经验启发式；实践中平方根缩放、干脆保持原值、或者重新调
 warmup，都可能更合适------尤其是 VLA 这种小数据微调场景。LeRobot
 不替你做这件事，得手动指定。稳妥的做法是\textbf{以原学习率为起点做一个小范围扫描}，同时检查
-warmup、总优化步数和梯度累积设置。比如 base 学习率是
-\texttt{1e-4}，双卡有效 batch 翻倍，可以先试线性缩放的
-\texttt{2e-4}，在命令里加 \texttt{-\/-optimizer.lr=2e-4}：
+warmup、总优化步数和梯度累积设置。
+
+改的时候要走对参数。\texttt{lerobot-train} 的
+\texttt{use\_policy\_training\_preset} 默认是
+\texttt{true}，启动校验那一步会用\textbf{策略自带的预置优化器整个覆盖}
+\texttt{-\/-optimizer.*}------也就是说 \texttt{-\/-optimizer.lr}
+写了也不生效，学习率仍是预置值。真正管用的入口是策略自己的
+\texttt{-\/-policy.optimizer\_lr}（2.3
+节那个真机微调脚本用的就是它）。ACT 的预置学习率是
+\texttt{1e-5}（\texttt{lerobot/policies/act/configuration\_act.py} 里的
+\texttt{optimizer\_lr}），双卡有效 batch 翻倍，先试线性缩放的
+\texttt{2e-5}：
 
 \begin{Shaded}
 \begin{Highlighting}[]
 \ExtensionTok{accelerate}\NormalTok{ launch }\AttributeTok{{-}{-}num\_processes}\OperatorTok{=}\NormalTok{2 }\VariableTok{$(}\FunctionTok{which}\NormalTok{ lerobot{-}train}\VariableTok{)} \DataTypeTok{\textbackslash{}}
-  \AttributeTok{{-}{-}optimizer.lr}\OperatorTok{=}\NormalTok{2e{-}4 }\DataTypeTok{\textbackslash{}}
-  \AttributeTok{{-}{-}dataset.repo\_id}\OperatorTok{=}\NormalTok{lerobot/pusht }\DataTypeTok{\textbackslash{}}
-  \AttributeTok{{-}{-}policy.type}\OperatorTok{=}\NormalTok{act}
+  \AttributeTok{{-}{-}policy.type}\OperatorTok{=}\NormalTok{act }\DataTypeTok{\textbackslash{}}
+  \AttributeTok{{-}{-}policy.optimizer\_lr}\OperatorTok{=}\NormalTok{2e{-}5 }\DataTypeTok{\textbackslash{}}
+  \AttributeTok{{-}{-}policy.push\_to\_hub}\OperatorTok{=}\NormalTok{false }\DataTypeTok{\textbackslash{}}
+  \AttributeTok{{-}{-}dataset.repo\_id}\OperatorTok{=}\NormalTok{lerobot/pusht}
 \end{Highlighting}
 \end{Shaded}
 
@@ -4290,17 +4468,18 @@ warmup、总优化步数和梯度累积设置。比如 base 学习率是
   PCIe）是否够快、数据加载与 CPU
   预处理是否成为瓶颈。这些条件都满足时接近线性；模型小或 batch
   小的时候，实际加速常常远低于 2 倍。所以别照搬''减半''，\textbf{用
-  samples/s 实测一遍}再定预期。这对应 4.2 讲的 DDP 近线性提速及其前提。
+  samples/s 实测一遍}再定预期。这对应 4.2 节讲的 DDP
+  近线性提速及其前提。
 \item
   \textbf{单卡显存不降。} 这点务必想清楚：DDP / accelerate
   这条路是\textbf{数据并行}，每张卡都存着一份\textbf{完整}的模型、梯度、优化器状态（对上
-  4.4 开头说的''N
+  4.4 节开头说的''N
   份冗余复制''）。所以加到双卡，单张卡要占的显存和单卡训练时\textbf{一样多}，不会因为多了一张卡就降下来。
 \end{itemize}
 
 把这两条合起来记：\textbf{双卡数据并行，买到的是吞吐（训得更快），买不到的是单卡显存（每卡照样要装下整份）。}
 如果瓶颈是''单卡显存装不下''而不是''训得太慢''，加卡做数据并行解决不了问题------那是
-4.4 的 FSDP /
+4.4 节的 FSDP /
 ZeRO（分片，单卡显存随卡数摊薄）该上场的场景。这条区分，正好引出下一节的选型。
 
 \subsubsection{4.6.5
@@ -4318,34 +4497,53 @@ DDP、省显存四件套、ZeRO/FSDP、模型并行一大串招式。真到自�
   \texttt{accelerate\ launch\ -\/-multi\_gpu}）。这一步只为\textbf{提速}，加卡近线性快、单卡显存不变，是最简单也最该首选的一档。
 \item
   \textbf{单卡放不下？先抠单卡。} 别急着加卡，先上 \textbf{4.3
-  省显存四件套}（混合精度 + 梯度检查点 + 梯度累积 + CPU/NVMe
+  节的省显存四件套}（混合精度 + 梯度检查点 + 梯度累积 + CPU/NVMe
   offload），在一张卡内部把显存抠出来。很多时候四件套就够，省去多卡的复杂度。
 \item
-  \textbf{四件套还不够？分片。} 上 \textbf{4.4 的 ZeRO/FSDP}（Lightning
-  \texttt{strategy="fsdp"} 或
+  \textbf{四件套还不够？分片。} 上 \textbf{4.4 节的
+  ZeRO/FSDP}（Lightning \texttt{strategy="fsdp"} 或
   \texttt{"deepspeed"}），把参数/梯度/优化器状态沿各卡切开，单卡显存随卡数摊薄；还顶不住就再叠
   \textbf{offload} 把分片搬到 CPU/盘。
 \item
   \textbf{连单独一层都放不下？切模型本身。}
   到这一步数据并行那条轴彻底失效（连 FSDP 都拼不出完整的一层），才上
-  \textbf{4.5 的模型并行}（张量并行横切一层 /
+  \textbf{4.5 节的模型并行}（张量并行横切一层 /
   流水线并行纵切层序列）。这是几十上百 B 超大模型才动用的重武器。
 \end{enumerate}
 
-下面这张表把这条决策线和它各自解决的瓶颈、对应讲次摆在一起，方便对照查：
+这四步的顺序不是随便排的：每往下一步，工程复杂度都要上一个台阶，所以能在上一步停住就别往下走。
 
-\begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0761\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2108\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3114\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4016\linewidth - 2\tabcolsep\relax}@{}}
-\toprule\noalign{}
-步骤 & 触发条件 & 选什么 & 解决的瓶颈（讲次） \\
-\midrule\noalign{}
-1 & 单卡放得下 & DDP（数据并行提速） & 训得太慢（4.2） \\
-2 & 单卡放不下 & 先上省显存四件套 & 单卡内部抠显存（4.3） \\
-3 & 四件套仍不够 & ZeRO/FSDP，再叠 offload & 沿各卡分片摊薄单卡显存（4.4） \\
-4 & 单独一层都放不下 & 模型并行 TP/PP & 切模型本身、离开数据并行轴（4.5） \\
-\bottomrule\noalign{}
-\end{tabular}
-\end{center}
+\begin{figure}[H]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/fig12-4-vram-under-each-strategy.png}
+
+}
+
+\caption{图：一根 7B 模型的单卡显存柱，在五种方案下怎么变。柱子按 4.1.2
+节的四类吃货分段：参数 fp16（蓝）、梯度 fp16（绿）、优化器状态
+fp32（橙）、激活值（斜纹灰）；红色虚线是标着 40 GB
+的单卡容量线。①单卡基线 124
+GB，高高在线上；②开省显存四件套后橙色的优化器状态整段消失（搬到卡外）、斜纹的激活段被梯度检查点压扁，落到
+31 GB；③DDP 那根柱子仍标着 124 GB，一条双向箭头从 ① 拉到
+③、上面写着''加卡只提速，单卡显存一点没降''，右侧几根灰柱注着''另外 7
+张卡各存一模一样的一份''；④ZeRO-2 把梯度段和优化器段各切成 1/8，降到 38
+GB；⑤ZeRO-3 把三段全部切成 1/8，降到 26
+GB。图下一行注明：斜纹那段是激活值，随批量与序列长度变，图上只画一个示意高度，其余三段按
+16 字节/参数精确折算（本书自绘；分片按 8 卡算，与 4.4.6
+节表里的公式一致）}
+
+\end{figure}%
+
+图上有两处正好解释了这条决策线为什么是这个顺序。\textbf{第一处是 ③
+那根柱子}：它和 ① 一模一样高，因为 DDP
+只是把数据分给多张卡，每张卡仍然要完整地放下参数、梯度和优化器状态------所以第
+1
+步只解决''慢''，不解决''放不下''，单卡放不下时加多少张卡都没用。\textbf{第二处是
+② 和 ④ 的高低}：省显存四件套（31 GB）比 ZeRO-2（38
+GB）还低，而且不需要多卡、不增加通信。这就是第 2 步要排在第 3
+步前面的原因------最贵的那一段（优化器状态 84 GB）用 offload
+直接搬走，比切成 8
+份还划算。真正非分片不可的，是四件套之后仍然顶破容量线的那些情况。
 
 对 VLA 当前这个量级（通常 \(\le\) 7B），绝大多数情况走到第
 1\textasciitilde3 步就解决了，\textbf{第 4 步基本用不到}。本节的双卡 +
@@ -4369,14 +4567,16 @@ LeRobot 实战，落在的正是第 1 步（DDP
 \item
   \textbf{Lightning 用一个 strategy 开关切并行}：同一句
   \texttt{trainer.fit(model,\ data)}，\texttt{Trainer(devices=2,\ strategy="ddp"/"fsdp"/"deepspeed")}
-  三选一，把 4.2(DDP)/4.4(ZeRO/FSDP) 的原理对上代码；底层仍是 torchrun
-  式多进程。
+  三选一，把 4.2 节（DDP）与 4.4 节（ZeRO/FSDP）的原理对上代码；底层仍是
+  torchrun 式多进程。
 \item
   \textbf{LeRobot 多卡走 \texttt{accelerate\ launch}}：accelerate 是和
   torchrun 同层的启动器，额外接管 DDP 与混合精度。双卡命令
   \texttt{accelerate\ launch\ -\/-multi\_gpu\ -\/-num\_processes=2\ \$(which\ lerobot-train)\ ...}；混合精度用
-  \texttt{-\/-mixed\_precision} 控；\textbf{学习率要手动线性缩}（有效
-  batch = batch×卡数，双卡 base 1e-4 缩到 2e-4）。
+  \texttt{-\/-mixed\_precision} 控；\textbf{学习率要手动调}，且要走
+  \texttt{-\/-policy.optimizer\_lr} 而不是会被预置覆盖的
+  \texttt{-\/-optimizer.lr}（有效 batch =
+  batch×卡数；线性缩放只是最常被引用的起点，不是定律，最终要扫）。
 \item
   \textbf{双卡相比单卡}：吞吐近线性翻倍，但单卡显存不降（数据并行各卡存整份）。
 \item
@@ -4387,15 +4587,15 @@ LeRobot 实战，落在的正是第 1 步（DDP
 \paragraph{（2）关键命令与结论参考表}\label{ux5173ux952eux547dux4ee4ux4e0eux7ed3ux8bbaux53c2ux8003ux8868}
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1453\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.8547\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1431\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.8569\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 维度 & 要点 \\
 \midrule\noalign{}
 通用启动器 & \texttt{torchrun\ -\/-nproc\_\allowbreak per\_\allowbreak node=2\ train.py}，单脚本变多进程；RANK/LOCAL\_\allowbreak RANK/WORLD\_\allowbreak SIZE 定身份 \\
 Lightning 切换 & \texttt{Trainer(devices=2,\ strategy="ddp"/"fsdp"/"deepspeed")} + \texttt{trainer.fit}，模型代码不改 \\
 LeRobot 入口 & \texttt{accelerate\ launch\ -\/-multi\_\allowbreak gpu\ -\/-num\_\allowbreak processes=2\ \$(which\ lerobot-train)\ ...}（不是 torchrun） \\
-混合精度 & 多卡下由 accelerate 控：\texttt{-\/-mixed\_\allowbreak precision=fp16/bf16}，取代 \texttt{-\/-policy.use\_\allowbreak amp} \\
-学习率缩放 & 不自动缩；有效 batch=batch×卡数，双卡线性缩 LR：\texttt{-\/-optimizer.lr=2e-4} \\
+混合精度 & 训练侧一律由 accelerate 控：\texttt{-\/-mixed\_\allowbreak precision=fp16/bf16}；\texttt{-\/-policy.use\_\allowbreak amp} 只作用于推理侧 \\
+学习率缩放 & 不自动缩；有效 batch=batch×卡数。改学习率走 \texttt{-\/-policy.optimizer\_\allowbreak lr}（\texttt{-\/-optimizer.*} 会被策略预置覆盖）；线性缩放只是起点，要用验证集扫 \\
 双卡效果 & 吞吐近线性翻倍；单卡显存不降（数据并行） \\
 选型顺序 & DDP 提速 → 省显存四件套 → ZeRO/FSDP+offload → 单层放不下才模型并行 \\
 \bottomrule\noalign{}
@@ -4406,37 +4606,34 @@ LeRobot 入口 & \texttt{accelerate\ launch\ -\/-multi\_\allowbreak gpu\ -\/-num
 一句话总结：多卡训练的本质是''启动器把单脚本拉成多进程、各绑一张卡靠
 rank 分工''------通用的是 \texttt{torchrun}，Lightning 用一个
 \texttt{strategy} 开关在 DDP/FSDP/DeepSpeed 间切换，而 LeRobot 的入口是
-HuggingFace 的 \texttt{accelerate\ launch}（双卡
+Hugging Face 的 \texttt{accelerate\ launch}（双卡
 \texttt{-\/-multi\_gpu\ -\/-num\_processes=2\ \$(which\ lerobot-train)}，混合精度交给
-accelerate、学习率得手动线性缩到
-2e-4）；双卡数据并行买到的是近线性吞吐、买不到单卡显存，选型就按''放得下用
+accelerate、学习率得自己调且不能照搬线性缩放）；双卡数据并行买到的是近线性吞吐、买不到单卡显存，选型就按''放得下用
 DDP、放不下先抠再分片、单层都放不下才切模型''这条线走下去。
 \end{quote}
 
 \section{5 Sim2Real 与 Real2Sim}\label{sim2real-ux4e0e-real2sim}
 
 微调好的策略，最终要在真实机器人上工作。但仿真里训练或验证、再迁到真机，中间隔着一道绕不开的鸿沟。这一节先把
-Sim-to-Real（从仿真到真实的策略迁移）讲透，再反过来看
-Real-to-Sim（把真实世界重建成可仿真的世界）。第 4 节多卡全量微调出的
-\(\pi_0\)，正好可以拿来做这类迁移示例。
+Sim2Real（从仿真到真实的策略迁移）讲透，再反过来看
+Real2Sim（把真实世界重建成可仿真的世界）。前面三节微调出来的策略，最后都要过这一关。
 
 \subsection{5.1
-Sim-to-Real：从仿真到真实的策略迁移}\label{sim-to-realux4eceux4effux771fux5230ux771fux5b9eux7684ux7b56ux7565ux8fc1ux79fb}
+Sim2Real：从仿真到真实的策略迁移}\label{sim2realux4eceux4effux771fux5230ux771fux5b9eux7684ux7b56ux7565ux8fc1ux79fb}
 
 \subsubsection{5.1.1 为什么需要
-Sim-to-Real}\label{ux4e3aux4ec0ux4e48ux9700ux8981-sim-to-real}
+Sim2Real}\label{ux4e3aux4ec0ux4e48ux9700ux8981-sim2real}
 
 \paragraph{（1）机器人学习的现实困境}\label{ux673aux5668ux4ebaux5b66ux4e60ux7684ux73b0ux5b9eux56f0ux5883}
 
-把一个深度神经网络的策略 (policy)
-真正部署到机器人上，并不像训练一个图像分类器那样轻松。机器人学习有几个不可绕开的现实约束：
+把一个深度神经网络的策略（policy）真正部署到机器人上，并不像训练一个图像分类器那样轻松。机器人学习有几个不可绕开的现实约束：
 
 \begin{itemize}
 \tightlist
 \item
   \textbf{数据贵}：在真机上每采一条轨迹，都要消耗硬件磨损、操作员时间和场地。OpenAI
-  训练一只 Shadow Hand
-  解魔方时，单卡仿真等价于约一万年现实经验，没有任何团队能在真机上跑出这个量级。
+  让 Shadow Hand 学会解魔方（5.1.4
+  节展开），靠的是在大规模仿真集群上堆出来的经验总量------那个量级不可能在真机上跑出来。
 \item
   \textbf{数据慢}：真机数据是''实时''的，5 Hz 控制频率意味着一秒只产生 5
   个样本；而 GPU 仿真器轻松能跑到每秒上万步。
@@ -4462,34 +4659,32 @@ Sim-to-Real}\label{ux4e3aux4ec0ux4e48ux9700ux8981-sim-to-real}
 \item
   物理参数、初始条件、任务变体可以任意配置
 \item
-  可以在仿真里跑强化学习 (Reinforcement Learning, RL)，让策略自我探索
+  可以在仿真里跑强化学习（reinforcement learning, RL），让策略自我探索
 \end{itemize}
 
 近十年来，许多机器人学习成果都依赖''先在仿真中训练或验证，再迁移到真机''这一基本范式，典型例子包括
 OpenAI Dactyl 的灵巧手和 ANYmal 类腿足机器人的敏捷运动。
 
-\paragraph{（3）现实差距：Reality
-Gap}\label{ux73b0ux5b9eux5deeux8dddreality-gap}
+\paragraph{（3）现实差距（Reality
+Gap）}\label{ux73b0ux5b9eux5deeux8dddreality-gap}
 
-但任何在仿真里训练好的策略，一旦放到真机就会出现性能下降，有时是小问题，有时是策略完全失效。这就是
-\textbf{现实差距 (reality gap)}。
+但任何在仿真里训练好的策略，一旦放到真机就会出现性能下降，有时是小问题，有时是策略完全失效。这就是\textbf{现实差距}。
 
-Aljalbout 等人的 \emph{The Reality Gap in Robotics: Challenges,
-Solutions, and Best Practices}
-系统总结了这个问题：现实差距不是一个单点误差，而是视觉、动力学、传感器、执行器和软件栈多层误差共同叠加的结果。
+Aljalbout 等人的综述《The Reality Gap in Robotics: Challenges,
+Solutions, and Best
+Practices》{[}26{]}系统总结了这个问题：现实差距不是一个单点误差，而是视觉、动力学、传感器、执行器和软件栈多层误差共同叠加的结果。
 
-Sim-to-Real Transfer
+Sim2Real
 就是研究''如何让仿真训练好的策略在真实世界依然能工作''的子领域。它在过去十年里发展出了一整套方法论，并且在
-VLA (Vision-Language-Action)
-时代继续演化。本节就是要把这套方法论梳理清楚。
+VLA（Vision-Language-Action）时代继续演化。本节就是要把这套方法论梳理清楚。
 
 \begin{quote}
-小结：仿真不是奢侈品而是必需品；但要把仿真里学到的东西真正落地，必须正面应对现实差距。Sim-to-Real
-Transfer 就是为这一步存在的。
+小结：仿真不是奢侈品而是必需品；但要把仿真里学到的东西真正落地，必须正面应对现实差距。Sim2Real
+这一整套方法就是为这一步存在的。
 \end{quote}
 
-\subsubsection{5.1.2 Reality Gap
-到底差在哪里}\label{reality-gap-ux5230ux5e95ux5deeux5728ux54eaux91cc}
+\subsubsection{5.1.2
+现实差距到底差在哪里}\label{ux73b0ux5b9eux5deeux8dddux5230ux5e95ux5deeux5728ux54eaux91cc}
 
 把''仿真和真实不一样''这句话再切细一点，可以分成四类来源。理解差距来自哪里，是后面理解每种方法的基础。
 
@@ -4509,12 +4704,11 @@ Transfer 就是为这一步存在的。
   仿真背景常常是干净的；真实背景充斥杂物、人、动态变化
 \end{itemize}
 
-视觉差距的影响是：基于像素的策略 (Vision Policy) 在仿真里能用到 99\%
-成功率，到真机上可能只剩 30\%。
+视觉差距的后果很直接：一个只看像素的策略，在仿真里刷到很高的成功率，换到真机相机下可能掉到勉强能动的水平------掉多少没有通用数字，取决于渲染与真实相机差多远。
 
 \paragraph{（2）动力学差距}\label{ux52a8ux529bux5b66ux5deeux8ddd}
 
-物理引擎的物理是近似的，特别是接触力学 (contact dynamics) 这一块：
+物理引擎的物理是近似的，特别是接触力学（contact dynamics）这一块：
 
 \begin{itemize}
 \tightlist
@@ -4523,10 +4717,10 @@ Transfer 就是为这一步存在的。
 \item
   摩擦系数、阻尼、弹性系数与真实不符
 \item
-  接触模型大多基于硬约束 (hard constraint)
-  求解，无法精确刻画粘滑、变形、接触面随时间退化等现象
+  接触模型大多基于硬约束（hard
+  constraint）求解，无法精确刻画粘滑、变形、接触面随时间退化等现象
 \item
-  关节传动不是理想刚体（齿轮间隙 backlash、皮带形变、连杆挠曲）
+  关节传动不是理想刚体（齿轮间隙、皮带形变、连杆挠曲）
 \end{itemize}
 
 四足机器人在仿真里可以稳稳跑过砂石坡道，到真机上一脚踩下去发现砂石''流动''了；这就是典型的动力学差距。
@@ -4565,17 +4759,17 @@ Transfer 就是为这一步存在的。
   状态滤波、坐标系定义、单位（弧度/角度，米/毫米）不一致
 \end{itemize}
 
-很多失败的 Sim-to-Real 不是算法问题，而是软件栈对不齐。
+很多失败的 Sim2Real 不是算法问题，而是软件栈对不齐。
 
 \paragraph{（5）把四类差距汇总到一张表}\label{ux628aux56dbux7c7bux5deeux8dddux6c47ux603bux5230ux4e00ux5f20ux8868}
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1296\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4230\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4473\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1364\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4489\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4147\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 差距类型 & 典型表现 & 主流应对策略 \\
 \midrule\noalign{}
-视觉差距 & 真机图像更暗、阴影更复杂、背景杂；仿真中训练好的视觉策略在真机失败 & 视觉域随机化 (Visual DR)；GAN 域适配；高保真渲染 (RTX、3DGS) \\
-动力学差距 & 真机摩擦/接触不可预测；步态/抓取不再稳定 & 动力学域随机化 (Dynamics DR)；系统辨识 (SysID)；可微仿真 \\
+视觉差距 & 真机图像更暗、阴影更复杂、背景杂；仿真中训练好的视觉策略在真机失败 & 视觉域随机化（visual DR）；GAN 域适配；高保真渲染（RTX、3DGS） \\
+动力学差距 & 真机摩擦/接触不可预测；步态/抓取不再稳定 & 动力学域随机化（dynamics DR）；系统辨识（SysID）；可微仿真 \\
 传感器/执行器差距 & IMU 漂移；电机延迟；编码器噪声；力/力矩零漂 & 注入噪声/延迟到仿真；师生框架的''鲁棒学生'' \\
 控制软件栈差距 & 控制频率、滤波、安全检查与仿真不一致 & 工程对齐；同一套控制代码同时跑仿真和真机 \\
 \bottomrule\noalign{}
@@ -4583,27 +4777,26 @@ Transfer 就是为这一步存在的。
 \end{center}
 
 \begin{quote}
-小结：Reality Gap
-不是单一问题，而是四类差距的叠加。本节后面讲的每种方法，都可以放到这张表上对号入座。
+小结：现实差距不是单一问题，而是四类差距的叠加。本节后面讲的每种方法，都可以放到这张表上对号入座。
 \end{quote}
 
 \subsubsection{5.1.3 Sim2Real
 方法的整体地图}\label{sim2real-ux65b9ux6cd5ux7684ux6574ux4f53ux5730ux56fe}
 
-在深入展开每条路线之前，先建立一个 mental map。把 Sim-to-Real
-的方法划成六个家族：
+在深入展开每条路线之前，先给这些方法画一张分布图。Sim2Real
+的方法大致可以划成六个家族：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3240\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3370\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3390\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3500\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3202\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3298\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 家族 & 核心思想（一句话） & 代表工作 \\
 \midrule\noalign{}
-1. 域随机化 (Domain Randomization) & 训练时把仿真环境的参数随机扰动；让真实世界看起来''只是又一个变体'' & Tobin 2017、Peng 2018、OpenAI Dactyl/ADR、DrEureka \\
-2. 域适配 (Domain Adaptation) & 学一个翻译器，把仿真和真实''对齐''到同一个分布 & GraspGAN、RL-CycleGAN、RetinaGAN、RCAN \\
-3. 系统辨识 (System Identification) & 用真实数据估出更准的仿真参数，让仿真离真实更近 & SimOpt、BayesSim \\
+1. 域随机化（domain randomization, DR） & 训练时把仿真环境的参数随机扰动；让真实世界看起来''只是又一个变体'' & Tobin 2017、Peng 2018、OpenAI Dactyl/ADR、DrEureka \\
+2. 域适配（domain adaptation, DA） & 学一个翻译器，把仿真和真实''对齐''到同一个分布 & GraspGAN、RL-CycleGAN、RetinaGAN、RCAN \\
+3. 系统辨识（system identification, SysID） & 用真实数据估出更准的仿真参数，让仿真离真实更近 & SimOpt、BayesSim \\
 4. 渐进网络与师生框架 & 仿真先训''教师''，真机或盲学生再蒸馏；或加新分支保留旧能力 & Progressive Nets、RMA、Hwangbo 2019 \\
 5. 基础模型与生成式策略 & 大数据 + 大模型；在语言条件和跨任务设置中提供语义先验，但仍依赖底层迁移工具 & Diffusion Policy、RT-2、OpenVLA、\(\pi_0\)、GR00T N1 \\
-6. 混合 / 协同训练 & 真实和仿真数据一起喂；或仿真中''嵌入''真实场景的重建 & SplatSim、TRANSIC、Lin 2025、Sim2Real-VLA \\
+6. 混合 / 协同训练 & 真实和仿真数据一起喂；或仿真中''嵌入''真实场景的重建 & SplatSim、TRANSIC、Lin 2025 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -4613,7 +4806,7 @@ Transfer 就是为这一步存在的。
 \begin{itemize}
 \tightlist
 \item
-  基础模型相关流水线常常把 ``DR + 师生 + 真实数据微调'' 一起用；
+  基础模型相关流水线常常把''DR + 师生 + 真实数据微调''一起用；
 \item
   SimOpt 同时是 SysID 又是 DR 的延伸；
 \item
@@ -4623,15 +4816,14 @@ Transfer 就是为这一步存在的。
 理解每一族''想解决什么差距''是关键，单纯记名字记不住。
 
 \begin{quote}
-小结：把任何一篇 Sim-to-Real
+小结：把任何一篇 Sim2Real
 论文摆到这张图上对号入座，就能看清它的位置和它的局限。
 \end{quote}
 
-\subsubsection{5.1.4 域随机化 (Domain
-Randomization)}\label{ux57dfux968fux673aux5316-domain-randomization}
+\subsubsection{5.1.4 域随机化（Domain
+Randomization）}\label{ux57dfux968fux673aux5316domain-randomization}
 
-域随机化是最早奏效、也最容易上手的 Sim-to-Real
-方法。它的核心直觉极其朴素：
+域随机化是最早奏效、也最容易上手的 Sim2Real 方法。它的核心直觉极其朴素：
 
 \begin{quote}
 与其费力把仿真做得''像真实''，不如让仿真的变体足够多，使真实世界对模型来说''只是其中一个特例''。
@@ -4639,21 +4831,22 @@ Randomization)}\label{ux57dfux968fux673aux5316-domain-randomization}
 
 \paragraph{（1）视觉域随机化}\label{ux89c6ux89c9ux57dfux968fux673aux5316}
 
-最早的代表作是 Sadeghi \& Levine 的 \textbf{CAD2RL} 和 Tobin 等人的
-\textbf{Domain Randomization} 论文（都在 2017 年发表）。
+最早的两个代表作是 Sadeghi 与 Levine 的 \textbf{CAD2RL}{[}42{]}（arXiv
+2016 年底、RSS 2017）和 Tobin 等人的 \textbf{Domain
+Randomization}{[}27{]}（2017）。
 
 CAD2RL 让无人机在大量随机化的 3D CAD
 房间里学避障，全程不用一张真实图片，模型直接零样本部署到真机就能飞。Tobin
-2017
-把同样的思路用在桌面物体定位上：在仿真里随机化纹理、光照、相机位姿、干扰物，训练出来的检测器直接在真机相机上工作。
+等人{[}27{]}把同样的思路用在桌面物体定位上：在仿真里随机化纹理、光照、相机位姿、干扰物，训练出来的检测器直接在真机相机上工作。
 
 \begin{figure}[H]
 
-{\centering \includegraphics[width=0.78\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/figures/wri-005-tobin2017-domain-randomization-figure1-crop.png}
+{\centering \includegraphics[width=0.78\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/figures/wri-005-tobin2017-domain-randomization-figure1-crop_arxiv-1703.06907.png}
 
 }
 
-\caption{图：训练时仿真图像里的桌子、物体、背景纹理被大幅扰动；测试时同一检测器直接在真机图像上工作。}
+\caption{图：左侧''训练''栏是九张仿真渲染图，同一张桌子和同一批几何体在每张里换了一套颜色、纹理、光照和相机角度，桌面从粉到绿到紫无所不有；右侧''测试''栏只有一张真机照片------普通木桌上摆着彩色积木。（图取自参考文献
+{[}27{]}）}
 
 \end{figure}%
 
@@ -4675,15 +4868,14 @@ CAD2RL 让无人机在大量随机化的 3D CAD
 
 \paragraph{（2）动力学域随机化}\label{ux52a8ux529bux5b66ux57dfux968fux673aux5316}
 
-Tobin 之后一年，\textbf{Peng 等人 (2018, ICRA)}
-把同样的思路从视觉迁到了物理：随机化质量、摩擦、阻尼、关节限位、控制延迟。他们用一个
+Tobin 之后一年，\textbf{Peng
+等人}{[}28{]}把同样的思路从视觉迁到了物理：随机化质量、摩擦、阻尼、关节限位、控制延迟。他们用一个
 LSTM 策略在仿真中学会''推方块到目标位姿''，再直接部署到 Fetch
 机械臂上。LSTM
 的隐状态承担了一个隐式的''在线系统辨识''作用------模型从最近几步的运动看出当前真实物理，自适应地选择动作。
 
-紧接着，\textbf{OpenAI 的 Dactyl} (2018/2020 IJRR) 把动力学 DR
-推到了极致。他们让 Shadow Dexterous Hand
-把一个方块旋转到指定姿态，仿真中随机化了：
+紧接着，\textbf{OpenAI 的 Dactyl}{[}29{]} 把动力学 DR 推到了极致。他们让
+Shadow Dexterous Hand 把一个方块旋转到指定姿态，仿真中随机化了：
 
 \begin{itemize}
 \tightlist
@@ -4700,15 +4892,15 @@ LSTM 策略在仿真中学会''推方块到目标位姿''，再直接部署到 F
 \end{itemize}
 
 模型完全在仿真里学，再零样本部署到真实 Shadow Hand
-上，\textbf{这是第一次有人在灵巧操作上用纯 sim-to-real 取得成功}。
+上。灵巧手自由度这么高、接触又这么密集，仍然靠''把变体撑宽到包住真实''这一条路走通了------这是本节开头那句直觉最极端的一次兑现。
 
 \paragraph{（3）自动化域随机化（ADR）}\label{ux81eaux52a8ux5316ux57dfux968fux673aux5316adr}
 
 朴素 DR
 有一个工程痛点：随机化范围如何选？范围太小，泛化不到真实；范围太大，策略学不会任务。研究者过去靠手动炼丹。
 
-\textbf{OpenAI Rubik 2019} 提出了 \textbf{Automatic Domain Randomization
-(ADR)}：
+OpenAI 在解魔方那项工作{[}30{]}里提出了
+\textbf{自动化域随机化（Automatic Domain Randomization, ADR）}：
 
 \begin{itemize}
 \tightlist
@@ -4722,16 +4914,15 @@ LSTM 策略在仿真中学会''推方块到目标位姿''，再直接部署到 F
 
 最终他们让 Shadow Hand
 在仿真里学会魔方旋转技能，并在真机上完成了多面解魔方任务。这是公认
-sim-to-real 历史上最复杂的成功演示之一。
+Sim2Real 历史上最复杂的成功演示之一。
 
 \paragraph{（4）LLM
 引导的域随机化}\label{llm-ux5f15ux5bfcux7684ux57dfux968fux673aux5316}
 
-到 2024 年，\textbf{DrEureka (Ma et al., RSS 2024)}
-又走了一步：把''如何选随机化范围''这件事交给一个大语言模型 (LLM)
-来想。GPT-4
+到 2024 年，\textbf{DrEureka}{[}31{]}
+又走了一步：把''如何选随机化范围''这件事交给一个大语言模型（LLM）来想。GPT-4
 阅读环境代码、阅读任务描述，自动生成奖励函数和域随机化分布，再迭代评估改进。在四足行走和灵巧操作两个任务上，DrEureka
-自动找到的 sim-to-real 配置与人类专家手动调出的相当，甚至更好。
+自动找到的 Sim2Real 配置与人类专家手动调出的相当，甚至更好。
 
 \paragraph{（5）一点理论：DR
 为什么会奏效？}\label{ux4e00ux70b9ux7406ux8bbadr-ux4e3aux4ec0ux4e48ux4f1aux594fux6548}
@@ -4743,27 +4934,32 @@ sim-to-real 历史上最复杂的成功演示之一。
 \]
 
 这里 \(\xi\) 是仿真环境的参数（质量、摩擦、纹理种子等），\(p(\xi)\)
-是我们设计的随机化分布。模型不是在某一个仿真上最优，而是在整个 \(\xi\)
+是我们设计的随机化分布，\(\pi_\theta\) 是参数为 \(\theta\) 的策略（这个
+\(\pi\) 是强化学习里表示策略的通用记号，和本讲反复出现的模型名 \(\pi_0\)
+没有关系），\(\tau\) 是它跑出来的一条轨迹，\(\mathcal{L}\)
+是这条轨迹上的损失。模型不是在某一个仿真上最优，而是在整个 \(\xi\)
 分布上的\textbf{平均最优}。如果真实世界的参数被这个 \(p(\xi)\)
 ``覆盖''了，那么真机就只是其中一个采样。
 
-\textbf{Chen et al.~(ICLR 2022)} 给出了正式分析：在合理假设下，DR
-训出来的策略相对真实世界最优策略的次优性，是亚线性 (sub-linear)
-的。这给了 DR 一个理论上的安心。
+\textbf{Chen 等人}{[}48{]}（ICLR
+2022）给出了正式分析：把仿真器建模成一族参数可调的 MDP 之后，可以对
+Sim2Real 差距------DR
+返回的策略与真实世界最优策略之间的价值差------给出上界，并证明在温和条件下，一条真实样本都不用也能迁移成功。同一篇还点出一件容易被忽略的事：DR
+里要让策略带上历史（也就是用依赖历史的记忆型策略），否则这套保证撑不住。
 
 \paragraph{（6）DR
 五种变体一张表}\label{dr-ux4e94ux79cdux53d8ux4f53ux4e00ux5f20ux8868}
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2307\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3665\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4028\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2119\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4331\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3550\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 变体 & 代表 & 关键扩展 \\
 \midrule\noalign{}
-视觉 DR & CAD2RL (2017)、Tobin 2017 & 随机化纹理、光照、相机参数 \\
-动力学 DR & Peng 2018、Dactyl & 随机化物理参数；LSTM 隐式辨识 \\
+视觉 DR & CAD2RL{[}42{]}（2017）、Tobin 2017{[}27{]} & 随机化纹理、光照、相机参数 \\
+动力学 DR & Peng 2018 & 随机化物理参数；LSTM 隐式辨识 \\
 全方位 DR & OpenAI Dactyl & 视觉 + 动力学 + 噪声同时随机 \\
-自动化 DR (ADR) & OpenAI Rubik (2019) & 训练中自动伸缩随机范围 \\
-LLM 引导 DR & DrEureka (2024) & LLM 自动生成奖励 + DR 分布 \\
+自动化 DR（ADR） & OpenAI 解魔方（2019） & 训练中自动伸缩随机范围 \\
+LLM 引导 DR & DrEureka（2024） & LLM 自动生成奖励 + DR 分布 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -4771,20 +4967,20 @@ LLM 引导 DR & DrEureka (2024) & LLM 自动生成奖励 + DR 分布 \\
 \begin{quote}
 小结：DR
 的精神是''宽到包住真实世界''。它简单、可扩展、不需要真机数据，是很多腿足/灵巧手
-Sim-to-Real
+Sim2Real
 流水线的第一选择。代价是策略往往是''鲁棒但保守''的；要榨干性能，往往还要叠加其他方法。
 \end{quote}
 
-\subsubsection{5.1.5 域适配 (Domain
-Adaptation)}\label{ux57dfux9002ux914d-domain-adaptation}
+\subsubsection{5.1.5 域适配（Domain
+Adaptation）}\label{ux57dfux9002ux914ddomain-adaptation}
 
 域随机化是''让模型学会忽略差异''；域适配则反过来------\textbf{让差异本身被消除}。具体做法：学习一个图像翻译器，把仿真图变成''看起来像真实''的图，或者把真实图变成''看起来像仿真''的图，让策略的输入分布对齐。
 
 \paragraph{（1）像素级 GAN
 适配：GraspGAN}\label{ux50cfux7d20ux7ea7-gan-ux9002ux914dgraspgan}
 
-\textbf{Bousmalis et al.~(ICRA 2018)} 的 GraspGAN
-是这条路线的开山作。他们把一个 GAN (生成对抗网络) 接到抓取数据流水线里：
+Bousmalis 等人的 GraspGAN{[}32{]} 是这条路线的开山作。他们把一个
+GAN（生成对抗网络）接到抓取数据流水线里：
 
 \begin{itemize}
 \tightlist
@@ -4796,7 +4992,8 @@ Adaptation)}\label{ux57dfux9002ux914d-domain-adaptation}
   训练目标：判别器分不清生成图和真实图
 \end{itemize}
 
-这样训练出来的抓取策略相比纯仿真训练，数据效率提升了 50 倍。
+论文{[}32{]}报告，这样训练出来的抓取策略相比纯仿真训练，达到同等效果所需的真实样本量少了约一个数量级到
+50 倍（视对照设置而定）。
 
 \paragraph{（2）任务感知 GAN：RL-CycleGAN 与
 RetinaGAN}\label{ux4efbux52a1ux611fux77e5-ganrl-cyclegan-ux4e0e-retinagan}
@@ -4807,18 +5004,18 @@ RetinaGAN}\label{ux4efbux52a1ux611fux77e5-ganrl-cyclegan-ux4e0e-retinagan}
 \begin{itemize}
 \tightlist
 \item
-  \textbf{RL-CycleGAN (Rao et al., ICRA 2020)}：把 RL
+  \textbf{RL-CycleGAN}{[}44{]}（Rao 等人，CVPR 2020）：把 RL
   智能体的特征也作为约束训练 GAN，强迫翻译保留任务相关信息。
 \item
-  \textbf{RetinaGAN (Ho et al., ICRA
-  2021)}：进一步引入''物体级一致性''约束，让翻译前后物体的边界框检测结果一致。最终在真实抓取上达到
-  80\% 成功率，明显优于 CycleGAN (\textasciitilde68\%)。
+  \textbf{RetinaGAN}{[}33{]}：进一步引入''物体级一致性''约束，让翻译前后物体的边界框检测结果一致。论文那张真机实例抓取对照表里，RetinaGAN
+  是 80.0\%，同表的 CycleGAN 是 67.8\%、RL-CycleGAN 是
+  68.9\%，而纯仿真训练只有 18.9\%。
 \end{itemize}
 
 \paragraph{（3）Sim-to-Sim
 中介：RCAN}\label{sim-to-sim-ux4e2dux4ecbrcan}
 
-\textbf{RCAN (James et al., CVPR 2019)} 走了一条颇具巧思的折中路线：
+\textbf{RCAN}{[}34{]} 走了一条颇具巧思的折中路线：
 
 \begin{itemize}
 \tightlist
@@ -4838,24 +5035,26 @@ RetinaGAN}\label{ux4efbux52a1ux611fux77e5-ganrl-cyclegan-ux4e0e-retinagan}
 
 }
 
-\caption{图：把高度随机化的仿真图翻译成规范化的 canonical sim 图。}
+\caption{图：上下两行结构完全相同，差别只在最左边那一格。上行''训练''从高度随机化的仿真图出发，下行''测试''从真机照片出发；两者都先过同一个生成器
+\(G\)，被翻译成同一套规范仿真外观（灰底、纯色积木、彩色机械臂），再送进同一个智能体输出动作。（图取自参考文献
+{[}34{]}）}
 
 \end{figure}%
 
 RCAN 因此既享受了 DR 的鲁棒性（训练翻译器要看大量随机化图），又享受了 DA
-的精确性（最后策略输入是一致的''canonical''图），并且不需要任何真机数据。
+的精确性（最后策略输入是同一套规范化的图），并且不需要任何真机数据。
 
 \paragraph{（4）三种 DA
 路线对比}\label{ux4e09ux79cd-da-ux8defux7ebfux5bf9ux6bd4}
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3602\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2818\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3580\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3373\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2648\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3979\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 方法 & 翻译方向 & 关键贡献 \\
 \midrule\noalign{}
-GraspGAN (2018) & sim → real 风格 & 像素级 GAN；50× 数据效率 \\
-RL-CycleGAN (2020) / RetinaGAN (2021) & sim \(\leftrightarrow\) real，加任务一致性约束 & 任务/物体级一致性，避免 GAN 移动机械臂 \\
-RCAN (2019) & 随机化 sim → canonical sim & 用 sim-to-sim 中介，规避真机数据 \\
+GraspGAN（2018） & 仿真 → 真实风格 & 像素级 GAN；真实样本最多省到 1/50 \\
+RL-CycleGAN（2020）/ RetinaGAN（2021） & 仿真 \(\leftrightarrow\) 真实，加任务一致性约束 & 任务/物体级一致性，避免 GAN 移动机械臂 \\
+RCAN（2019） & 随机化仿真 → 规范化仿真 & 用 Sim-to-Sim 中介，规避真机数据 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -4865,14 +5064,14 @@ RCAN (2019) & 随机化 sim → canonical sim & 用 sim-to-sim 中介，规避�
 适合视觉差距是主要瓶颈、动力学差距相对较小的任务（典型代表：抓取）。它对真机数据的需求很轻量（一些无标签真实图），代价是要训一个图像翻译器，并保证它别把任务关键信息丢了。
 \end{quote}
 
-\subsubsection{5.1.6 系统辨识 (System
-Identification)}\label{ux7cfbux7edfux8fa8ux8bc6-system-identification}
+\subsubsection{5.1.6 系统辨识（System
+Identification）}\label{ux7cfbux7edfux8fa8ux8bc6system-identification}
 
 域随机化和域适配都从模型这边发力。系统辨识则反过来：\textbf{改进仿真，让仿真离真实更近}。
 
 \paragraph{（1）闭环辨识：SimOpt}\label{ux95edux73afux8fa8ux8bc6simopt}
 
-\textbf{SimOpt (Chebotar et al., ICRA 2019)} 提出一个闭环：
+\textbf{SimOpt}{[}45{]}（Chebotar 等人，ICRA 2019）提出一个闭环：
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -4892,7 +5091,7 @@ Identification)}\label{ux7cfbux7edfux8fa8ux8bc6-system-identification}
 
 \paragraph{（2）贝叶斯辨识：BayesSim}\label{ux8d1dux53f6ux65afux8fa8ux8bc6bayessim}
 
-\textbf{BayesSim (Ramos et al., RSS 2019)} 把 SimOpt
+\textbf{BayesSim}{[}46{]}（Ramos 等人，RSS 2019）把 SimOpt
 的思路放在概率框架下：用高斯混合分布建模仿真参数的后验，给定真实观测求后验。这意味着不再是点估计，而是一个
 \textbf{置信分布}；这个分布天然可以作为下一轮 DR 的范围。
 
@@ -4924,39 +5123,41 @@ DR + SysID & 鲁棒性 + 精度兼顾 & 工程链路较长 \\
 DR、DA、SysID
 都是''调环境''或''调输入''。下一类方法换一个角度：\textbf{调网络结构和训练流程}。
 
-\paragraph{（1）渐进网络 (Progressive
-Networks)}\label{ux6e10ux8fdbux7f51ux7edc-progressive-networks}
+\paragraph{（1）渐进网络（Progressive
+Networks）}\label{ux6e10ux8fdbux7f51ux7edcprogressive-networks}
 
-\textbf{Rusu et al.~(DeepMind, 2016/2017)} 提出 Progressive Networks：
+\textbf{Rusu 等人}（DeepMind）先在 2016 年 6 月提出 Progressive
+Networks{[}50{]} 这个架构本身：
 
 \begin{itemize}
 \tightlist
 \item
   第一列：在仿真中训练一个完整网络
 \item
-  第二列：冻结第一列，新加一列在真机上训练；新列每一层都和第一列对应层有''侧向连接
-  (lateral connection)''
+  第二列：冻结第一列，新加一列在真机上训练；新列每一层都和第一列对应层有''侧向连接（lateral
+  connection）''
 \item
   后续列继续叠加
 \end{itemize}
 
 好处是\textbf{没有灾难性遗忘}：旧能力被冻结的列保留下来，新能力由新列扛。代价是参数随任务数线性增长。
 
-在 sim-to-real 上的代表作 (Rusu et al., CoRL
-2017)：仿真里训练好像素级到达任务，加一列在真机上微调，只需要少量真机数据就能迁移。
+把它用到 Sim2Real 上的是同一批人同年 10
+月挂出的那篇{[}43{]}（后来正式发表在 CoRL
+2017）：仿真里训练好像素级到达任务，加一列在真机上微调，只需要少量真机数据就能迁移。
 
 \paragraph{（2）师生框架（Teacher-Student）}\label{ux5e08ux751fux6846ux67b6teacher-student}
 
-师生是腿足机器人 sim-to-real 真正的主流方案，\textbf{RMA: Rapid Motor
-Adaptation (Kumar et al., RSS 2021)} 是最有代表性的工作之一。
+师生是腿足机器人 Sim2Real 真正的主流方案，\textbf{RMA（Rapid Motor
+Adaptation）}{[}35{]} 是最有代表性的工作之一。
 
 RMA 把训练分成两阶段：
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{教师阶段}：在仿真中训练一个能直接看到''特权信息'' (privileged
-  info)（地形高度图、摩擦、负载、机器人物理参数）的策略；用 RL
+  \textbf{教师阶段}：在仿真中训练一个能直接看到''特权信息''（privileged
+  info：地形高度图、摩擦、负载、机器人物理参数）的策略；用 RL
   学到一个最优控制策略，外加一个把特权信息编码成隐变量 \(z\) 的编码器。
 \item
   \textbf{适应模块阶段}：训练一个\textbf{只看真机能看到的输入}的模块------它从最近若干步的本体历史（关节状态、IMU、命令）去\textbf{估计第一阶段那个同一个环境隐变量
@@ -4968,10 +5169,11 @@ RMA 把训练分成两阶段：
 的估计随时间更新，这套结构本身就是一种''在线快速适应''------RMA
 因此能在岩石、沙地、楼梯、湿滑地面上稳定行走。把它笼统说成''学生蒸馏教师动作''，会把这个在线适应机制盖掉。
 
-更早的开山工作是 \textbf{Hwangbo et al.~(Science Robotics 2019)}：在
-ANYmal
-上用师生框架学敏捷动作。教师在仿真里享受准确动力学，学生再蒸馏到只看实际可观测的输入。这一篇也是
-sim-to-real 在 \emph{Science Robotics} 上正式被认可的标志性论文之一。
+更早的开山工作是 \textbf{Hwangbo 等人}{[}47{]}（Science Robotics
+2019）：在 ANYmal
+上用师生框架学敏捷动作。教师在仿真里享受准确动力学，学生再蒸馏到只看实际可观测的输入。它和
+RMA 的分工正好互补：RMA
+把重点放在部署后的在线估计，这一篇把重点放在''仿真里的准确动力学怎么蒸馏进一个只看得见本体的学生''。
 
 \paragraph{（3）师生 vs 渐进 vs
 DR}\label{ux5e08ux751f-vs-ux6e10ux8fdb-vs-dr}
@@ -4989,8 +5191,8 @@ DR & 训练时随机化环境参数 & 不愿/没法访问真机的设定 \\
 \end{center}
 
 \begin{quote}
-小结：师生是腿足机器人 sim-to-real
-的事实标准，因为腿足机器人天生有''特权 vs 实际可观测''的差距；DR
+小结：师生是腿足机器人 Sim2Real 的事实标准，因为腿足机器人天生有''特权
+vs 实际可观测''的差距；DR
 主要负责''仿真环境本身就有变化''，两者经常组合。
 \end{quote}
 
@@ -5014,39 +5216,45 @@ DR、域适配、系统辨识、渐进网络和师生框架分开讲了。近年
 \item
   有的工作在加入 \textbf{真机纠错或残差模型}；
 \item
-  有的工作在做 \textbf{real-to-sim 参数对齐}。
+  有的工作在做 \textbf{Real2Sim 参数对齐}。
 \end{enumerate}
 
-这几类做法解决的 gap
-不一样。把它们分开看，反而更容易判断一篇论文到底贡献在哪里。
+这几类做法针对的差距不一样。把它们分开看，反而更容易判断一篇论文到底贡献在哪里。
 
-\paragraph{（1）扩散策略 (Diffusion
-Policy)}\label{ux6269ux6563ux7b56ux7565-diffusion-policy}
+\paragraph{（1）扩散策略（Diffusion
+Policy）}\label{ux6269ux6563ux7b56ux7565diffusion-policy}
 
-\textbf{Chi et al.~(RSS 2023)} 提出 Diffusion Policy，把扩散模型
-(diffusion model) 用作机器人动作生成的策略类。
+Chi 等人提出的 Diffusion Policy{[}36{]} 把扩散模型（diffusion
+model）用作机器人动作生成的策略类。
 
 \begin{figure}[H]
 
-{\centering \includegraphics[width=0.8\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/figures/wri-003-diffusion-policy-overview.png}
+{\centering \includegraphics[width=0.8\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/figures/wri-003-diffusion-policy-overview_arxiv-2303.04137.png}
 
 }
 
-\caption{图：将动作建模为去噪过程，能够表达多模态动作分布、稳定训练、容易扩展到高维连续动作空间。}
+\caption{图：论文的方法总览，分三格。左格是输入输出示例------上排是机械臂的图像观测序列，下排三张图叠着彩色散点，画的是同一个观测下采出的多条候选动作序列。中格是通用形式：观测
+\(\mathbf{O}_t\) 送进去噪网络
+\(\varepsilon_\theta(\mathbf{O},\mathbf{A},k)\)，一次吐出预测时域
+\(T_p\) 内的一整段动作
+\(\mathbf{A}_t\)，只执行开头几步再重新预测。右两格是两种网络实现：CNN
+版用 FiLM 把观测条件注入一维卷积，Transformer
+版用交叉注意力。（图取自参考文献 {[}36{]}）}
 
 \end{figure}%
+
+左格那三张彩色散点图是这张图里最该看的：同一个观测下，动作不是收敛到一个点，而是散成几团------\textbf{``多模态''在这里是画得出来的}，而这正是下面三条特点里第一条要说的事。
 
 和传统 BC 相比，Diffusion Policy 有三个特点：
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{多模态动作分布}：同一观测可以有多种合理动作；扩散模型不会把它们
-  ``平均'' 成一个差的动作
+  \textbf{多模态动作分布}：同一观测可以有多种合理动作；扩散模型不会把它们''平均''成一个差的动作
 \item
   \textbf{训练稳定}：本质上是回归损失，不像 GAN/VAE 那么挑超参
 \item
-  \textbf{高维连续动作友好}：扩散过程天然适配长序列连续动作 chunk
+  \textbf{高维连续动作友好}：扩散过程天然适配长序列的连续动作块
 \end{itemize}
 
 Diffusion Policy 自身不是
@@ -5057,8 +5265,8 @@ SplatSim 用它训练 RGB 操作策略，\(\pi_0\) 则把 flow matching
 \paragraph{（2）VLA /
 机器人基础模型}\label{vla-ux673aux5668ux4ebaux57faux7840ux6a21ux578b}
 
-VLA 的核心想法是：把视觉-语言模型 (VLM)
-接上机器人动作输出，让一个模型同时具备语义理解和动作生成能力。下面这些工作按时间排列，但不是一条严格的继承链；更准确地说，它们代表了几种不同的
+VLA
+的核心想法是：把视觉-语言模型（VLM）接上机器人动作输出，让一个模型同时具备语义理解和动作生成能力。下面这些工作按时间排列，但不是一条严格的继承链；更准确地说，它们代表了几种不同的
 VLA 设计取向。
 
 在这些系统里，仿真通常不是唯一训练来源，而是用于数据增广、评估、具身适配或补足真实数据。VLA
@@ -5069,63 +5277,78 @@ VLA 设计取向。
 \begin{itemize}
 \tightlist
 \item
-  \textbf{RT-2 (Brohan et al., CoRL 2023)}：把动作离散化成文本 token，让
-  VLM 直接生成动作；论文基于 PaLI-X / PaLM-E 等 VLM
-  尺度做实验，展现出语义泛化（例如能理解 ``把灭绝的动物放到桌上''
-  这种新颖指令）。
+  \textbf{RT-2}{[}6{]}：把动作离散化成文本 token，让 VLM
+  直接生成动作；论文基于 PaLI-X / PaLM-E 等 VLM
+  尺度做实验，展现出语义泛化（例如能理解''把灭绝的动物放到桌上''这种新颖指令）。
 \item
-  \textbf{OpenVLA (Kim et al., 2024)}：开源 7B VLA，用 DINOv2 + SigLIP
-  视觉编码器和 LLaMA-2 骨干，在 Open X-Embodiment 970K 条数据上训练；用
-  LoRA 高效适配新任务。
+  \textbf{OpenVLA}{[}7{]}：开源 7B VLA，用 DINOv2 + SigLIP 视觉编码器和
+  LLaMA-2 骨干，在 Open X-Embodiment 970K 条数据上训练；用 LoRA
+  高效适配新任务。
 \end{itemize}
 
 \begin{figure}[H]
 
-{\centering \includegraphics[width=0.72\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/figures/wri-005-openvla-architecture-flattened.png}
+{\centering \includegraphics[width=0.72\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/figures/wri-005-openvla-architecture-flattened_arxiv-2406.09246.png}
 
 }
 
-\caption{图：开源 7B 参数 VLA，用 DINOv2+SigLIP 视觉编码器和 LLaMA-2
-主干，在 970K 条机器人轨迹上训练。}
+\caption{图：OpenVLA 的数据通路。左侧输入是一张相机图和一句语言指令
+``Put eggplant in bowl''；图像经 DinoV2 与 SigLIP 两个编码器并联，再过
+MLP 投影成视觉 token，指令经 Llama Tokenizer 成文本 token，两串 token
+拼在一起送进 Llama 2 7B；输出端的动作 token 经 Action De-Tokenizer
+还原成 \([\Delta x, \Delta\theta, \Delta\text{Grip}]\) 这样一个 7
+维机器人动作。（图取自参考文献 {[}7{]}）}
 
 \end{figure}%
+
+图右端那个七维向量是理解这条路线的关键：动作在模型内部一直是\textbf{离散
+token}，直到最后一步才被反 token 化成连续量------所以 OpenVLA
+能直接复用语言模型的全部训练机制，代价是动作精度受限于 token 的分辨率。
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{\(\pi_0\) (Black et al., Physical Intelligence 2024; RSS
-  2025)}：在 VLM 之上挂 flow matching 动作专家 (action
-  expert)，输出连续动作 chunk；预训练数据来自 7 种机器人配置、68
-  个任务和超过 10,000 小时机器人数据，并补充 Open X-Embodiment
-  数据。相较于离散 action-token 路线，\(\pi_0\)
+  \textbf{\(\pi_0\)}{[}8{]}：在 VLM 之上挂 flow matching
+  动作专家（action expert），输出连续动作块；预训练数据来自 7
+  种机器人配置、68 个任务和超过 10,000 小时机器人数据，并补充 Open
+  X-Embodiment 数据。相较于离散 action-token 路线，\(\pi_0\)
   更强调连续动作建模和长程真实任务。
 \end{itemize}
 
 \begin{figure}[H]
 
-{\centering \includegraphics[width=0.72\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/figures/wri-005-pi0-framework-flattened.png}
+{\centering \includegraphics[width=0.72\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/figures/wri-005-pi0-framework-flattened_arxiv-2410.24164.png}
 
 }
 
-\caption{图：基于 VLM + flow matching
-动作专家的通用机器人策略，在多种机器人和长程任务（折叠衣物、清理餐桌、装配纸箱等）上演示。}
+\caption{图：\(\pi_0\) 的框架。左端是训练数据来源------\(\pi\)
+自采数据集、互联网预训练语料与 OXE（Open X-Embodiment）；中间是预训练
+VLM，标注为 SigLIP（400M）+ Gemma（2.6B），多路相机图各过一个
+ViT，与指令 ``fold shirt'' 一起进入；右接一个 300M
+的动作专家，输入当前关节状态 \(q_t\) 和噪声，输出动作块
+\(a_t, a_{t+1}, \dots, a_{t+H}\)；最右列出三类目标本体------14
+自由度双臂、18 自由度移动操作、7 与 8 自由度单臂。（图取自参考文献
+{[}8{]}）}
 
 \end{figure}%
+
+和上一张并排看差别就很清楚：OpenVLA 的动作从主干里以 token
+形式出来，\(\pi_0\) 则把动作交给一个\textbf{挂在 VLM 之外的 300M
+动作专家}，主干只负责理解、不负责产出连续量。右侧那三类本体也说明了参数量为什么要这么分------同一个
+VLM 要面对自由度差一倍以上的机器人，可换的是动作专家那一头。
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{GR00T N1 (NVIDIA
-  2025)}：人形机器人基础模型；双系统设计------System 1
+  \textbf{GR00T N1}{[}9{]}：人形机器人基础模型；双系统设计------System 1
   是高频扩散动作策略，System 2 是 LLM 高层规划。
 \end{itemize}
 
 \paragraph{（3）LLM
 辅助奖励和随机化：DrEureka}\label{llm-ux8f85ux52a9ux5956ux52b1ux548cux968fux673aux5316dreureka}
 
-\textbf{DrEureka (Ma et al., RSS 2024)}
-不直接提出一个新的机器人策略网络。它解决的是另一个更工程化的问题：奖励函数和
-domain randomization 参数通常要靠人手调。
+\textbf{DrEureka}{[}31{]}
+不直接提出一个新的机器人策略网络。它解决的是另一个更工程化的问题：奖励函数和域随机化的参数范围通常要靠人手调。
 
 DrEureka 的形态可以拆成三步：
 
@@ -5140,18 +5363,18 @@ DrEureka 的形态可以拆成三步：
   LLM 根据这些范围生成 DR 配置，再训练用于真机部署的策略。
 \end{enumerate}
 
-所以 DrEureka 属于''自动化 sim-to-real 配置''这一类。它和 VLA
-的关系很弱：LLM 在这里不是低层控制器，而是 reward / DR 设计助手。
+所以 DrEureka 属于''自动化 Sim2Real 配置''这一类。它和 VLA
+的关系很弱：LLM
+在这里不是低层控制器，而是奖励函数与域随机化范围的设计助手。
 
 \paragraph{（4）3DGS
 场景桥接：SplatSim}\label{dgs-ux573aux666fux6865ux63a5splatsim}
 
-\textbf{SplatSim (Qureshi et al., arXiv 2024 / ICRA 2025)} 关心的是视觉
-gap。传统视觉 DR 是随机换纹理、光照、背景；SplatSim 换了一种思路：先用
-3D Gaussian Splatting (3DGS)
-把真实场景外观重建出来，再在这个更接近真实的仿真视觉里训练策略。
+\textbf{SplatSim}{[}37{]} 关心的是视觉差距。传统视觉 DR
+是随机换纹理、光照、背景；SplatSim 换了一种思路：先用 3D Gaussian
+Splatting（3DGS）把真实场景外观重建出来，再在这个更接近真实的仿真视觉里训练策略。
 
-它的 pipeline 是：
+它的流程是：
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -5161,21 +5384,21 @@ gap。传统视觉 DR 是随机换纹理、光照、背景；SplatSim 换了一�
 \item
   重建出 3DGS 场景；
 \item
-  用 Gaussian Splatting 作为仿真渲染 primitive；
+  用三维高斯点作为仿真的渲染图元；
 \item
   在仿真里训练 RGB 操作策略；
 \item
   零样本部署到真实机器人。
 \end{enumerate}
 
-论文报告的结果是：SplatSim 训练的 RGB 操作策略零样本到真机平均成功率为
+论文{[}37{]}报告的结果是：SplatSim 训练的 RGB
+操作策略零样本到真机平均成功率为
 86.25\%，而同任务全真实数据训练的参考上限为
 97.5\%。这说明它解决的是''视觉上像不像真实世界''的问题，而不是语言理解问题。
 
 \paragraph{（5）真机纠错和残差学习：TRANSIC}\label{ux771fux673aux7ea0ux9519ux548cux6b8bux5deeux5b66ux4e60transic}
 
-\textbf{TRANSIC (Sim-to-Real Policy Transfer by Learning from Online
-Correction, 2024)}
+\textbf{TRANSIC}{[}38{]}
 处理的是另一个常见情况：仿真策略已经不错，但真机上会在某些状态失败。
 
 它的形态是：
@@ -5184,35 +5407,35 @@ Correction, 2024)}
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  先在仿真里训练一个 base policy；
+  先在仿真里训练一个基础策略；
 \item
   部署到真机时，让人类操作者在线介入纠正；
 \item
-  不直接覆盖 base policy，而是学习一个 residual policy；
+  不直接覆盖基础策略，而是学习一个残差策略；
 \item
-  再训练一个 gating 模块，判断什么时候该用 residual correction。
+  再训练一个门控模块，判断什么时候该让残差策略接管。
 \end{enumerate}
 
 这和第 5.1.7
 小节的师生框架有关，但重点不同。师生框架主要解决''仿真中特权信息如何蒸馏到真实可观测策略''；TRANSIC
 解决的是''真机失败时如何用少量纠错数据补上仿真策略的短板''。
 
-\paragraph{（6）Real-to-Sim 对齐和人形灵巧操作：ASAP /
-Humanoid-Dex}\label{real-to-sim-ux5bf9ux9f50ux548cux4ebaux5f62ux7075ux5de7ux64cdux4f5casap-humanoid-dex}
+\paragraph{（6）Real2Sim 对齐和人形灵巧操作：ASAP /
+Humanoid-Dex}\label{real2sim-ux5bf9ux9f50ux548cux4ebaux5f62ux7075ux5de7ux64cdux4f5casap-humanoid-dex}
 
 还有一类工作不是只把策略做得更鲁棒，而是反过来先把仿真调得更像真实。
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{ASAP (He et al.,
-  2025)}：先在仿真中预训练人形全身动作跟踪策略；再在真实机器人上采集少量数据，学习一个
-  delta action model，用它补偿仿真和真实动力学差异；最后把这个 delta
-  model 放回仿真中继续微调策略。
+  \textbf{ASAP}（He
+  等人，2025）：先在仿真中预训练人形全身动作跟踪策略；再在真实机器人上采集少量数据，学习一个增量动作模型（delta
+  action
+  model），用它补偿仿真和真实动力学差异；最后把这个增量模型放回仿真中继续微调策略。
 \item
-  \textbf{Humanoid-Dex / Lin et al.~2025}：做人形灵巧操作时，使用自动
-  real-to-sim 标定、通用 contact/object
-  reward、分而治之策略蒸馏，以及稀疏/稠密混合物体表示。
+  \textbf{Humanoid-Dex（Lin 等人，2025）}：做人形灵巧操作时，使用自动
+  Real2Sim
+  标定、通用的接触与物体奖励、分而治之的策略蒸馏，以及稀疏/稠密混合的物体表示。
 \end{itemize}
 
 这类工作说明：在接触丰富、人形、灵巧操作任务里，``让仿真变准''和''让策略更强''一样重要。VLA
@@ -5220,46 +5443,45 @@ Humanoid-Dex}\label{real-to-sim-ux5bf9ux9f50ux548cux4ebaux5f62ux7075ux5de7ux64cd
 
 \subsubsection{5.1.9 开放挑战}\label{ux5f00ux653eux6311ux6218}
 
-虽然 sim-to-real
+虽然 Sim2Real
 已经取得了大量成功案例，离''问题解决''还差得远。把当前公认的开放问题列出来，作为这门课讨论和后续科研的起点。
 
 \paragraph{（1）接触动力学}\label{ux63a5ux89e6ux52a8ux529bux5b66}
 
-接触是机器人物理仿真最薄弱的一环。摩擦、滑动、粘附、磨损、碰撞瞬态------绝大多数仿真器都用大幅简化的接触求解器。一旦任务依赖精细接触（夹精密件、摩擦触觉、装配公差），sim-to-real
+接触是机器人物理仿真最薄弱的一环。摩擦、滑动、粘附、磨损、碰撞瞬态------绝大多数仿真器都用大幅简化的接触求解器。一旦任务依赖精细接触（夹精密件、摩擦触觉、装配公差），Sim2Real
 就会显著恶化。
 
 \paragraph{（2）可形变物体}\label{ux53efux5f62ux53d8ux7269ux4f53}
 
 布、绳、流体、食物、人体软组织------这些都是当前任何主流仿真器都无法精确刻画的。SoftGym、PhysTwin
-等工作在尝试，但距离''在仿真里训练好直接落地'' 还有相当距离。
+等工作在尝试，但距离''在仿真里训练好直接落地''还有相当距离。
 
 \paragraph{（3）触觉与力反馈}\label{ux89e6ux89c9ux4e0eux529bux53cdux9988}
 
-视觉 sim-to-real 已经成熟，但 \textbf{触觉 sim-to-real
-仍是早期阶段}。GelSight、DIGIT
+视觉那一侧已经攒下一整套可用的工具（域随机化、域适配、3DGS
+渲染），\textbf{触觉 Sim2Real 却还在早期阶段}。GelSight、DIGIT
 等基于光学的触觉传感器开始可仿真，力/力矩传感器的零飘和动力学耦合在仿真里还很难刻画。
 
-\paragraph{（4）跨 embodiment
-迁移}\label{ux8de8-embodiment-ux8fc1ux79fb}
+\paragraph{（4）跨本体迁移}\label{ux8de8ux672cux4f53ux8fc1ux79fb}
 
 策略在一台机器人上学会的，能不能直接搬到另一种机器人上？现状是：
 
 \begin{itemize}
 \tightlist
 \item
-  同 morphology、不同尺度：通常可以
+  同一形态、不同尺度：通常可以
 \item
   同类机器人不同型号：经常需要重新微调
 \item
-  跨 morphology（机械臂 → 人形）：基本不行，必须重新训练
+  跨形态（机械臂 → 人形）：基本不行，必须重新训练
 \end{itemize}
 
-基础模型路线最被关注的开放问题之一就是 \textbf{cross-embodiment
-generalization}。
+基础模型路线最被关注的开放问题之一就是
+\textbf{跨本体泛化（cross-embodiment generalization）}。
 
 \paragraph{（5）基础模型策略的现实缺口}\label{ux57faux7840ux6a21ux578bux7b56ux7565ux7684ux73b0ux5b9eux7f3aux53e3}
 
-VLA 和扩散/flow
+VLA 和扩散 / flow matching
 策略在部分仿真或离线基准上能拿到很高分数，但部署到真机时仍常出现明显下降。原因复杂：
 
 \begin{itemize}
@@ -5274,102 +5496,96 @@ VLA 和扩散/flow
 
 \paragraph{（6）评估标准化}\label{ux8bc4ux4f30ux6807ux51c6ux5316}
 
-不同论文用不同的真机平台、不同的成功率定义，结果很难严格比较。SimplerEnv、LIBERO
+不同论文用不同的真机平台、不同的成功率定义，结果很难严格比较。SIMPLER、LIBERO
 等基准在缩小这个鸿沟，但远未统一。
 
 \paragraph{（7）在线适应与持续学习}\label{ux5728ux7ebfux9002ux5e94ux4e0eux6301ux7eedux5b66ux4e60}
 
 部署后的策略能不能在真实世界继续学？RMA
-提供了''在线快速适应''的雏形（靠适应模块在线估计环境隐变量，见
-5.1.7）；真机在线纠正这一路的代表是 TRANSIC、DAgger 及 HIL-SERL
-一类人在环方法（第16讲会展开）。但持续学习不忘旧、避免奖励 hacking
-仍是难题。
+提供了''在线快速适应''的雏形（靠适应模块在线估计环境隐变量，见 5.1.7
+节）；真机在线纠正这一路的代表是 TRANSIC{[}38{]}、DAgger 及 HIL-SERL
+一类人在环方法（第16讲第 8
+节会展开）。但持续学习不忘旧、避免奖励黑客仍是难题。
 
-顺带把一个容易混的归类说清：\(\pi_{0.5}\)
-\textbf{不属于}这一格。它的核心是\textbf{开放世界泛化、异构数据与知识迁移}（预训练
+顺带把一个容易混的归类说清：\(\pi_{0.5}\)（第11讲第 5
+节）\textbf{不属于}这一格。它的核心是\textbf{开放世界泛化、异构数据与知识迁移}（预训练
 +
 后训练那条线），不是部署后在线更新或持续学习------把它放进''在线纠正''会误导读者去它身上找不存在的在线学习机制。
 
 \begin{quote}
-小结：这些挑战不是孤立的；接触/可形变/触觉的精度上限决定了基础策略在精操作上的天花板，跨
-embodiment 决定了基础模型能走多远。
+小结：这些挑战不是孤立的；接触/可形变/触觉的精度上限决定了基础策略在精操作上的天花板，跨本体迁移决定了基础模型能走多远。
 \end{quote}
 
 \subsubsection{5.1.10 本节小结}\label{ux672cux8282ux5c0fux7ed3-3}
 
-Sim-to-Real 的全貌可以这样把握：
+Sim2Real 的全貌可以这样把握：
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{Reality Gap
-  是问题}。视觉、动力学、传感器/执行器、控制软件栈四类来源都在制造它。
+  \textbf{现实差距是问题}。视觉、动力学、传感器/执行器、控制软件栈四类来源都在制造它。
 \item
-  \textbf{Sim-to-Real
+  \textbf{Sim2Real
   是一族方法}，不是一个算法。几大家族------DR、DA、SysID、渐进/师生、基础模型与生成式策略、混合训练------按''想消除哪个差距''来选用。
 \item
-  \textbf{DR + 师生}是腿足机器人 sim-to-real 的事实主流；\textbf{DA +
-  DR} 是视觉抓取的常见组合；\textbf{SimOpt + DR}
-  是接触敏感任务的稳态做法。
+  \textbf{DR + 师生}是腿足机器人 Sim2Real 的事实主流；\textbf{DA + DR}
+  是视觉抓取的常见组合；\textbf{SimOpt + DR} 是接触敏感任务的稳妥做法。
 \item
   \textbf{基础模型扩展了流水线}：VLA
   和扩散策略让语言条件、多任务和长程操作更可行，但完全替代不了 DR、SysID
-  与师生这些底层工具。``基础模型 + 仿真增广 + 真机微调''
-  是当前常见的工程组合之一。
+  与师生这些底层工具。``基础模型 + 仿真增广 +
+  真机微调''是当前常见的工程组合之一。
 \item
-  \textbf{开放问题集中在}：接触动力学、可形变物体、触觉、跨
-  embodiment、基础策略的真机精度，以及评估标准化。
+  \textbf{开放问题集中在}：接触动力学、可形变物体、触觉、跨本体迁移、基础策略的真机精度，以及评估标准化。
 \end{itemize}
 
 本节后面的 Real2Sim
 部分会从另一个角度回到这张地图，讨论如何把真实世界重建到仿真里。
 
 \subsection{5.2
-Real-to-Sim：从真实观测到可仿真的三维世界}\label{real-to-simux4eceux771fux5b9eux89c2ux6d4bux5230ux53efux4effux771fux7684ux4e09ux7ef4ux4e16ux754c}
+Real2Sim：从真实观测到可仿真的三维世界}\label{real2simux4eceux771fux5b9eux89c2ux6d4bux5230ux53efux4effux771fux7684ux4e09ux7ef4ux4e16ux754c}
 
-\subsubsection{5.2.1 Real-to-Sim
-的问题定义}\label{real-to-sim-ux7684ux95eeux9898ux5b9aux4e49}
+\subsubsection{5.2.1 Real2Sim
+的问题定义}\label{real2sim-ux7684ux95eeux9898ux5b9aux4e49}
 
-Sim2Real
-关心的是：策略已经在仿真里学好，怎样迁移到真实机器人。Real-to-Sim
+Sim2Real 关心的是：策略已经在仿真里学好，怎样迁移到真实机器人。Real2Sim
 关心的是更靠前的一步：真实世界本身怎样变成一个机器人仿真器能使用的世界。这里的目标不是做一个好看的三维模型，而是做一个可以被加载、碰撞、推动、控制、采样、评估的仿真环境。
 
-一个厨房柜子如果只在渲染图里像柜子，还不够。机器人需要知道门板是哪一个
-link（物体模型中的刚性部件），铰链轴在哪里，关节限位是多少，碰撞几何是否稳定，摩擦和质量是否合理，场景能否写成
+一个厨房柜子如果只在渲染图里像柜子，还不够。机器人需要知道门板是哪一根连杆（link，模型里可以独立运动的刚性部件），铰链轴在哪里，关节限位是多少，碰撞几何是否稳定，摩擦和质量是否合理，场景能否写成
 URDF / MJCF /
 USD（机器人和仿真场景常用的模型描述格式）或仿真器原生格式。衣服、绳子、软包裹这类可形变物体还需要材料参数和变形模型。Real2Sim
-的核心难点就在这里：\textbf{从真实观测恢复一个
-simulation-ready（可被仿真器直接使用）的三维世界}。
+的核心难点就在这里：\textbf{从真实观测恢复一个仿真就绪（simulation-ready，能被仿真器直接加载并稳定求解）的三维世界}。
 
-Ye et al.~2026 的综述 \emph{3D Generation for Embodied AI and Robotic
-Simulation: A Survey} 把这个问题概括得很清楚：面向 embodied AI 的 3D
-内容正在从``视觉真实''转向``交互可用''。该综述把相关工作分成三个角色：Data
-Generator、Simulation Environments、Sim2Real
-Bridge。三个角色分别处理资产生成、交互环境构建，以及真实观测、数字孪生、数据增强和机器人学习之间的闭环。
+Ye 等人的综述《3D Generation for Embodied AI and Robotic Simulation: A
+Survey》{[}39{]}把这个问题概括得很清楚：面向具身智能的三维内容正在从''视觉真实''转向''交互可用''。该综述把相关工作分成三个角色------资产生成器（Data
+Generator）管物体级资产从哪里来，仿真环境（Simulation
+Environments）管这些资产怎么组成可交互的世界，Sim2Real 桥接（Sim2Real
+Bridge）管真实观测怎么进仿真、仿真数据又怎么回到真实机器人。下面三个小节就按这三个角色展开。
 
 \begin{figure}[H]
 
-{\centering \includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/figures/wri-018-ye2026-fig1-outline.png}
+{\centering \includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/figures/wri-018-ye2026-fig1-outline_arxiv-2604.26509.png}
 
 }
 
-\caption{图：Data Generator 负责物体级资产，Simulation Environments
-负责场景级环境，Sim2Real Bridge
-负责从真实观测到数字孪生、数据增强和真实部署的闭环。}
+\caption{图：Ye 等人综述的全文外框，自上而下五层：预备知识（三维表示 /
+生成模型 / 仿真平台与资产 /
+具身智能基础）、三个角色（资产生成器、仿真环境、Sim2Real
+桥接）、数据集与评估、挑战与未来方向。三个角色一层被虚线框单独圈出。（图出自参考文献
+{[}39{]} 图 1）}
 
 \end{figure}%
 
-图中的 Data Generator 处理``物体和资产怎么来''，Simulation Environments
-处理``这些资产如何组成可交互世界''，Sim2Real Bridge
-处理``真实世界如何进入仿真，以及仿真数据如何回到真实机器人''。Real2Sim
-以真实观测到可执行仿真的转换为核心，同时依赖资产生成和场景构建：没有可仿真的资产，就没有可靠的数字孪生；没有可交互的场景，就不能训练或评估策略。
+被虚线圈起来的那一层才是本节要讲的部分，它上下各压着一层：上面是三维表示与生成模型这些前置技术，下面是数据集与评估。这个夹层位置本身说明了
+Real2Sim
+的处境：它算不上一项独立技术，更像是把三维生成的能力接到机器人评估口径上的中间环节。三个角色之间也有依赖顺序：没有可仿真的资产，就没有可靠的数字孪生；没有可交互的场景，就不能训练或评估策略。
 
 Real2Sim 可以写成一条链：
 
 \[
 \text{真实观测}
 \rightarrow
-\text{3D 表示}
+\text{三维表示}
 \rightarrow
 \text{仿真资产}
 \rightarrow
@@ -5380,33 +5596,32 @@ Real2Sim 可以写成一条链：
 
 其中每一环都有自己的失败模式。NeRF（Neural Radiance
 Field，用神经网络表示场景辐射和密度的隐式三维表示）或 3DGS（3D Gaussian
-Splatting，用大量三维高斯点快速渲染场景的显式表示）可以让画面逼真，但不一定能碰撞；mesh（三角网格，物理引擎常用的表面几何）可以进物理引擎，但材质和纹理可能不真实；有
+Splatting，用大量三维高斯点快速渲染场景的显式表示）可以让画面逼真，但不一定能碰撞；三角网格（mesh，物理引擎常用的表面几何）可以进物理引擎，但材质和纹理可能不真实；有
 URDF
 关节也不代表物理参数准确；有一个重建场景也不代表训练出来的策略能迁回真机。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0740\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2345\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6915\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1092\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4015\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4892\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 层级 & 主要问题 & 典型输出 \\
 \midrule\noalign{}
-三维表示 & 真实图像、深度、视频如何变成 3D 内容 & point cloud（点云）、mesh（三角网格）、SDF（有符号距离场）、NeRF、3DGS \\
-仿真资产 & 3D 内容如何被物理引擎消费 & collision mesh（碰撞网格）、inertia（惯量）、friction（摩擦）、URDF、MJCF、USD \\
-交互环境 & 多个资产如何组成任务场景 & scene graph（场景图）、layout（布局）、task metadata（任务元数据）、simulator scene（仿真场景） \\
-桥接闭环 & 真实观测如何转成数字孪生并反哺策略学习 & digital twin（数字孪生）、augmentation（数据增强）、synthetic demos（合成示教）、policy evaluation（策略评估） \\
+三维表示 & 真实图像、深度、视频如何变成三维内容 & 点云、三角网格、有符号距离场（SDF）、NeRF、3DGS \\
+仿真资产 & 三维内容如何被物理引擎消费 & 碰撞网格、惯量、摩擦、URDF、MJCF、USD \\
+交互环境 & 多个资产如何组成任务场景 & 场景图、布局、任务元数据、仿真场景 \\
+桥接闭环 & 真实观测如何转成数字孪生并反哺策略学习 & 数字孪生、数据增强、合成示教、策略评估 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
-NeRF、3DGS、mesh 只是这条链中的表示选择，不能单独构成 Real2Sim
-的完整结构。
+NeRF、3DGS、三角网格只是这条链里的表示选择，单独拿出来都撑不起完整的
+Real2Sim。
 
 \subsubsection{5.2.2
-Simulation-ready：比视觉真实更高的门槛}\label{simulation-readyux6bd4ux89c6ux89c9ux771fux5b9eux66f4ux9ad8ux7684ux95e8ux69db}
+仿真就绪：比视觉真实更高的门槛}\label{ux4effux771fux5c31ux7eeaux6bd4ux89c6ux89c9ux771fux5b9eux66f4ux9ad8ux7684ux95e8ux69db}
 
-传统 3D 生成常用 Chamfer
-Distance（点云或表面之间的几何距离）、FID（生成图像分布和真实图像分布的距离）、CLIP
-score（图像与文本语义匹配分数）评估几何和外观。但机器人仿真还要回答另一个问题：这个资产能不能真的在仿真器里跑。Ye
-et al.~把 simulation readiness 拆成四项要求：
+传统三维生成常用 Chamfer
+Distance（倒角距离，衡量点云或表面之间的几何差异）、FID（生成图像分布和真实图像分布的距离）、CLIP
+Score（图像与文本的语义匹配分数）评估几何和外观。但机器人仿真还要回答另一个问题：这个资产能不能真的在仿真器里跑。该综述{[}39{]}把仿真就绪拆成四项要求：
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -5416,266 +5631,229 @@ et al.~把 simulation readiness 拆成四项要求：
 \item
   \textbf{物理参数化}：质量、惯量、密度、摩擦、恢复系数、质心、材料属性等可以被表达。
 \item
-  \textbf{运动学可执行}：如果对象有关节，要有 joint type、joint
-  axis、joint limit、运动约束。
+  \textbf{运动学可执行}：如果对象有关节，要有关节类型、关节轴、关节限位和运动约束。
 \item
   \textbf{仿真器兼容}：输出能写成 URDF、MJCF、USD
   或目标仿真平台的原生格式。
 \end{enumerate}
 
-这四项把 Real2Sim 和普通 3D 重建区分开。一个漂亮的 3DGS
-场景，如果没有稳定 collision
-mesh（用于接触计算的简化碰撞网格），就不能直接训练接触策略；一个由多视角图片重建的
-mesh，如果不是
-watertight（封闭无洞、适合做体积和碰撞计算），进入物理引擎后可能穿模、爆炸或产生错误接触；一个看起来正确的抽屉，如果铰链轴错了，机器人学到的开抽屉策略就没有意义。
+这四项把 Real2Sim 和普通三维重建区分开。一个漂亮的 3DGS
+场景，如果没有稳定的碰撞网格（collision
+mesh，专供接触计算用的简化几何），就不能直接训练接触策略；一个由多视角图片重建的三角网格，如果不是封闭无洞的（watertight，表面完全闭合，体积与碰撞计算才有定义），进入物理引擎后可能穿模、爆炸或产生错误接触；一个看起来正确的抽屉，如果铰链轴错了，机器人学到的开抽屉策略就没有意义。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3254\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3772\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2973\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2323\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3981\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3696\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 表示 / 格式 & 优势 & 在 Real2Sim 中的限制 \\
 \midrule\noalign{}
-Point cloud（点云） & 来自 RGB-D（彩色图像加深度图）/ LiDAR（激光雷达），适合感知输入 & 缺少拓扑和物理属性，不能直接表达关节和材料 \\
-Mesh & 物理引擎最常用，便于碰撞和接触 & 需要清理拓扑、简化碰撞几何、补物理参数 \\
-SDF（Signed Distance Field，有符号距离场）/ Occupancy & 连续几何，适合抽取 watertight surface & 需要转换为仿真器可用格式 \\
+点云 & 来自 RGB-D（彩色图像加深度图）/ 激光雷达，适合感知输入 & 缺少拓扑和物理属性，不能直接表达关节和材料 \\
+三角网格 & 物理引擎最常用，便于碰撞和接触 & 需要清理拓扑、简化碰撞几何、补物理参数 \\
+有符号距离场（SDF）/ 占据场 & 连续几何，适合抽出封闭无洞的表面 & 需要转换为仿真器可用格式 \\
 NeRF & 视角合成质量高，适合视觉增强 & 渲染慢，几何隐式，物理接入成本高 \\
-3DGS & 显式、高速、照片级渲染 & 高斯是渲染 primitive，不天然等于碰撞 primitive \\
+3DGS & 显式、高速、照片级渲染 & 高斯是渲染图元，不天然等于碰撞图元 \\
 URDF / MJCF / USD & 可被仿真器加载执行 & 需要几何、关节、物理属性一起正确序列化 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
-3DGS 和 NeRF 属于``可渲染表示''这一层。它们能显著减少视觉
-gap，但不自动解决动力学 gap。完整的 Real2Sim 系统通常采用混合表示：3DGS
-或 NeRF 负责真实外观，mesh / SDF 负责碰撞，URDF / MJCF / USD
-负责运动学和物理属性。
+3DGS 和 NeRF
+属于''可渲染表示''这一层。它们能显著减少视觉差距，但不自动解决动力学差距。完整的
+Real2Sim 系统通常采用混合表示：3DGS 或 NeRF 负责真实外观，三角网格 /
+有符号距离场负责碰撞，URDF / MJCF / USD 负责运动学和物理属性。
 
-\subsubsection{5.2.3 Data
-Generator：生成可仿真的物体资产}\label{data-generatorux751fux6210ux53efux4effux771fux7684ux7269ux4f53ux8d44ux4ea7}
+\subsubsection{5.2.3
+资产生成器：生成可仿真的物体资产}\label{ux8d44ux4ea7ux751fux6210ux5668ux751fux6210ux53efux4effux771fux7684ux7269ux4f53ux8d44ux4ea7}
 
-Data Generator
-关注的是``资产从哪里来''。它不一定从某个具体真实场景重建，而是生成或补全大量可进入仿真的物体。对机器人来说，一个资产库不能只包含外观模型，还要包含
-articulated structure、physical parameters、deformable model 和
-simulator format。
+资产生成器关注的是''资产从哪里来''。它未必对着某个具体真实场景做重建，更多是成批生成或补全可进入仿真的物体。对机器人来说，一个资产库光有外观模型不够用，还要有关节结构、物理参数、可形变模型，以及仿真器能读的文件格式。
 
 \paragraph{（1）关节物体：从几何到运动学}\label{ux5173ux8282ux7269ux4f53ux4eceux51e0ux4f55ux5230ux8fd0ux52a8ux5b66}
 
 家居和工业场景里大量对象都是关节物体：柜门、抽屉、剪刀、笔记本、瓶盖、微波炉门。机器人要操作它们，就必须知道哪些部件能动、如何动、运动范围是多少。URDFormer、SINGAPO、Articulate-Anything、URDF-Anything
-这类工作都在试图从图像、文本或 3D 形状生成可执行的关节资产。
+这类工作都在试图从图像、文本或三维形状生成可执行的关节资产。
 
 关节资产至少需要四类信息：
 
 \begin{itemize}
 \tightlist
 \item
-  link / part 的几何；
+  各个连杆与部件的几何；
 \item
-  joint type（关节类型），例如 revolute、prismatic、fixed；
+  关节类型，例如转动副（revolute，绕轴转，柜门属于这类）、移动副（prismatic，沿轴平移，抽屉属于这类）、固定（fixed，不动）；
 \item
-  joint axis、joint origin、joint limit（关节轴、关节原点、关节限位）；
+  关节轴、关节原点、关节限位；
 \item
   可被仿真器读取的文件格式，例如 URDF 或 MJCF。
 \end{itemize}
 
-如果只预测几何，机器人最多知道``这里有一个抽屉''；如果能预测关节，机器人才能在仿真中尝试``拉开抽屉''。这就是
-embodied 3D generation 和普通 3D generation 的差别。
+如果只预测几何，机器人最多知道''这里有一个抽屉''；如果能预测关节，机器人才能在仿真中尝试''拉开抽屉''。这就是面向具身智能的三维生成和普通三维生成的差别。
 
-\paragraph{（2）物理属性：从``能看''到``能推''}\label{ux7269ux7406ux5c5eux6027ux4eceux80fdux770bux5230ux80fdux63a8}
+\paragraph{（2）物理属性：从''能看''到''能推''}\label{ux7269ux7406ux5c5eux6027ux4eceux80fdux770bux5230ux80fdux63a8}
 
 物体能被推动、抓取、碰撞，取决于质量、质心、惯量、摩擦、材料等属性。NeRF2Physics、PhysX-3D、PhysX-Anything、GaussianProperty
 等工作尝试从几何、语言、图像或 3DGS
-中推断这些属性。很多估计只能达到粗粒度，例如``金属比泡沫重''\,``橡胶摩擦更大''，但即使这种粗粒度信息也比完全手填参数更接近真实世界。
+中推断这些属性。很多估计只能达到粗粒度，例如''金属比泡沫重''\,``橡胶摩擦更大''，但即使这种粗粒度信息也比完全手填参数更接近真实世界。
 
 物理属性很难单靠静态图像可靠恢复。两个外观相同的盒子，一个可能是空纸盒，一个可能装满金属零件。真正可靠的参数估计通常需要交互观测：拿起、推动、碰撞、下落，才能从运动响应中反推物理。
 
 \paragraph{（3）可形变资产：布、绳子和软体物体}\label{ux53efux5f62ux53d8ux8d44ux4ea7ux5e03ux7ef3ux5b50ux548cux8f6fux4f53ux7269ux4f53}
 
 可形变物体是 Real2Sim
-最难的部分。布料、绳子、软玩具、包裹、食物没有低维刚体状态，接触和变形高度非线性。综述中把可形变资产单独列为一类，因为它们需要和
-FEM（有限元法）、MPM（物质点法）、PBD（基于位置的动力学）、spring-mass（弹簧-质点模型）、cloth
-solver（布料求解器）等模型接起来。
+最难的部分。布料、绳子、软玩具、包裹、食物没有低维刚体状态，接触和变形高度非线性。综述中把可形变资产单独列为一类，因为它们需要和有限元法（FEM）、物质点法（MPM）、基于位置的动力学（PBD）、弹簧-质点模型、布料求解器等模型接起来。
 
-服装生成相对成熟一些，因为 sewing pattern 可以作为 simulation-native
-intermediate：它不是单纯的视觉
-mesh，而是布料仿真器能直接理解的结构。一般软体物体还没有类似统一的中间表示。PhysGaussian、PhysDreamer、GarmentDreamer、DressCode
-代表了早期路线，但离``任意可形变资产都能自动生成并稳定仿真''还有明显距离。
+服装生成相对成熟一些，因为裁剪样片（sewing
+pattern，衣服在裁剪台上摊平后的二维片形）可以充当仿真原生的中间表示：它不是单纯的视觉网格，而是布料仿真器能直接理解的结构。一般软体物体还没有类似统一的中间表示。PhysGaussian、PhysDreamer、GarmentDreamer、DressCode
+代表了早期路线，但离''任意可形变资产都能自动生成并稳定仿真''还有明显距离。
 
 \paragraph{（4）端到端资产流水线}\label{ux7aefux5230ux7aefux8d44ux4ea7ux6d41ux6c34ux7ebf}
 
 真正有用的资产生成系统需要把几何、纹理、关节、材料、物理参数和文件格式串起来。EmbodiedGen、Seed3D、PhysX-Anything
-这类工作代表了端到端方向：输入文本、图片或粗糙 3D
-内容，输出仿真器可加载的资产。
+这类工作代表了端到端方向：输入文本、图片或粗糙的三维内容，输出仿真器可加载的资产。
 
-这类系统的关键不只是生成能力，还有质量控制。大规模生成一定会产生坏资产：非流形
-mesh、自相交、错误尺度、漂浮部件、碰撞体缺失、关节轴错位。好的流水线需要自动验证和过滤，例如拓扑检查、语义一致性检查、物理稳定性检查、仿真器加载测试。
+这类系统的关键不只是生成能力，还有质量控制。大规模生成一定会产生坏资产：非流形网格、自相交、错误尺度、漂浮部件、碰撞体缺失、关节轴错位。好的流水线需要自动验证和过滤，例如拓扑检查、语义一致性检查、物理稳定性检查、仿真器加载测试。
 
-\textbf{小结}：Data Generator 解决``物体资产的规模化来源''。这类方法为
-Real2Sim 提供可补全、可替换、可扩展的资产基础。
+\textbf{小结}：资产生成器解决的是''物体资产的规模化来源''，为 Real2Sim
+提供可补全、可替换、可扩展的资产基础。
 
-\subsubsection{5.2.4 Simulation
-Environments：生成可交互场景}\label{simulation-environmentsux751fux6210ux53efux4ea4ux4e92ux573aux666f}
+\subsubsection{5.2.4
+仿真环境：生成可交互场景}\label{ux4effux771fux73afux5883ux751fux6210ux53efux4ea4ux4e92ux573aux666f}
 
-一个物体资产能动，不代表整个场景能用。机器人训练和评估需要完整环境：物体之间的空间关系、支撑关系、可达性、任务目标、随机化范围、传感器配置、初始状态分布。Simulation
-Environments 关注的就是``多个资产如何组成可交互世界''。
+一个物体资产能动，不代表整个场景能用。机器人训练和评估需要完整环境：物体之间的空间关系、支撑关系、可达性、任务目标、随机化范围、传感器配置、初始状态分布。仿真环境这一层关注的就是''多个资产如何组成可交互世界''。
 
 \paragraph{（1）结构驱动场景生成}\label{ux7ed3ux6784ux9a71ux52a8ux573aux666fux751fux6210}
 
-早期 embodied 场景多来自 procedural rules 或已有 scan
-数据。ProcTHOR、RoboCasa、OmniGibson、BEHAVIOR、Habitat
-这类平台提供大量房间、厨房、家居任务。它们的价值在于：场景不是静态图片，而是可以被
-agent 走动、抓取、打开、移动和重置。
+早期具身场景多来自程序化生成规则（procedural
+rules）或已有的真实扫描数据。ProcTHOR、RoboCasa、OmniGibson、BEHAVIOR、Habitat
+这类平台提供大量房间、厨房、家居任务。它们的价值在于：场景不是静态图片，而是可以被智能体走动、抓取、打开、移动和重置。
 
-结构驱动方法通常依赖 scene graph（场景图，用节点和边表示物体及其关系）或
-layout
-prior（布局先验）。场景图里的节点是物体，边表示支撑、相邻、包含、可交互关系。例如``杯子在桌子上''\,``抽屉属于柜子''\,``盘子靠近水槽''。这种结构比单纯的
-3D mesh 更接近机器人任务。
+结构驱动方法通常依赖场景图（scene
+graph，用节点和边表示物体及其关系）或布局先验。场景图里的节点是物体，边表示支撑、相邻、包含、可交互关系。例如''杯子在桌子上''\,``抽屉属于柜子''``盘子靠近水槽''。这种结构比单纯的三角网格更接近机器人任务。
 
 \paragraph{（2）可控场景生成}\label{ux53efux63a7ux573aux666fux751fux6210}
 
-可控生成把用户需求、图片条件、任务条件或物理条件引入场景构建。文本可以指定``一个杂乱厨房台面''，图片可以提供真实布局，任务可以要求``杯子必须在机器人可达范围内''，物理条件可以约束``物体不能悬空、不能互相穿透''。
+可控生成把用户需求、图片条件、任务条件或物理条件引入场景构建。文本可以指定''一个杂乱厨房台面''，图片可以提供真实布局，任务可以要求''杯子必须在机器人可达范围内''，物理条件可以约束''物体不能悬空、不能互相穿透''。
 
 对 Real2Sim
 来说，可控生成很重要，因为真实扫描往往不完整。摄像头看不到的柜子背面、桌子下方、遮挡物内部，都需要生成先验补全。生成模型可以填补缺失几何和纹理，但必须受物理和语义约束，否则补出来的内容可能好看但不可用。
 
-\paragraph{（3）Agentic
-场景生成}\label{agentic-ux573aux666fux751fux6210}
+\paragraph{（3）智能体式场景生成}\label{ux667aux80fdux4f53ux5f0fux573aux666fux751fux6210}
 
-近年的场景生成开始引入 LLM / VLM agent（大语言模型 /
-视觉语言模型驱动的自动化决策模块）：模型先理解任务，再调用分割、检索、生成、放置、物理检查等模块，迭代构造场景。Holodeck、SceneWeaver、SAGE、SceneSmith
+近年的场景生成开始引入由 LLM / VLM
+驱动的智能体（自动化决策模块）：模型先理解任务，再调用分割、检索、生成、放置、物理检查等模块，迭代构造场景。Holodeck、SceneWeaver、SAGE、SceneSmith
 代表了这种趋势。
 
-agentic
-方法的优势是语义强、可控性高，能根据任务调整场景；缺点是成本高、模块误差会累积。一个失败的分割、错误的物体检索或不稳定的物理验证，都会让最终环境不可用。工程上更可行的方向是层次化：先快速生成粗布局，再对任务关键区域做精细化生成和物理验证。
+智能体式方法的优势是语义强、可控性高，能根据任务调整场景；缺点是成本高、模块误差会累积。一个失败的分割、错误的物体检索或不稳定的物理验证，都会让最终环境不可用。工程上更可行的方向是层次化：先快速生成粗布局，再对任务关键区域做精细化生成和物理验证。
 
-\textbf{小结}：Simulation Environments
-解决``场景如何可交互''。没有这一层，Real2Sim
-只能得到孤立资产，无法支撑长任务、导航、操作和策略评估。
+\textbf{小结}：仿真环境这一层解决的是''场景如何可交互''。缺了它，Real2Sim
+只能得到一堆孤立资产，撑不起长任务、导航、操作和策略评估。
 
 \subsubsection{5.2.5 Sim2Real
-Bridge：从数字孪生到策略闭环}\label{sim2real-bridgeux4eceux6570ux5b57ux5b6aux751fux5230ux7b56ux7565ux95edux73af}
+桥接：从数字孪生到策略闭环}\label{sim2real-ux6865ux63a5ux4eceux6570ux5b57ux5b6aux751fux5230ux7b56ux7565ux95edux73af}
 
-Sim2Real Bridge
-描述真实观测和机器人策略之间的闭环：真实观测先变成数字孪生；数字孪生再用于数据增强、任务生成和示教生成；训练出的策略回到真实机器人；真实执行反馈继续修正仿真域。
+Sim2Real
+桥接描述真实观测和机器人策略之间的闭环：真实观测先变成数字孪生；数字孪生再用于数据增强、任务生成和示教生成；训练出的策略回到真实机器人；真实执行反馈继续修正仿真域。
 
 \begin{figure}[H]
 
-{\centering \includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/figures/wri-018-ye2026-fig9-bridge.png}
+{\centering \includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/figures/wri-018-ye2026-fig9-bridge_arxiv-2604.26509.png}
 
 }
 
-\caption{图：真实观测转成数字孪生，经过 3D-grounded augmentation 和
-task/demo generation
-扩展训练数据，再用于真实机器人策略，并用真实反馈继续更新仿真。}
+\caption{图：中间橙色框是生成式仿真域，内含三列------数字孪生列（自动场景重建
+/ 运动学重建 / 物理感知与对齐）、数据增强列（视角与几何增强 /
+动态与时序增强 / 物理一致性）、任务与示教生成列；左端真实观测（RGB-D
+扫描、视频示教、遥操数据）经一支粗箭头进入，右端合成示教喂给真实机器人部署，底部一条虚线箭头从部署折返回真实观测。（图出自参考文献
+{[}39{]} 图 9）}
 
 \end{figure}%
 
-左侧的真实观测不是终点，而是数字孪生的输入；中间的数据增强和任务生成把少量真实数据放大成可训练数据；右侧的策略部署再把真实反馈带回仿真。Real2Sim
-因而不止是从照片重建 3D
-模型，而是把真实数据转化为可训练、可评估、可迭代更新的机器人学习资源。
+图里最值得看的是那条底部虚线：中间三列之间都是单向往右推进的实线箭头，只有它从真实部署折回起点。它把这套流水线的设计意图交代清楚了------真机执行的失败要被当作下一轮重建的输入，而不是''扫一次、生成一批数据、训完就结束''。少了这条虚线，中间三列就退化成一个只跑一遍的离线数据工厂；5.2.9
+节最后一条开放挑战说的正是这件事。
 
 \paragraph{（1）生成式数字孪生}\label{ux751fux6210ux5f0fux6570ux5b57ux5b6aux751f}
 
-数字孪生的目标是从真实观测自动构造 simulation-ready
-replica（可仿真的真实场景副本）。输入可能是
+数字孪生的目标是从真实观测自动构造一份仿真就绪的真实场景副本。输入可能是
 RGB-D、视频、多视角图片、点云、机器人力矩传感器或接触轨迹；输出必须既视觉对齐，又物理可交互。
 
-生成式数字孪生包括三个子问题：
+生成式数字孪生要解决三个层层递进的子问题，正对应上图数字孪生那一列的三格：\textbf{自动场景重建}（从
+RGB-D
+或多视角图像得到可交互的资产与场景）、\textbf{运动学重建}（恢复某个具体物体实例的关节类型、轴与限位）、\textbf{物理感知与视觉-动力学对齐}（恢复质量、惯量、摩擦、弹性、阻尼，让仿真推演的轨迹对得上真实观测）。三者的难度是递增的：几何最容易，关节次之，物理参数最难------因为前两者能从图像里看出来，物理参数看不出来。本节后面的两个案例正好各占一端：Scalable
+Real2Sim{[}40{]} 做刚体的几何加惯性参数，PhysTwin{[}41{]}
+做可形变物体的物理模型。
 
-\begin{itemize}
-\tightlist
-\item
-  \textbf{自动场景重建}：从 RGB-D / 多视角图像得到可交互资产和场景，例如
-  DRAWER、LiteReality、LatticeWorld、RoboSimGS、Scalable Real2Sim。
-\item
-  \textbf{运动学重建}：恢复具体物体实例的关节类型、轴、限位，例如
-  Ditto、PARIS、ArticulatedGS、ArtGS。
-\item
-  \textbf{物理感知与视觉-动力学对齐}：恢复质量、惯量、摩擦、弹性、阻尼等，让仿真
-  rollout（从给定初始状态开始的仿真展开轨迹）对齐真实观测，例如
-  PhysTwin、TwinAligner、Real-is-Sim。
-\end{itemize}
+资产生成器多是生成''新的类别级资产''；数字孪生多是重建''某个真实实例''。两者可以共享技术，目标却不同：生成一个可能存在的抽屉，和重建眼前这个抽屉，是两件事。
 
-Data Generator
-多是生成``新的类别级资产''；数字孪生多是重建``某个真实实例''。一个系统可以共享技术，但目标不同。生成一个可能存在的抽屉，和重建眼前这个抽屉，是两件事。
+\paragraph{（2）三维可控的数据增强}\label{ux4e09ux7ef4ux53efux63a7ux7684ux6570ux636eux589eux5f3a}
 
-\paragraph{（2）3D-grounded
-数据增强}\label{d-grounded-ux6570ux636eux589eux5f3a}
+机器人示教很贵。Real2Sim
+的一个直接用途是把少量真实示教转成可编辑的三维表示，然后从新视角、新物体摆放、新光照、新背景、新时间轨迹中合成更多训练数据。
 
-机器人示教很贵。Real2Sim 的一个直接用途是把少量真实示教转成可编辑的 3D
-表示，然后从新视角、新物体摆放、新光照、新背景、新时间轨迹中合成更多训练数据。
+传统二维图像增强容易破坏几何一致性：换背景、改颜色、贴干扰物，都不保证多视角深度和接触关系正确。NeRF
+和 3DGS
+把增强从像素层搬到三维层：相机可以移动，物体可以替换，遮挡关系和深度更容易保持一致。5.1.8
+节讲过的 SplatSim{[}37{]} 就属于这一方向，同路的还有
+RoboSplat、ExoGS、GAF、Splat-MOVER。
 
-传统 2D 图像增强容易破坏几何一致性：换背景、改颜色、贴
-distractor，都不保证多视角深度和接触关系正确。NeRF 和 3DGS
-把增强从像素层搬到 3D
-层：相机可以移动，物体可以替换，遮挡关系和深度更容易保持一致。SplatSim、RoboSplat、ExoGS、GAF、Splat-MOVER
-等工作都属于这一方向。
-
-3D-grounded augmentation
-的底线是物理一致性。合成数据不能出现物体穿插、深度不一致、运动轨迹违反接触约束等问题。否则策略会学到仿真工件，真实部署时反而更差。
+这类增强的底线是物理一致性。合成数据不能出现物体穿插、深度不一致、运动轨迹违反接触约束等问题。否则策略学到的是重建流程留下的伪影，而不是任务本身，真实部署时反而更差。
 
 \paragraph{（3）任务和示教生成}\label{ux4efbux52a1ux548cux793aux6559ux751fux6210}
 
-更进一步，系统可以不只增强已有示教，而是生成新的任务、新的场景、新的示教轨迹。MimicGen
-从少量人类示教中重组出大量 object-centric 轨迹；Gen2Sim 和 GenSim2 用
-LLM / VLM 生成仿真任务、奖励和示教；R2R2R 从视频恢复物体运动，再把 3DGS
-转成 mesh 进入 IsaacLab 之类的并行仿真器。
+更进一步，系统可以不只增强已有示教，还能生成新的任务、新的场景、新的示教轨迹。MimicGen
+从少量人类示教中重组出大量以物体为中心的轨迹；Gen2Sim 和 GenSim2 用 LLM
+/ VLM 生成仿真任务、奖励和示教；R2R2R 从视频恢复物体运动，再把 3DGS
+转成三角网格进入 IsaacLab 之类的并行仿真器。
 
-这类工作把 Real2Sim 和 foundation-scale robot learning 连起来。VLA
+这类工作把 Real2Sim 和基础模型规模的机器人学习连了起来。VLA
 模型需要大量跨任务、跨对象、跨场景数据，真实采集成本过高。可仿真的三维世界可以成为数据发动机：真实观测提供锚点，生成和仿真提供规模。
 
-\textbf{小结}：Sim2Real Bridge 是 Real2Sim
-的下游闭环。数字孪生不是为了保存一个漂亮场景，而是为了把真实数据转成可训练、可评估、可迁移的机器人学习资源。
+\textbf{小结}：Sim2Real 桥接是 Real2Sim
+的下游闭环。数字孪生做出来是要拿去用的------把真实数据转成可训练、可评估、可迁移的机器人学习资源，光留一个漂亮场景没有意义。
 
 \subsubsection{5.2.6 案例一：Scalable
 Real2Sim}\label{ux6848ux4f8bux4e00scalable-real2sim}
 
-\textbf{Scalable Real2Sim: Physics-Aware Asset Generation Via Robotic
-Pick-and-Place Setups}（Pfaff, Fu, Binagia, Isola, Tedrake, IROS
-2025）展示了刚体资产的主动式 Real2Sim
-流水线。它的目标不是做一个展示用数字孪生，而是在标准 pick-and-place
-工作站里自动生成可仿真的物体资产。
+\textbf{Scalable Real2Sim}{[}40{]} 展示了刚体资产的主动式 Real2Sim
+流水线。它瞄准的是产量------在一个标准的抓取-放置工作台上，把可仿真的物体资产一件件自动造出来，展示效果不在它的目标里。
 
 它的输入很克制：一个外部相机和机器人自身的关节力矩传感器。系统让机器人抓取物体、重新摆放物体、从多个视角观察物体，再执行激励轨迹收集力矩和位姿数据。最终输出三类内容：
 
 \begin{itemize}
 \tightlist
 \item
-  visual geometry：带纹理的视觉 mesh；
+  \textbf{视觉几何}：带纹理的三角网格；
 \item
-  collision geometry：适合物理引擎使用的凸分解碰撞几何；
+  \textbf{碰撞几何}：适合物理引擎使用的凸分解碰撞体；
 \item
-  physical properties：质量、质心、转动惯量等惯性参数。
+  \textbf{物理属性}：质量、质心、转动惯量等惯性参数。
 \end{itemize}
 
-这篇论文的重要性在于它把 Real2Sim 变成了一个``物理扫描''过程。普通 3D
-扫描只能得到形状；Scalable Real2Sim
-通过机器人交互同时估计碰撞几何和惯性参数。论文还提出从 NeRF / 3DGS 等
-photometric reconstruction 中抽取物体级 triangle mesh
-的方法，处理了运动物体和夹爪遮挡的问题。
+这篇论文的重要性在于它把 Real2Sim
+变成了一个''物理扫描''过程。普通三维扫描只能得到形状；Scalable Real2Sim
+通过机器人交互同时估计碰撞几何和惯性参数。论文还提出从 NeRF / 3DGS
+这类只按图像亮度重建出来的表示里，抽取物体级三角网格的方法，处理了运动物体和夹爪遮挡的问题。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2729\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.7271\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2779\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.7221\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 流水线阶段 & 作用 \\
 \midrule\noalign{}
 机器人抓取和重抓取 & 让相机看到物体多个面，减少遮挡 \\
 视觉重建 & 从多视角观测恢复带纹理的物体几何 \\
-碰撞几何生成 & 把视觉 mesh 简化成物理引擎可稳定计算的 convex parts \\
+碰撞几何生成 & 把视觉网格简化成物理引擎能稳定求解的若干凸块 \\
 激励轨迹设计 & 让机器人运动充分激发待估计惯性参数 \\
 参数辨识 & 从关节位置、速度、加速度和力矩估计质量、质心、惯量 \\
-仿真导入 & 把资产放进 Drake 等物理仿真器做 rollout \\
+仿真导入 & 把资产放进 Drake 等物理仿真器做推演 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
-这篇案例清楚地说明：Real2Sim 的关键不在于``是否用了 NeRF 或
-3DGS''，而在于是否生成了完整 simulation-ready
-asset。视觉重建只是中间步骤；碰撞几何和物理参数才决定它能否进入真实的操作仿真。
+这篇案例清楚地说明：决定 Real2Sim
+成不成的，是有没有产出一份完整的、仿真器直接能用的资产；用没用 NeRF 或
+3DGS
+反倒是次要的。视觉重建只是中间步骤，碰撞几何和物理参数才决定它能否进入真实的操作仿真。
 
 \subsubsection{5.2.7 案例二：PhysTwin}\label{ux6848ux4f8bux4e8cphystwin}
 
-\textbf{PhysTwin: Physics-Informed Reconstruction and Simulation of
-Deformable Objects from Videos}（Jiang et al.,
-2025）面向可形变物体的物理数字孪生。它从稀疏 RGB-D
+\textbf{PhysTwin}{[}41{]} 面向可形变物体的物理数字孪生。它从稀疏 RGB-D
 视频构建可交互的物理数字孪生，目标对象包括绳子、布、软玩具和包裹。
 
 \begin{figure}[H]
@@ -5684,16 +5862,15 @@ Deformable Objects from Videos}（Jiang et al.,
 
 }
 
-\caption{图：PhysTwin
-的框架：核心表示包含几何、拓扑、弹簧和接触相关物理参数以及 Gaussian
-kernels；优化目标同时约束渲染结果和模拟出来的几何 / 运动。}
+\caption{图：左下角方框是 PhysTwin
+的核心表示------一只软玩具，放大处画出连接质点的弹簧拓扑（红点为控制点），旁边挂着刚度、接触和三维高斯三组参数；左上角两台相机拍下真实视频，经重建与跟踪得到上排的伪轨迹，下排是仿真渲染出的几何与运动；两排之间的代价函数由几何项、运动项、渲染项三项相加，红色虚线箭头是回传的优化方向。（图出自参考文献
+{[}41{]}）}
 
 \end{figure}%
 
-这张图展示了 PhysTwin 为什么不是单纯的动态
-3DGS。它的表示由三部分共同工作：spring-mass
-物理模型负责可形变动力学，生成式形状先验帮助补全稀疏视角下的几何，3DGS
-负责逼真渲染。优化时既要让图像渲染对齐真实视频，也要让模拟出的几何和运动对齐观测。
+图中间那个三项相加的代价函数，是 PhysTwin 与单纯的动态 3DGS
+分野的地方。动态 3DGS 只需要渲染项------把画面拟合上就行；PhysTwin
+另外两项要求仿真推出来的几何与运动也对得上观测，等于强迫弹簧刚度、接触参数这些物理量必须解释真实视频里的形变，而不只是渲染得像。左上角那两台相机也值得留一眼：视角只有两个，靠的是生成式形状先验把看不到的背面补出来。
 
 PhysTwin 的关键思想有三点：
 
@@ -5701,34 +5878,31 @@ PhysTwin 的关键思想有三点：
 \def\labelenumi{\arabic{enumi}.}
 \tightlist
 \item
-  \textbf{物理表示和渲染表示分工}：弹簧-质点图负责动力学，Gaussian
-  splats 负责外观。
+  \textbf{物理表示和渲染表示分工}：弹簧-质点模型负责动力学，三维高斯点负责外观。
 \item
   \textbf{稀疏到稠密优化}：先用零阶优化处理拓扑和碰撞边界等不易求导的变量，再用一阶优化细化弹簧刚度等连续物理参数。
 \item
-  \textbf{面向下游交互}：构建出的 digital twin 不只用于重放视频，还能做
-  future prediction、interactive simulation 和 model-based robotic
-  planning。
+  \textbf{面向下游交互}：构建出的数字孪生不只用于重放视频，还能预测未来状态、支持交互式仿真，以及给基于模型的机器人规划当环境。
 \end{enumerate}
 
-PhysTwin 说明可形变 Real2Sim 不能只依赖``外观重建''。动态 NeRF 或动态
+PhysTwin 说明可形变 Real2Sim 不能只依赖''外观重建''。动态 NeRF 或动态
 3DGS
 可以复现已经看到的运动，但如果没有物理参数和可执行动力学模型，就很难预测未见过的交互。Real2Sim
-真正有价值的地方，是让机器人在仿真中尝试新的动作，而不是只重播旧视频。
+真正有价值的地方，是让机器人在仿真里尝试没做过的动作；重播旧视频这件事，动态重建本来就会。
 
 \subsubsection{5.2.8
 评估：资产质量必须落实到任务表现}\label{ux8bc4ux4f30ux8d44ux4ea7ux8d28ux91cfux5fc5ux987bux843dux5b9eux5230ux4efbux52a1ux8868ux73b0}
 
-面向机器人仿真的 3D 内容至少要经过三层评估。
+面向机器人仿真的三维内容至少要经过三层评估。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0809\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6892\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2299\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0833\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6771\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2396\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 评估层级 & 常见指标 & 局限 \\
 \midrule\noalign{}
 几何与外观 & Chamfer Distance、F-Score、IoU、FID、CLIP Score & 不能判断能否稳定碰撞和操作 \\
-物理可用性 & stability rate、joint type accuracy、joint axis error、penetration volume、collision-free ratio、material error & 依赖仿真器，静态指标多，动态接触覆盖不足 \\
-下游任务 & grasp success、articulated manipulation success、navigation success、SPL、sim-to-real success rate & 会混合资产质量、策略质量和仿真器调参影响 \\
+物理可用性 & 稳定率、关节类型准确率、关节轴误差、穿模体积、无碰撞比例、材料参数误差 & 依赖仿真器，静态指标多，动态接触覆盖不足 \\
+下游任务 & 抓取成功率、关节物体操作成功率、导航成功率、SPL（按路径长度加权的导航成功率，走得越绕分越低）、Sim2Real 迁移成功率 & 会混合资产质量、策略质量和仿真器调参影响 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -5737,9 +5911,9 @@ PhysTwin 说明可形变 Real2Sim 不能只依赖``外观重建''。动态 NeRF 
 评估中最关键的一层。一个资产在几何指标上很好，不代表机器人能抓；一个场景渲染很逼真，不代表策略能迁回真机。最终要看它是否提升真实机器人训练、评估或部署的可靠性。
 
 这也解释了 SIMPLER、PolaRiS、REALM、Real2Sim-Eval
-这类评估基础设施为什么重要。它们不只是重建场景，而是用重建场景比较策略表现，尤其是让
-VLA、Diffusion Policy、ACT 等策略在更可复现的环境中横向比较。Real2Sim
-评估不能替代真机实验，但可以显著降低筛选策略和定位失败模式的成本。
+这类评估基础设施为什么重要：它们重建场景是为了拿它当比较策略的公共考场，让
+VLA、扩散策略、ACT 在更可复现的环境里横向比一次。Real2Sim
+评估替代不了真机实验，但可以显著降低筛选策略和定位失败模式的成本。
 
 \subsubsection{5.2.9 开放挑战}\label{ux5f00ux653eux6311ux6218-1}
 
@@ -5753,8 +5927,7 @@ Objaverse、Objaverse-XL
 \paragraph{（2）几何好看不等于物理可用}\label{ux51e0ux4f55ux597dux770bux4e0dux7b49ux4e8eux7269ux7406ux53efux7528}
 
 很多生成模型优化的是视觉指标。非流形面、自相交、薄片结构、错误尺度在图片里不明显，但进入物理引擎会直接失败。Real2Sim
-需要把 watertight ratio、collision-free
-ratio、稳定性测试、跨仿真器一致性作为基本检查。
+需要把封闭无洞比例、无碰撞比例、稳定性测试、跨仿真器一致性作为基本检查。
 
 \paragraph{（3）可形变和动态对象仍然困难}\label{ux53efux5f62ux53d8ux548cux52a8ux6001ux5bf9ux8c61ux4ecdux7136ux56f0ux96be}
 
@@ -5764,44 +5937,42 @@ ratio、稳定性测试、跨仿真器一致性作为基本检查。
 
 \paragraph{（4）场景生成的效率与可控性冲突}\label{ux573aux666fux751fux6210ux7684ux6548ux7387ux4e0eux53efux63a7ux6027ux51b2ux7a81}
 
-feed-forward 或 diffusion 场景生成速度快，但任务约束和物理一致性弱；LLM
-/ VLM agentic
-生成可控性强，但慢且容易模块累积误差。一个务实方向是先用快速模型生成粗布局，再只对任务关键区域做
-agentic refinement 和物理验证。
+一次前馈或扩散式的场景生成速度快，但任务约束和物理一致性弱；LLM / VLM
+智能体式生成可控性强，但慢且容易在模块之间累积误差。一个务实方向是先用快速模型生成粗布局，再只对任务关键区域做智能体式精修和物理验证。
 
 \paragraph{（5）评价标准碎片化}\label{ux8bc4ux4ef7ux6807ux51c6ux788eux7247ux5316}
 
 不同论文使用不同数据集、仿真器、策略和任务，导致结果很难横向比较。未来需要三层统一协议：格式有效性、物理可用性、下游任务表现，并加入跨
 MuJoCo、Isaac Sim、Genesis、SAPIEN 等仿真器的一致性测试。
 
-\paragraph{（6）Sim-to-Real gap
-不会自动消失}\label{sim-to-real-gap-ux4e0dux4f1aux81eaux52a8ux6d88ux5931}
+\paragraph{（6）Sim2Real
+差距不会自动消失}\label{sim2real-ux5deeux8dddux4e0dux4f1aux81eaux52a8ux6d88ux5931}
 
-Real2Sim 可以减少 gap，但不能消灭
-gap。传感器噪声、接触模型、电机延迟、材质变化、隐藏状态、场景长尾都会造成残余误差。更可靠的方向是闭环：真实执行反馈持续更新数字孪生，而不是一次扫描后永远相信仿真。
+Real2Sim
+能把差距压小，但消不掉它。传感器噪声、接触模型、电机延迟、材质变化、隐藏状态、场景长尾都会造成残余误差。更可靠的方向是闭环：真实执行反馈持续更新数字孪生，而不是一次扫描后永远相信仿真。
 
 \subsubsection{5.2.10 本节小结}\label{ux672cux8282ux5c0fux7ed3-4}
 
 Real2Sim
-的核心不是``把真实世界重建得很像''，而是``把真实世界转换成机器人仿真器可执行的三维内容''。这要求资产同时满足几何有效、物理参数化、运动学可执行和格式兼容。Ye
-et al.~2026 的三段式结构可以概括为：
+要交付的不是''把真实世界重建得很像''，而是''把真实世界转换成机器人仿真器可执行的三维内容''------资产要同时满足几何有效、物理参数化、运动学可执行和格式兼容四项。Ye
+等人{[}39{]}的三段式结构可以概括为：
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{Data Generator} 提供可仿真的物体资产；
+  \textbf{资产生成器}提供可仿真的物体资产；
 \item
-  \textbf{Simulation Environments} 把资产组织成可交互任务世界；
+  \textbf{仿真环境}把资产组织成可交互任务世界；
 \item
-  \textbf{Sim2Real Bridge}
-  把真实观测转成数字孪生，并用于数据增强、任务生成、策略训练和评估。
+  \textbf{Sim2Real
+  桥接}把真实观测转成数字孪生，并用于数据增强、任务生成、策略训练和评估。
 \end{itemize}
 
 Scalable Real2Sim
 展示了刚体资产如何通过机器人主动交互自动获得视觉几何、碰撞几何和惯性参数；PhysTwin
 展示了可形变物体如何把物理模型、生成先验和 3DGS
 渲染合在一起。两者共同说明：Real2Sim
-的前沿正在从``视觉重建''走向``物理可执行的数字孪生''。
+的前沿正在从''视觉重建''走向''物理可执行的数字孪生''。
 
 \section{6 本讲小结}\label{ux672cux8bb2ux5c0fux7ed3}
 
@@ -5823,12 +5994,12 @@ Scalable Real2Sim
 \item
   \textbf{多卡训练}：训练显存被参数 / 梯度 / 优化器状态 /
   激活值四类吃掉，优化器状态是大头；沿数据并行（省时间）和模型并行（攻放不下）两条正交轴展开，DDP、省显存四件套、ZeRO/FSDP、张量
-  / 流水线并行各归其位，最后用双卡 + LeRobot 把一次真实多卡训练跑起来。
+  / 流水线并行各归其位，最后落到双卡 + LeRobot 的真实启动命令上。
 \item
   \textbf{Sim2Real 与 Real2Sim}：现实差距来自视觉 / 动力学 /
   传感器执行器 /
-  软件栈四类；域随机化、域适配、系统辨识、师生框架等方法弥合
-  sim→real，Real2Sim 则把真实重建成可仿真世界，两者互为闭环。
+  软件栈四类；域随机化、域适配、系统辨识、师生框架各有主攻的那一类差距，但真跑通的方案基本都是几种叠着用；Real2Sim
+  则反过来把真实重建成可仿真的世界，两者互为闭环。
 \end{itemize}
 
 \begin{quote}
@@ -5840,163 +6011,220 @@ Scalable Real2Sim
 下一讲我们把目光投向 VLA
 的前沿：怎么让它跑得更快、记得更久、用上整个人形身体。
 
-\section{参考资料}\label{ux53c2ux8003ux8d44ux6599}
+\section{参考文献}\label{ux53c2ux8003ux6587ux732e}
 
 \begin{quote}
-著录遵《GB/T 7714---2015》，著录信息经 paper-manager 核准；arXiv
-预印本按 {[}EB/OL{]}、正式会议论文按 {[}C{]}。引用日期 2026-06-26。
+著录遵《GB/T 7714---2015》；arXiv 预印本按 {[}EB/OL{]}、正式会议论文按
+{[}C{]}、期刊按 {[}J{]}。引用日期以各条方括号内标注为准。
 \end{quote}
 
-\begin{quote}
-本讲多张示意图（LoRA 注入位置、QLoRA
-架构与显存对比）为本课程依据相应论文重绘（本课程实验 EAI-wri-004
-渲染）。
-\end{quote}
+{[}1{]} HU E J, SHEN Y, WALLIS P, et al.~LoRA: low-rank adaptation of
+large language models{[}EB/OL{]}. (2021){[}2026-06-26{]}.
+https://arxiv.org/abs/2106.09685.
 
-{[}1{]} RASCHKA S 等. 大模型微调示意图集（Web 科普博文）{[}EB/OL{]}.
-(2023){[}2026-06-26{]}. https://magazine.sebastianraschka.com.
+{[}2{]} DETTMERS T, PAGNONI A, HOLTZMAN A, et al.~QLoRA: efficient
+finetuning of quantized LLMs{[}EB/OL{]}. (2023){[}2026-06-26{]}.
+https://arxiv.org/abs/2305.14314.
 
-{[}2{]} OUYANG L, WU J, JIANG X, et al.~Training language models to
+{[}3{]} HOULSBY N, GIURGIU A, JASTRZEBSKI S, et al.~Parameter-efficient
+transfer learning for NLP{[}EB/OL{]}. (2019){[}2026-06-26{]}.
+https://arxiv.org/abs/1902.00751.
+
+{[}4{]} OUYANG L, WU J, JIANG X, et al.~Training language models to
 follow instructions with human feedback{[}EB/OL{]}.
 (2022){[}2026-06-26{]}. https://arxiv.org/abs/2203.02155.
 
-{[}3{]} RAFAILOV R, SHARMA A, MITCHELL E, et al.~Direct preference
+{[}5{]} RAFAILOV R, SHARMA A, MITCHELL E, et al.~Direct preference
 optimization: your language model is secretly a reward model{[}EB/OL{]}.
 (2023){[}2026-06-26{]}. https://arxiv.org/abs/2305.18290.
 
-{[}4{]} BROHAN A, BROWN N, CARBAJAL J, et al.~RT-2:
+{[}6{]} BROHAN A, BROWN N, CARBAJAL J, et al.~RT-2:
 vision-language-action models transfer web knowledge to robotic
 control{[}EB/OL{]}. (2023){[}2026-06-26{]}.
 https://arxiv.org/abs/2307.15818.
 
-{[}5{]} NVIDIA, BJORCK J, CASTAÑEDA F, et al.~GR00T N1: an open
+{[}7{]} KIM M J, PERTSCH K, KARAMCHETI S, et al.~OpenVLA: an open-source
+vision-language-action model{[}EB/OL{]}. (2024){[}2026-06-26{]}.
+https://arxiv.org/abs/2406.09246.
+
+{[}8{]} BLACK K, BROWN N, DRIESS D, et al.~\(\pi_0\): a
+vision-language-action flow model for general robot control{[}EB/OL{]}.
+(2024){[}2026-06-26{]}. https://arxiv.org/abs/2410.24164.
+
+{[}9{]} NVIDIA, BJORCK J, CASTAÑEDA F, et al.~GR00T N1: an open
 foundation model for generalist humanoid robots{[}EB/OL{]}.
 (2025){[}2026-06-26{]}. https://arxiv.org/abs/2503.14734.
 
-{[}6{]} HOULSBY N, GIURGIU A, JASTRZEBSKI S, et al.~Parameter-efficient
-transfer learning for NLP{[}EB/OL{]}. (2019){[}2026-06-26{]}.
-https://arxiv.org/abs/1902.00751.
-
-{[}7{]} AGHAJANYAN A, ZETTLEMOYER L, GUPTA S. Intrinsic dimensionality
+{[}10{]} AGHAJANYAN A, ZETTLEMOYER L, GUPTA S. Intrinsic dimensionality
 explains the effectiveness of language model fine-tuning{[}EB/OL{]}.
 (2020){[}2026-06-26{]}. https://arxiv.org/abs/2012.13255.
 
-{[}8{]} HU J E, SHEN Y, WALLIS P, et al.~LoRA: low-rank adaptation of
-large language models{[}EB/OL{]}. (2021){[}2026-06-26{]}.
-https://arxiv.org/abs/2106.09685.
+{[}11{]} RASCHKA S. Practical tips for finetuning LLMs using LoRA
+(low-rank adaptation){[}EB/OL{]}. (2023){[}2026-06-26{]}.
+https://magazine.sebastianraschka.com/p/practical-tips-for-finetuning-llms.
 
-{[}9{]} DETTMERS T, PAGNONI A, HOLTZMAN A, et al.~QLoRA: efficient
-finetuning of quantized LLMs{[}EB/OL{]}. (2023){[}2026-06-26{]}.
-https://arxiv.org/abs/2305.14314.
-
-{[}10{]} LIU S, WANG C, YIN H, et al.~DoRA: weight-decomposed low-rank
-adaptation{[}EB/OL{]}. (2024){[}2026-06-26{]}.
+{[}12{]} LIU S Y, WANG C Y, YIN H, et al.~DoRA: weight-decomposed
+low-rank adaptation{[}EB/OL{]}. (2024){[}2026-06-26{]}.
 https://arxiv.org/abs/2402.09353.
 
-{[}11{]} ZHANG Q, CHEN M, BUKHARIN A, et al.~AdaLoRA: adaptive budget
+{[}13{]} ZHANG Q, CHEN M, BUKHARIN A, et al.~AdaLoRA: adaptive budget
 allocation for parameter-efficient fine-tuning{[}EB/OL{]}.
 (2023){[}2026-06-26{]}. https://arxiv.org/abs/2303.10512.
 
-{[}12{]} HAYOU S, GHOSH N, YU B. LoRA+: efficient low rank adaptation of
+{[}14{]} HAYOU S, GHOSH N, YU B. LoRA+: efficient low rank adaptation of
 large models{[}EB/OL{]}. (2024){[}2026-06-26{]}.
 https://arxiv.org/abs/2402.12354.
 
-{[}13{]} KALAJDZIEVSKI D. A rank stabilization scaling factor for
+{[}15{]} KALAJDZIEVSKI D. A rank stabilization scaling factor for
 fine-tuning with LoRA{[}EB/OL{]}. (2023){[}2026-06-26{]}.
 https://arxiv.org/abs/2312.03732.
 
-{[}14{]} MENG F, WANG Z, ZHANG M. PiSSA: principal singular values and
+{[}16{]} MENG F, WANG Z, ZHANG M. PiSSA: principal singular values and
 singular vectors adaptation of large language models{[}EB/OL{]}.
 (2024){[}2026-06-26{]}. https://arxiv.org/abs/2404.02948.
 
-{[}15{]} HPC-AI Tech. Colossal-AI documentation: paradigms of
-parallelism{[}EB/OL{]}. (2024){[}2026-06-26{]}.
-https://colossalai.org/docs/.
-
-{[}16{]} SHEN L, ZHAO Y, VARMA R, et al.~PyTorch distributed:
-experiences on accelerating data parallel training{[}EB/OL{]}.
-(2020){[}2026-06-26{]}. https://arxiv.org/abs/2006.15704.
-
-{[}17{]} Uber Engineering. Meet Horovod: Uber's open source distributed
-deep learning framework{[}EB/OL{]}. (2017){[}2026-06-26{]}.
-https://eng.uber.com/horovod/.
-
-{[}18{]} Google Cloud. BFloat16: the secret to high performance on Cloud
-TPUs{[}EB/OL{]}. (2019){[}2026-06-26{]}.
-https://cloud.google.com/blog/products/ai-machine-learning/bfloat16-the-secret-to-high-performance-on-cloud-tpus.
-
-{[}19{]} CHEN T 等. gradient-checkpointing{[}EB/OL{]}.
-(2018){[}2026-06-26{]}.
-https://github.com/cybertronai/gradient-checkpointing.
-
-{[}20{]} PyTorch Team. Getting started with fully sharded data parallel
-(FSDP){[}EB/OL{]}. (2023){[}2026-06-26{]}.
-https://pytorch.org/tutorials/intermediate/FSDP\_tutorial.html.
-
-{[}21{]} RAJBHANDARI S, RASLEY J, RUWASE O, et al.~ZeRO: memory
+{[}17{]} RAJBHANDARI S, RASLEY J, RUWASE O, et al.~ZeRO: memory
 optimizations toward training trillion parameter models{[}EB/OL{]}.
 (2019){[}2026-06-26{]}. https://arxiv.org/abs/1910.02054.
 
-{[}22{]} SHOEYBI M, PATWARY M, PURI R, et al.~Megatron-LM: training
+{[}18{]} HPC-AI Tech. Colossal-AI documentation: paradigms of
+parallelism{[}EB/OL{]}. (2024){[}2026-06-26{]}.
+https://colossalai.org/docs/.
+
+{[}19{]} LI S, ZHAO Y, VARMA R, et al.~PyTorch distributed: experiences
+on accelerating data parallel training{[}EB/OL{]}.
+(2020){[}2026-06-26{]}. https://arxiv.org/abs/2006.15704.
+
+{[}20{]} Uber Engineering. Meet Horovod: Uber's open source distributed
+deep learning framework{[}EB/OL{]}. (2017){[}2026-06-26{]}.
+https://eng.uber.com/horovod/.
+
+{[}21{]} Google Cloud. BFloat16: the secret to high performance on Cloud
+TPUs{[}EB/OL{]}. (2019){[}2026-06-26{]}.
+https://cloud.google.com/blog/products/ai-machine-learning/bfloat16-the-secret-to-high-performance-on-cloud-tpus.
+
+{[}22{]} CHEN T, XU B, ZHANG C, et al.~Training deep nets with sublinear
+memory cost{[}EB/OL{]}. (2016){[}2026-08-29{]}.
+https://arxiv.org/abs/1604.06174.
+
+{[}23{]} PyTorch Team. Getting started with fully sharded data parallel
+(FSDP){[}EB/OL{]}. (2023){[}2026-06-26{]}.
+https://pytorch.org/tutorials/intermediate/FSDP\_tutorial.html.
+
+{[}24{]} SHOEYBI M, PATWARY M, PURI R, et al.~Megatron-LM: training
 multi-billion parameter language models using model
 parallelism{[}EB/OL{]}. (2019){[}2026-06-26{]}.
 https://arxiv.org/abs/1909.08053.
 
-{[}23{]} HUANG Y, CHENG Y, BAPNA A, et al.~GPipe: efficient training of
+{[}25{]} HUANG Y, CHENG Y, BAPNA A, et al.~GPipe: efficient training of
 giant neural networks using pipeline parallelism{[}EB/OL{]}.
 (2018){[}2026-06-26{]}. https://arxiv.org/abs/1811.06965.
 
-{[}24{]} TOBIN J, FONG R, RAY A, et al.~Domain randomization for
+{[}26{]} ALJALBOUT E, XING J, ROMERO Á, et al.~The reality gap in
+robotics: challenges, solutions, and best practices{[}EB/OL{]}.
+(2025){[}2026-06-26{]}. https://arxiv.org/abs/2510.20808.
+
+{[}27{]} TOBIN J, FONG R, RAY A, et al.~Domain randomization for
 transferring deep neural networks from simulation to the real
 world{[}EB/OL{]}. (2017){[}2026-06-26{]}.
 https://arxiv.org/abs/1703.06907.
 
-{[}25{]} JAMES S, WOHLHART P, KALAKRISHNAN M, et al.~Sim-to-real via
+{[}28{]} PENG X B, ANDRYCHOWICZ M, ZAREMBA W, et al.~Sim-to-real
+transfer of robotic control with dynamics randomization{[}C{]}//ICRA
+2018. https://doi.org/10.1109/ICRA.2018.8460528.
+
+{[}29{]} OPENAI, ANDRYCHOWICZ M, BAKER B, et al.~Learning dexterous
+in-hand manipulation{[}EB/OL{]}. (2018){[}2026-06-26{]}.
+https://arxiv.org/abs/1808.00177.
+
+{[}30{]} OPENAI, AKKAYA I, ANDRYCHOWICZ M, et al.~Solving Rubik's cube
+with a robot hand{[}EB/OL{]}. (2019){[}2026-06-26{]}.
+https://arxiv.org/abs/1910.07113.
+
+{[}31{]} MA Y J, LIANG W, WANG H J, et al.~DrEureka: language model
+guided sim-to-real transfer{[}C{]}//Robotics: Science and Systems XX
+(RSS 2024), paper 094. https://doi.org/10.15607/RSS.2024.XX.094.
+
+{[}32{]} BOUSMALIS K, IRPAN A, WOHLHART P, et al.~Using simulation and
+domain adaptation to improve efficiency of deep robotic
+grasping{[}C{]}//ICRA 2018. https://doi.org/10.1109/ICRA.2018.8460875.
+
+{[}33{]} HO D, RAO K, XU Z, et al.~RetinaGAN: an object-aware approach
+to sim-to-real transfer{[}C{]}//ICRA 2021.
+https://arxiv.org/abs/2011.03148.
+
+{[}34{]} JAMES S, WOHLHART P, KALAKRISHNAN M, et al.~Sim-to-real via
 sim-to-sim: data-efficient robotic grasping via randomized-to-canonical
 adaptation networks{[}C{]}//CVPR 2019.
 https://doi.org/10.1109/CVPR.2019.01291.
 
-{[}26{]} CHI C, XU Z, FENG S, et al.~Diffusion policy: visuomotor policy
-learning via action diffusion{[}EB/OL{]}. (2023){[}2026-06-26{]}.
-https://arxiv.org/abs/2303.04137.
-
-{[}27{]} KIM M J, PERTSCH K, KARAMCHETI S, et al.~OpenVLA: an
-open-source vision-language-action model{[}EB/OL{]}.
-(2024){[}2026-06-26{]}. https://arxiv.org/abs/2406.09246.
-
-{[}28{]} BLACK K, BROWN N, DRIESS D, et al.~\(\pi_0\): a
-vision-language-action flow model for general robot control{[}EB/OL{]}.
-(2024){[}2026-06-26{]}. https://arxiv.org/abs/2410.24164.
-
-{[}29{]} KUMAR A, FU Z, PATHAK D, et al.~RMA: rapid motor adaptation for
+{[}35{]} KUMAR A, FU Z, PATHAK D, et al.~RMA: rapid motor adaptation for
 legged robots{[}EB/OL{]}. (2021){[}2026-06-26{]}.
 https://arxiv.org/abs/2107.04034.
 
-{[}30{]} MA Y J, LIANG W, WANG H, et al.~DrEureka: language model guided
-sim-to-real transfer{[}C{]}//Robotics: Science and Systems XX (RSS
-2024), paper 094. https://doi.org/10.15607/RSS.2024.XX.094.
+{[}36{]} CHI C, XU Z, FENG S, et al.~Diffusion policy: visuomotor policy
+learning via action diffusion{[}EB/OL{]}. (2023){[}2026-06-26{]}.
+https://arxiv.org/abs/2303.04137.
 
-{[}31{]} QURESHI M N, GARG S, YANDÚN F, et al.~SplatSim: zero-shot
+{[}37{]} QURESHI M N, GARG S, YANDÚN F, et al.~SplatSim: zero-shot
 sim2real transfer of RGB manipulation policies using Gaussian
 splatting{[}EB/OL{]}. (2024){[}2026-06-26{]}.
 https://arxiv.org/abs/2409.10161.
 
-{[}32{]} JIANG Y, WANG C, ZHANG R, et al.~TRANSIC: sim-to-real policy
+{[}38{]} JIANG Y, WANG C, ZHANG R, et al.~TRANSIC: sim-to-real policy
 transfer by learning from online correction{[}EB/OL{]}.
 (2024){[}2026-06-26{]}. https://arxiv.org/abs/2405.10315.
 
-{[}33{]} YE T, MAO Y, LIAO M, et al.~3D generation for embodied AI and
+{[}39{]} YE T, MAO Y, LIAO M, et al.~3D generation for embodied AI and
 robotic simulation: a survey{[}EB/OL{]}. (2026){[}2026-06-26{]}.
 https://arxiv.org/abs/2604.26509.
 
-{[}34{]} JIANG H, HSU H, ZHANG K, et al.~PhysTwin: physics-informed
-reconstruction and simulation of deformable objects from
-videos{[}C{]}//ICCV 2025. https://doi.org/10.1109/ICCV51701.2025.00678.
-
-{[}35{]} PFAFF N, FU E, BINAGIA J P, et al.~Scalable real2sim:
+{[}40{]} PFAFF N, FU E, BINAGIA J P, et al.~Scalable real2sim:
 physics-aware asset generation via robotic pick-and-place
 setups{[}C{]}//IROS 2025.
 https://doi.org/10.1109/IROS60139.2025.11246653.
+
+{[}41{]} JIANG H, HSU H, ZHANG K, et al.~PhysTwin: physics-informed
+reconstruction and simulation of deformable objects from
+videos{[}C{]}//ICCV 2025. https://doi.org/10.1109/ICCV51701.2025.00678.
+
+{[}42{]} SADEGHI F, LEVINE S. CAD2RL: real single-image flight without a
+single real image{[}C{]}//Robotics: Science and Systems XIII (RSS 2017),
+paper 34. https://www.roboticsproceedings.org/rss13/p34.pdf.
+
+{[}43{]} RUSU A A, VECERIK M, ROTHÖRL T, et al.~Sim-to-real robot
+learning from pixels with progressive nets{[}EB/OL{]}.
+(2016){[}2026-08-29{]}. https://arxiv.org/abs/1610.04286.
+
+{[}44{]} RAO K, HARRIS C, IRPAN A, et al.~RL-CycleGAN: reinforcement
+learning aware simulation-to-real{[}C{]}//CVPR 2020.
+https://arxiv.org/abs/2006.09001.
+
+{[}45{]} CHEBOTAR Y, HANDA A, MAKOVIYCHUK V, et al.~Closing the
+sim-to-real loop: adapting simulation randomization with real world
+experience{[}C{]}//ICRA 2019: 8973-8979.
+https://arxiv.org/abs/1810.05687.
+
+{[}46{]} RAMOS F, POSSAS R C, FOX D. BayesSim: adaptive domain
+randomization via probabilistic inference for robotics
+simulators{[}C{]}//Robotics: Science and Systems XV (RSS 2019).
+https://arxiv.org/abs/1906.01728.
+
+{[}47{]} HWANGBO J, LEE J, DOSOVITSKIY A, et al.~Learning agile and
+dynamic motor skills for legged robots{[}J{]}. Science Robotics, 2019,
+4(26): eaau5872. https://doi.org/10.1126/scirobotics.aau5872.
+
+{[}48{]} CHEN X, HU J, JIN C, et al.~Understanding domain randomization
+for sim-to-real transfer{[}C{]}//ICLR 2022.
+https://openreview.net/forum?id=T8vZHIRTrY.
+
+{[}49{]} HARLAP A, NARAYANAN D, PHANISHAYEE A, et al.~PipeDream: fast
+and efficient pipeline parallel DNN training{[}EB/OL{]}.
+(2018){[}2026-08-29{]}. https://arxiv.org/abs/1806.03377.
+
+{[}50{]} RUSU A A, RABINOWITZ N C, DESJARDINS G, et al.~Progressive
+neural networks{[}EB/OL{]}. (2016){[}2026-08-29{]}.
+https://arxiv.org/abs/1606.04671.
 
 
 

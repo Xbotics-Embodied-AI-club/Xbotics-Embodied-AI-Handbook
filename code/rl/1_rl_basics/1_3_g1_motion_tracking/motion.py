@@ -1,3 +1,10 @@
+"""参考动作文件的读取与校验。
+
+参考动作由 `1_2_video_to_g1_reference/` 那条管线产出（视频 → GVHMR → GMR → npz）。
+本文件只负责把它读进来、逐项校验形状，并提供训练前预览用的小工具。
+
+讲义对应：第14讲 4.4 节（管线）与 6.6 节（用它训练）。
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -21,20 +28,53 @@ class MotionClip:
 
     @property
     def num_frames(self) -> int:
+        """这段动作一共多少帧。
+
+        Returns:
+            帧数。
+        """
         return int(self.joint_pos.shape[0])
 
     @property
     def duration_s(self) -> float:
+        """这段动作有多长（秒）。
+
+        Returns:
+            时长，按帧数除以帧率算。
+        """
         return self.num_frames / self.fps
 
     def joint_snapshot(self, frame_index: int, num_joints: int = 6) -> list[float]:
-        """取一小段关节角，方便在训练前看清 motion 文件里的动作数值。"""
+        """取某一帧前几个关节的角度，训练前用来肉眼确认动作文件不是一团乱码。
+
+        Args:
+            frame_index: 帧号，越界会被夹到有效范围内。
+            num_joints: 取前几个关节。
+
+        Returns:
+            保留四位小数的关节角列表。
+        """
 
         frame_index = min(max(frame_index, 0), self.num_frames - 1)
         return [round(float(value), 4) for value in self.joint_pos[frame_index, :num_joints].detach().cpu()]
 
     @classmethod
     def load(cls, motion_file: str | Path, device: str | torch.device = "cpu") -> "MotionClip":
+        """从 npz 文件读一段参考动作，并逐项校验形状。
+
+        宁可在训练开始前把文件读坏的情况直接抛出来，也不要让一个形状不对的
+        参考动作悄悄进入训练、几小时后才发现学的是一团乱码。
+
+        Args:
+            motion_file: `build_motion_npz.py` 产出的 npz 路径。
+            device: 张量放到哪个设备上。
+
+        Returns:
+            校验通过的 `MotionClip`。
+
+        Raises:
+            ValueError: 缺少必需字段，或某个张量的形状与 29 关节的 G1 对不上。
+        """
         data = np.load(motion_file)
         required = [
             "fps",

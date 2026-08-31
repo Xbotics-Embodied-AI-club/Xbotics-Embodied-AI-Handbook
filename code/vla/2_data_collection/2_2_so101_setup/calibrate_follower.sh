@@ -14,6 +14,10 @@
 
 set -euo pipefail
 
+# 串口名来自 udev 绑定，不同机架绑出来的名字不一样：
+#   platform/so101_real/setup/bind_devices.sh              -> /dev/follower
+#   platform/so101_real/setup/bind_uarm_serial_port_s100.sh -> /dev/ttyLeader, /dev/ttyFollower
+# 下面这条按 bind_devices.sh 那套写；换机架就改这一行。
 PORT=/dev/follower
 ARM_ID=so101_01
 # ARM_ID 就是这条物理臂的名字。标定数据是**单臂专属**的（每个舵机的零位偏移和行程），

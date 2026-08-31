@@ -82,7 +82,15 @@ def _return_length(target_gap: np.ndarray, scale: np.ndarray, n_policy: int) -> 
 
 
 def append_return_home(in_h5: Path, out_h5: Path) -> tuple[int, int]:
-    """给 `in_h5` 每集接上收回段，写到 `out_h5`。返回 (集数, 追加的总帧数)。"""
+    """给 `in_h5` 每集接上收回段，写到 `out_h5`。返回 (集数, 追加的总帧数)。
+
+    Args:
+        in_h5: 待处理的 h5。
+        out_h5: 输出路径。
+
+    Returns:
+        `(集数, 追加的总帧数)`。
+    """
     added_total, kept = 0, 0
     with h5py.File(in_h5, "r") as src:
         scale = _solve_delta_scale(src)
@@ -114,6 +122,14 @@ def append_return_home(in_h5: Path, out_h5: Path) -> tuple[int, int]:
                 n_obs = states.shape[0]
 
                 def extend(name, obj):
+                    """把一个数据集沿时间维接上收回段。
+
+                    观测比动作多一帧，所以两类数据集要按各自的长度分别补齐，不能一刀切。
+
+                    Args:
+                        name: h5 里的数据集名。
+                        obj: 对应的 h5 对象（只处理 Dataset，忽略 Group）。
+                    """
                     if not isinstance(obj, h5py.Dataset):
                         return
                     data = obj[:]

@@ -1,5 +1,7 @@
 """确认两路相机都能按 640×480@30 取图，并各存一张样张。
 
+对应第9讲《操作数据闭环》4.2 节的备注——正式录之前先确认相机这一路是好的。
+
 跑这个的目的不是"能打开吗"，而是**两路同时开的时候还能不能保住 30fps**。
 两个相机插在同一个 USB 2.0 hub 上，裸 YUYV 的带宽是塞不下两路的，必须走 MJPG 让相机
 自己先压一遍。所以下面固定用 MJPG——真掉到 20fps 以下，先看是不是插到了同一个 hub。
@@ -12,6 +14,11 @@ import time
 
 import cv2
 
+# 设备名来自 udev 绑定，不同机架绑出来的名字不一样，跑之前先确认自己这台绑的是哪一套：
+#   platform/so101_real/setup/bind_devices.sh     -> /dev/topcam, /dev/wristcam
+#   platform/so101_real/setup/bind_camera_s100.sh -> /dev/top_camera, /dev/wrist_camera
+# 下面这条按 bind_devices.sh 那套写；换机架就改这两个设备名（键名 top / wrist 不要改，
+# 它们要和 2_3_teleop_record/ 的录制命令写成同一套，否则落盘字段名对不上）。
 CAMERAS = {"top": "/dev/topcam", "wrist": "/dev/wristcam"}
 WIDTH, HEIGHT, FPS = 640, 480, 30
 WARMUP_FRAMES = 10
@@ -28,7 +35,10 @@ for name, dev in CAMERAS.items():
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)
     cap.set(cv2.CAP_PROP_FPS, FPS)
     if not cap.isOpened():
-        raise SystemExit(f"打不开 {name} ({dev})，先跑 platform/so101_real/setup/bind_devices.sh")
+        raise SystemExit(
+            f"打不开 {name} ({dev})，先跑 platform/so101_real/setup/ 下对应本机架的绑定脚本，"
+            "或把上面 CAMERAS 里的设备名改成自己这套"
+        )
     caps[name] = cap
     print(f"{name}: {dev} 已打开")
 

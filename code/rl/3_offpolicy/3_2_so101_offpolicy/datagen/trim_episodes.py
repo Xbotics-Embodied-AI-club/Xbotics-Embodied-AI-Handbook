@@ -24,7 +24,15 @@ HOLD_FRAMES = 5         # 成功后保留几帧收尾（0=成功即切）
 
 
 def trim(in_h5: Path, out_h5: Path) -> tuple[int, int]:
-    """裁剪 + 只留成功轨迹，写到 `out_h5`。返回 (保留集数, 保留总帧数)。"""
+    """裁剪 + 只留成功轨迹，写到 `out_h5`。返回 (保留集数, 保留总帧数)。
+
+    Args:
+        in_h5: 待裁剪的 h5。
+        out_h5: 输出路径。
+
+    Returns:
+        `(保留集数, 保留总帧数)`。
+    """
     kept, total_frames = 0, 0
     with h5py.File(in_h5, "r") as src, h5py.File(out_h5, "w") as dst:
         for attr, value in src.attrs.items():
@@ -48,6 +56,14 @@ def trim(in_h5: Path, out_h5: Path) -> tuple[int, int]:
 
             # 逐数据集拷贝再切片（避免整组拷完再删的双倍占用）
             def copy_and_slice(name, obj):
+                """把一个数据集拷进输出组并按帧切片。
+
+                逐个数据集拷完就切，而不是整组拷完再删——后者在磁盘上会短暂占用双倍空间。
+
+                Args:
+                    name: h5 里的数据集名。
+                    obj: 对应的 h5 对象（只处理 Dataset，忽略 Group）。
+                """
                 if isinstance(obj, h5py.Dataset):
                     data = obj[:]
                     if data.shape[0] == success.shape[0] + 1:

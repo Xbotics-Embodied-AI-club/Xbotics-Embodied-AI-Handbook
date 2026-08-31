@@ -4,3 +4,13 @@ project:
   type: default
 filters:
   - _filters/tbl-autowidth.lua
+
+# 代码块自动折行。pandoc 默认把 Highlighting 定成不折行的 Verbatim，超过版心
+# （letter 减 1in 边距 = 468pt，等宽体约 86 列）的行会直接冲出右边界被裁掉——
+# 实测第 8/9/10/14/15 讲都有代码行这样丢字符。fvextra 加 breaklines 后自动折行。
+format:
+  pdf:
+    include-in-header:
+      text: |
+        \usepackage{fvextra}
+        \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,commandchars=\\\{\}}

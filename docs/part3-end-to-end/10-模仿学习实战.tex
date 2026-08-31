@@ -155,6 +155,8 @@
  
 
 
+\usepackage{fvextra}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,commandchars=\\\{\}}
 \makeatletter
 \@ifpackageloaded{caption}{}{\usepackage{caption}}
 \AtBeginDocument{%
@@ -229,14 +231,13 @@
 \section{1
 朴素行为克隆撞墙：为什么需要生成式策略}\label{ux6734ux7d20ux884cux4e3aux514bux9686ux649eux5899ux4e3aux4ec0ux4e48ux9700ux8981ux751fux6210ux5f0fux7b56ux7565}
 
-上一讲我们采到了一份能训练的数据集：每条轨迹都是人类示教的一串
-\((o_t, a_t)\) 配对。这一讲开始，从数据里真正把策略学出来。
+第9讲采到了一份能训练的数据集：每条轨迹都是人类示教的一串 \((o_t, a_t)\)
+配对。这一讲开始，从数据里真正把策略学出来。
 
 最朴素、也最直接的做法就是\textbf{行为克隆（Behavioral Cloning,
-BC）}：把示教数据当成监督学习的训练集，输入观测、回归动作。它离线、安全、不需要
-reward，是最能落地的起点。但朴素 BC
-很快会撞上两堵墙，这两堵墙正是后面所有生成式策略（ACT、Diffusion
-Policy、Flow Matching）出现的根本原因。
+BC）}：把示教数据当成监督学习的训练集，输入观测、回归动作。它离线、安全，也不需要奖励（reward，机器人做对一步时环境给的分数，要到第14讲才登场），是最能落地的起点。但朴素
+BC 很快会撞上两堵墙，本讲后面的 ACT、Diffusion Policy、Flow Matching
+三条路线，都是冲着这两堵墙去的。
 
 \subsection{1.1
 从确定性映射说起：行为克隆在学什么}\label{ux4eceux786eux5b9aux6027ux6620ux5c04ux8bf4ux8d77ux884cux4e3aux514bux9686ux5728ux5b66ux4ec0ux4e48}
@@ -291,9 +292,8 @@ o_t \xrightarrow{\pi} a_t \;\to\; o_{t+1} \xrightarrow{\pi} a_{t+1} \;\to\; \cdo
 
 训练时，模型只见过专家状态分布 \(d^{\pi^*}\)（专家策略 \(\pi^*\)
 诱导的状态分布）。推理时只要某一步 \(a_t\) 有偏差，\(o_{t+1}\)
-就偏离专家轨迹，进入训练集从未覆盖的
-OOD（out-of-distribution）区域。模型在 OOD
-状态下更容易出错，误差沿时间轴滚雪球：
+就偏离专家轨迹，落进\textbf{分布外}（out-of-distribution,
+OOD）区域------也就是训练集里压根没出现过的那类观测。模型在分布外状态下更容易出错，误差沿时间轴滚雪球：
 
 \[
 \text{小误差} \;\to\; \text{偏离专家轨迹} \;\to\; \text{进入 OOD 状态} \;\to\; \text{更大误差} \;\to\; \text{任务失败}
@@ -305,9 +305,13 @@ OOD（out-of-distribution）区域。模型在 OOD
 
 }
 
-\caption{point-wise policy 在 covariate shift 下如何逐步失控}
+\caption{单步 BC 在一个腕部关节上的输出（浅色）与专家示教（深色）的对照}
 
 \end{figure}%
+
+图里深色那条是专家示教的腕部滚转指令，浅色那条是训练好的单步策略在闭环里实际发出的指令。两条线的\textbf{走势}是贴合的------说明网络确实学到了任务；但浅色线在每一步上都在深色线附近高频抖动，因为它是一步一步独立预测的，相邻两步之间没有任何约束。这些抖动本身就是上面那条链的起点：每一次微小的偏差都会把机器人推到一个略微不同的状态，而下一步的预测又建立在这个已经偏了的状态上。第
+2
+节的动作分块正是冲着这个''逐步''来的------一次预测一整段，段内的连贯性由网络自己保证。
 
 \subsection{1.3
 死穴二：多模态动作分布（Multimodality）}\label{ux6b7bux7a74ux4e8cux591aux6a21ux6001ux52a8ux4f5cux5206ux5e03multimodality}
@@ -342,7 +346,9 @@ OOD（out-of-distribution）区域。模型在 OOD
 
 }
 
-\caption{双峰示教被平均后，策略输出会变得犹豫甚至不安全}
+\caption{同一个观测下有两个都对的抓法：夹爪从左边下去（Mode
+2）或从右边下去（Mode
+1），两条红箭头各指一个。示教里两种都会出现，可回归目标只有一个数，模型学到的是它们的平均------夹爪停在方块正上方两边都不靠的位置（出处待核）}
 
 \end{figure}%
 
@@ -364,7 +370,7 @@ OOD（out-of-distribution）区域。模型在 OOD
   用连续流（continuous flow）表达''把简单分布运输到动作分布''。
 \end{itemize}
 
-换句话说，在机器人模仿学习里，生成模型首先是一个''动作分布建模器''：它的任务不是生成图片，而是表达多峰动作分布、保留不同示教风格、而不是强行平均。这就是生成模型进入机器人策略学习的入口。
+在机器人模仿学习里，生成模型扮演的角色首先是一个''动作分布建模器''：它要做的不是生成一张好看的图片，而是把多个峰都表达出来，让''从左绕''和''从右绕''各自保留成一个模式，而不是被平均成中间那个谁也做不到的动作。这就是生成模型进入机器人策略学习的入口。
 
 \subsection{1.5 三条生成式主线地图：CVAE / Diffusion / Flow
 Matching}\label{ux4e09ux6761ux751fux6210ux5f0fux4e3bux7ebfux5730ux56fecvae-diffusion-flow-matching}
@@ -372,13 +378,13 @@ Matching}\label{ux4e09ux6761ux751fux6210ux5f0fux4e3bux7ebfux5730ux56fecvae-diffu
 接下来这一讲，会沿三条生成式主线把''如何建模 \(p(a \mid o)\)``讲透：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1762\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2791\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1713\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3734\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1762\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2211\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1714\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4313\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 方法 & 核心想法 & 推理方式 & 在机器人里的意义 \\
 \midrule\noalign{}
-\textbf{VAE / CVAE} & 用 latent variable 表达隐含模式 & 一次采样 + 一次解码 & 适合 chunk-level 动作生成，直接通向 ACT \\
+\textbf{VAE / CVAE} & 用一个隐变量表达隐含模式 & 一次采样 + 一次解码 & 适合一次生成一整段动作，直接通向 ACT \\
 \textbf{Diffusion} & 从噪声开始，逐步去噪得到动作 & 多步迭代 & 更强的多模态建模，直接通向 Diffusion Policy \\
-\textbf{Flow Matching} & 学习从简单分布到目标分布的连续流 & ODE 积分，通常步数更少 & 是新一代 VLA action head 的关键基础 \\
+\textbf{Flow Matching} & 学习从简单分布到目标分布的连续流 & ODE 积分，通常步数更少 & \(\pi_0\) 一类 VLA 拿它当\textbf{动作头}（action head），第11讲 3 节展开 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -390,8 +396,8 @@ Matching），分别就是这三条线在机器人里的代表实现。
 建模示教分布}\label{actux7528-action-chunking-cvae-ux5efaux6a21ux793aux6559ux5206ux5e03}
 
 \begin{quote}
-论文：\emph{Learning Fine-Grained Bimanual Manipulation with Low-Cost
-Hardware}，Tony Z. Zhao et al., 2023 arXiv: 2304.13705
+本节讲的 ACT 出自 Zhao 等人 2023
+年的工作{[}1{]}。那篇论文同时给出了一套低成本双臂遥操作硬件和跑在它上面的策略，这里只讲策略这一半。
 \end{quote}
 
 \subsection{2.1 两个核心想法：动作分块 +
@@ -412,8 +418,10 @@ ACT 用两个机制分别对付第 1 节提出的两个问题：
 
 \begin{quote}
 备注：Action Chunking
-是\textbf{缓解}误差累积，不是消除分布漂移（covariate
-shift）。它把''每步都重新决策''换成''每 \(k\)
+是\textbf{缓解}误差累积，不是消除\textbf{协变量偏移}（covariate
+shift，第8讲 3.2
+节给过定义：策略自己走出来的状态分布和示教数据的状态分布对不上）。它把''每步都重新决策''换成''每
+\(k\)
 步决策一次''，减少了自回归式的逐步偏移，但策略一旦走进示教没覆盖的状态，照样没有恢复机制。而且
 chunk 越长，对新观测的反应就越慢------这是一个要按任务权衡的旋钮，2.6.2
 会讲执行策略怎么在两者之间取平衡。
@@ -447,9 +455,10 @@ o_t \;\longrightarrow\; \hat{\mathbf{a}}_{t:t+k} = (\hat{a}_t,\; \hat{a}_{t+1},\
 步一次''，误差只在重新规划时才有机会继续累积。
 
 \begin{quote}
-备注：原论文里还重点讨论了 \textbf{temporal ensembling}
-这一执行方式；本文主线以 LeRobot
-默认实现（\texttt{temporal\_ensemble\_coeff\ =\ None}）为准，论文设定作为补充说明。
+备注：原论文里还重点讨论了另一种执行方式 \textbf{temporal
+ensembling}。下面的主线按 LeRobot
+的默认实现（\texttt{temporal\_ensemble\_coeff\ =\ None}，即关闭）来讲，论文那套设定放在
+2.6.2.2 节作为对照。
 \end{quote}
 
 ACT 不是简单的回归器，而是一个\textbf{条件变分自编码器（CVAE）}。在讲
@@ -468,7 +477,7 @@ CVAE}\label{ux4ece-ae-ux5230-vae-ux5230-cvae}
 
 \end{figure}%
 
-上图展示了三种自编码器的演进关系。我们逐个拆解。
+图里三种自编码器是一条演进链：后一个都在前一个的基础上加一样东西。下面按这条链逐个拆。
 
 \subsubsection{2.3.1
 Auto-Encoder（AE）：压缩与重建}\label{auto-encoderaeux538bux7f29ux4e0eux91cdux5efa}
@@ -575,11 +584,9 @@ z = \mu + \sigma \odot \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, I)
 分布彼此重叠、连续，不会散落到隐空间的犄角旮旯。这样推理时从
 \(\mathcal{N}(0, I)\) 附近取值，就能落在有意义的区域。
 
-简单类比：KL
-散度就像一根弹簧，把编码器的输出往原点拉。弹簧太松（\(\beta\)
-小），隐空间散乱，采样质量差；弹簧太紧（\(\beta\)
-大），所有数据被压到同一个点，丢失多样性。好的 \(\beta\)
-在两者之间取平衡。
+KL 这一股力的大小是可以调的：训练时给它配一个权重 \(\beta\)，\(\beta\)
+越大，往原点拉得越狠。ACT 把 \(\beta\) 取到 10
+这样一个相当大的值，图的是推理时的一个具体便利，2.5.3 节会讲清楚。
 
 \subsubsection{2.3.3 Conditional
 VAE（CVAE）：加入条件信息}\label{conditional-vaecvaeux52a0ux5165ux6761ux4ef6ux4fe1ux606f}
@@ -627,8 +634,9 @@ p(\mathbf{a}_{t:t+k} \mid o_t) = \int p(\mathbf{a}_{t:t+k} \mid o_t, z) \; p(z) 
 \begin{quote}
 备注：上面是 \textbf{CVAE 的概念层表达}。如果落到 LeRobot
 的具体实现，训练时的 VAE encoder 并不读取图像，只用
-\((s_t, \mathbf{a}_{t:t+k})\) 去近似后验；图像是在右侧 policy decoder
-中使用的。这是一个很容易和''概念上的条件变量 \(o_t\)``混淆的点。
+\((s_t, \mathbf{a}_{t:t+k})\) 去近似后验；图像只进 policy decoder
+那一侧（2.4 节的结构图里就是右半边）。这是一个很容易和''概念上的条件变量
+\(o_t\)``混淆的点。
 \end{quote}
 
 不同的 \(z\) 对应不同的动作模式。多模态分布被分解成：先采样
@@ -639,7 +647,7 @@ p(\mathbf{a}_{t:t+k} \mid o_t) = \int p(\mathbf{a}_{t:t+k} \mid o_t, z) \; p(z) 
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture10/ref/structure.png}}
+{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture10/ref/fig10-2-act-architecture_arxiv-2304.13705.png}}
 
 }
 
@@ -647,7 +655,7 @@ p(\mathbf{a}_{t:t+k} \mid o_t) = \int p(\mathbf{a}_{t:t+k} \mid o_t, z) \; p(z) 
 
 \end{figure}%
 
-上图展示了 ACT 的整体结构。从左到右：
+这张结构图左右两半是分开的两条通路，训练时都要走，推理时只走右半边：
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -664,7 +672,10 @@ p(\mathbf{a}_{t:t+k} \mid o_t) = \int p(\mathbf{a}_{t:t+k} \mid o_t, z) \; p(z) 
 
 训练时，ACT 做三件事：(1) VAE Encoder 从真实动作中提取隐变量 \(z\)；(2)
 Transformer 主干根据 \(z\) 和观测预测动作块；(3) 用重建损失 + KL
-正则来优化。下面按数据流的顺序走一遍。
+正则来优化。下面按数据流的顺序走一遍。（接下来 2.4.1 那两张「训练过程
+Step 1 / 2」图是同一套素材里连着的两张，它把 VAE Encoder
+那一段拆成了两张，所以图上的 Step 号和小节号对不齐是正常的；2.4.2
+的主干数据流图则是本书按 LeRobot 默认配置重画的。）
 
 \subsubsection{2.4.1 Step 1 --- VAE
 Encoder：从真实动作中推断隐变量}\label{step-1-vae-encoderux4eceux771fux5b9eux52a8ux4f5cux4e2dux63a8ux65adux9690ux53d8ux91cf}
@@ -688,8 +699,9 @@ VAE Encoder 的任务：看到机器人当前状态 \(s_t\) 和接下来真实�
 q(z \mid s_t, \mathbf{a}_{t:t+k}) = \mathcal{N}\!\left(\mu_\phi,\; \text{diag}(\sigma_\phi^2)\right)
 \]
 
-VAE Encoder 是一个 BERT 风格的 Transformer Encoder。它的输入是一个 token
-序列，每个 token 都是 \(d_{\text{model}} = 512\) 维的向量：
+VAE Encoder 是一个 BERT 风格的 Transformer Encoder。它的输入是一串
+\textbf{token}（词元，Transformer 处理的最小单位；这里一个 token
+就是一个 512 维向量，可能来自一个状态、也可能来自一步动作）：
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0792\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3229\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1367\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3604\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1008\linewidth - 2\tabcolsep\relax}@{}}
@@ -754,11 +766,17 @@ VAE Encoder \textbf{仅在训练时使用}。推理时没有真实动作可看�
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture10/ref/02_training3.png}}
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/ref/fig10-2-act-step3-dataflow.png}
 
 }
 
-\caption{训练过程 Step 3：Transformer 预测动作序列}
+\caption{Transformer 主干这一段的数据流：四路相机各自过
+ResNet18，每路拿到 \(15\times20\times512\) 的特征图，展平成 300 个 512
+维 token 并加上位置编码；机器人关节状态与 \(z\) 不走
+ResNet，各过一个线性层直接投到 512 维。所有 token 一起进 Transformer
+Encoder（4 层自注意力），再由 Transformer Decoder（1 层交叉注意力）吐出
+\(k\) 步动作块。两处标注按 LeRobot 默认写：特征通道数 512、decoder 1
+层（本书自绘）}
 
 \end{figure}%
 
@@ -767,9 +785,10 @@ VAE Encoder \textbf{仅在训练时使用}。推理时没有真实动作可看�
 Decoder 两部分组成（注意：这里的 encoder/decoder 是 Transformer
 架构意义上的，不是 VAE 意义上的）。
 
-每路相机图像先经过 \textbf{ResNet18} backbone（ImageNet 预训练权重），取
-\texttt{layer4} 的输出特征图，再经过 \(1 \times 1\) 卷积投影到
-\(d_{\text{model}} = 512\) 维，最后展平空间维度变成 token 序列：
+每路相机图像先经过 \textbf{ResNet18} 骨干网络（backbone，用 ImageNet
+预训练权重），取 \texttt{layer4} 的输出特征图，再经过 \(1 \times 1\)
+卷积投影到 \(d_{\text{model}} = 512\) 维，最后展平空间维度变成 token
+序列：
 
 \[
 I^{(c)} \in \mathbb{R}^{3 \times H \times W} \;\xrightarrow{\text{ResNet18}}\; F^{(c)} \in \mathbb{R}^{512 \times H' \times W'} \;\xrightarrow{1\times1 \text{ Conv + flatten}}\; (f_1^{(c)}, \ldots, f_{H'W'}^{(c)})
@@ -816,10 +835,18 @@ Decoder Layer 包含三个子层：
   \textbf{FFN}：两层线性 + ReLU。
 \end{enumerate}
 
-LeRobot 中 \texttt{n\_decoder\_layers\ =\ 1}。虽然原始 ACT
-代码配置里写的是 7 层，但社区发现其 released implementation
-实际只用到了第 1 层；LeRobot 因而直接把默认值设为 1
-以对齐这一行为。Decoder 输出经过线性 action head 投影到动作空间：
+Decoder 到底堆几层，是这里唯一需要停一下的地方。上面那张图按 LeRobot
+的默认值标了 \textbf{1 层交叉注意力}，但你在原始 ACT
+的论文与讲解材料里会看到 decoder 框上写着 \textbf{7x cross-attention
+blocks}------两个数字都没写错：原始 ACT 的配置文件确实写了 7
+层，可公开出来的那份实现里只有第 1 层的输出真正被取用，后面 6
+层白算了。LeRobot 索性把默认值直接设成
+1，好让复现出来的行为和原实现一致。同理，那些材料上把图像特征的通道数标成
+728、再线性投影到 512，与本节按 ResNet18 讲的 512 也对不上------ResNet18
+的 \texttt{layer4} 输出就是 512 通道，所以图上直接标
+512。\textbf{跑起来的层数与维度以代码为准}，这也是上面那张图重画的原因。
+
+Decoder 输出经过线性 action head 投影到动作空间：
 
 \[
 \hat{\mathbf{a}}_{t:t+k} = W_{\text{head}} \cdot \text{decoder\_out}, \quad W_{\text{head}} \in \mathbb{R}^{d_a \times 512}
@@ -840,16 +867,16 @@ ACT 的训练损失是标准的 CVAE 形式------重建损失 + KL 正则：
 \subsubsection{\texorpdfstring{2.5.1 重建损失
 \(\mathcal{L}_{\text{L1}}\)}{2.5.1 重建损失 \textbackslash mathcal\{L\}\_\{\textbackslash text\{L1\}\}}}\label{ux91cdux5efaux635fux5931-mathcall_textl1}
 
-逐元素 L1，对 padding 位置做 mask
-后取均值------直觉上就是''预测的每一步每一个关节，和真实值的绝对误差''：
+逐元素
+L1，先把补位（padding）的位置屏蔽掉再取均值------直觉上就是''预测的每一步每一个关节，和真实值的绝对误差''：
 
 \[
 \mathcal{L}_{\text{L1}} = \operatorname{mean}\!\left(\,|\mathbf{a} - \hat{\mathbf{a}}| \odot \mathbf{1}_{\text{not pad}}\right)
 \]
 
-其中 \(\mathbf{1}_{\text{not pad}}\) 是非 padding 位置的掩码。当一段
-chunk 落在 episode 尾部、未来动作不足 \(k\) 步时，超出部分会被 padding
-填上，再被这个掩码屏蔽掉，不参与损失。
+其中 \(\mathbf{1}_{\text{not pad}}\) 是非补位位置的掩码。当一段 chunk
+落在 episode 尾部、未来动作不足 \(k\)
+步时，超出的部分会被补位填上，再被这个掩码屏蔽掉，不参与损失。
 
 \subsubsection{\texorpdfstring{2.5.2 KL 散度
 \(D_{\text{KL}}\)}{2.5.2 KL 散度 D\_\{\textbackslash text\{KL\}\}}}\label{kl-ux6563ux5ea6-d_textkl}
@@ -913,15 +940,31 @@ Encoder，怎么得到 \(z\)？
 
 \begin{figure}[H]
 
-{\centering \includegraphics[width=0.5\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/ref/output.png}
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/ref/fig10-2-chunking-vs-temporal-ensemble.png}
 
 }
 
-\caption{Action Chunking 与 Temporal Ensemble}
+\caption{两种执行策略摆在同一条时间轴上：上半是动作队列，\(t=0\)
+预测的一段依次执行完，\(t=4\) 才重新查询策略，两段不重叠；下半是
+temporal ensemble，\(t=0,1,2,3\) 每一步都重新预测一整段，于是第 3
+步那一列（橙色框）被四段预测同时覆盖。底下两行标出这四个权重按
+\(w_i \propto \exp(-mi)\) 在 \(m=0.01\) 时的真实取值（本书自绘）}
 
 \end{figure}%
 
-上图展示了两种推理执行策略。
+两种策略的差别全落在\textbf{重叠}上。上半那两排格子首尾相接，\(t=4\)
+处留着一道明显的缝，缝两侧的动作来自两次互不相干的预测，衔接处最容易跳一下。下半每晚一步的预测就往右错开一格，错出来的阶梯让第
+3
+步那一列同时压着四个格子------把这一列平均掉，缝也就被抹平了。图里把段长画成
+4 步，所以重叠最深是四层；默认配置下段长是 100，重叠会厚得多。
+
+图底下那行权重不是示意，是按下面 2.6.2.2 的公式算出来的真实取值：\(m\)
+取原始 ACT 的 0.01 时，四个归一化权重是
+0.254、0.251、0.249、0.246------\textbf{几乎完全相等}。这里要留意
+2.6.2.2 的编号方向：\(i=0\)
+是缓冲区里最老的那次预测，\(w_i = \exp(-mi)\) 随 \(i\) 递减，所以 \(m\)
+调得越大，占主导的是\textbf{最老}那次预测，而不是\textbf{最新}那次。\(m=0.01\)
+只是把这个偏向压到几乎看不见，落成一次等权平均。
 
 \paragraph{2.6.2.1 模式一：Action Queue（LeRobot
 默认）}\label{ux6a21ux5f0fux4e00action-queuelerobot-ux9ed8ux8ba4}
@@ -958,10 +1001,17 @@ a_t^{\text{exec}} = \frac{\sum_{i} w_i \cdot \hat{a}_t^{(i)}}{\sum_{i} w_i}
 \]
 
 其中 \(m\) 是 \texttt{temporal\_ensemble\_coeff}（原始 ACT 取
-0.01）。\(m > 0\)
+0.01{[}1{]}）。\(m > 0\)
 意味着更老的预测权重更高，这看起来有点反直觉，但它确实是 ACT 论文与
 LeRobot 实现采用的定义，可以理解为在 chunk 边界处减少策略抖动、保留
 action chunking 的平滑性。
+
+打开这个开关有一个硬约束容易被忽略：\texttt{ACTConfig} 在校验时会要求
+\texttt{n\_action\_steps\ ==\ 1}，一旦
+\texttt{temporal\_ensemble\_coeff} 不是 \texttt{None} 而
+\texttt{n\_action\_steps} 还留着默认的
+100，构造配置时就直接抛异常。道理也很直白------既然每一步都要重新规划、再和历史预测加权，就不能同时又让队列一口气吐
+100 步。这两个旋钮是互斥的，不是可以叠加的。
 
 \subsubsection{2.6.3
 完整数据流总结}\label{ux5b8cux6574ux6570ux636eux6d41ux603bux7ed3}
@@ -1048,9 +1098,12 @@ ACT}\label{ux5b9eux9a8cux8badux7ec3ux90e8ux7f72ux5e76ux89e3ux6790-act}
 \subsection{3.1 在 LIBERO
 上训练与推理}\label{ux5728-libero-ux4e0aux8badux7ec3ux4e0eux63a8ux7406}
 
-先用 LeRobot 的 ACT 在 LIBERO 数据集上训练一个抓取策略（例如
-\texttt{libero\_goal}
-套件里''把碗放到盘子上''这条任务）。流程是标准三步：
+先用 LeRobot 的 ACT 在 LIBERO
+数据集上训练一个抓取策略：\texttt{libero\_goal}
+套件里''把碗放到盘子上''（task 8）这条任务。训练脚本是
+\texttt{code/vla/3\_imitation\_learning/3\_1\_act/train\_act\_libero.py}，训完之后用
+\texttt{code/vla/3\_imitation\_learning/3\_1\_act/infer\_act\_libero.py}
+加载 checkpoint 做闭环推理并录像。流程是标准三步：
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -1069,10 +1122,42 @@ ACT}\label{ux5b9eux9a8cux8badux7ec3ux90e8ux7f72ux5e76ux89e3ux6790-act}
   \texttt{eval/video} 里策略一边看、一边按 chunk 出动作的执行过程。
 \end{enumerate}
 
-关键在于：\textbf{loss
-下降不等于任务成功}（这一点在第8讲已经强调过），所以必须靠仿真器内的闭环
-rollout 来真正判断策略好不好。LIBERO
+关键在于：\textbf{loss 下降不等于任务成功}（第8讲 3.1
+节已经强调过），所以必须靠仿真器内的闭环 rollout
+来真正判断策略好不好。LIBERO
 这类带成功判定的仿真环境，正好提供了这条闭环验证的标尺。
+
+跑完之后，真正要盯的是 \texttt{eval/pc\_success}
+这条曲线，它的形状本身就在说事。开头一段会长时间贴着
+0------这不是训练坏了，而是这个任务要求''抓起碗、移过去、放到盘子上''三步全对才算成功，前面若干次评估里策略往往只做对了前两步，成功率是离散的
+0/1 统计，中间没有部分分。等它第一次离开
+0，通常会在很短的训练区间里迅速抬起来，然后进入一个上下大幅震荡的高位平台：因为每次评估只跑
+10 个 episode，成功率天然只有 0\%、10\%\ldots\ldots100\% 这 11
+个取值，抖动是采样噪声不是性能反复。判断''训好了没有''要看这个平台的\textbf{中位水平}，不能看某一次评估的峰值------正好一次
+100\% 就宣布收敛，是这一步最常见的自欺。
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/ref/fig10-3-libero-success-curve.png}
+
+}
+
+\caption{这条曲线来自本仓库真跑过的一次 LIBERO ACT
+训练：三段背景色对应上面说的三个阶段。灰色段一直贴在 0，到约第 184
+步才第一次离开；橙色段在两百多步的区间里迅速抬起；绿色段进入高位平台，此后一直在
+40\% 与 100\% 之间大幅震荡，红色虚线是平台期的中位水平
+83\%。平台里任何一次 100\% 的峰值都不能单独拿来当结论（数据出自
+\texttt{code/vla/3\_imitation\_learning/result/3\_1\_act/eval\_result1.png}
+这次 run 的 \texttt{eval/pc\_success}
+面板，逐像素还原后用本书配色重绘）}
+
+\end{figure}%
+
+图上最值得盯的是绿色那段的\textbf{厚度}：平台期最低点 40\%、最高点
+100\%，整整差了 60 个百分点，而这全部是 10 个 episode
+带来的采样噪声。所以拿相邻两次评估的数字比高低是没有意义的------同一个模型，连着评两次就能给出
+60\% 和 100\% 两个结果。真正能比的是中位线：这次 run 的 83\%
+才是它的成绩。
 
 \subsection{3.2 在 SO-101 主从臂上训练
 ACT（无真机用仿真器替代）}\label{ux5728-so-101-ux4e3bux4eceux81c2ux4e0aux8badux7ec3-actux65e0ux771fux673aux7528ux4effux771fux5668ux66ffux4ee3}
@@ -1082,10 +1167,11 @@ ACT（无真机用仿真器替代）}\label{ux5728-so-101-ux4e3bux4eceux81c2ux4e
 \begin{itemize}
 \tightlist
 \item
-  \textbf{有真机}：用上一讲采的 SO-101
+  \textbf{有真机}：用第9讲 4 节采的 SO-101
   主从臂遥操作数据（例如''抓方块放盘子''），同样用
-  \texttt{lerobot-train} 训 ACT，再把训练好的策略部署回 SO-101
-  做闭环执行；动作维度 \(d_a\)、状态维度
+  \texttt{lerobot-train} 训 ACT，训练命令封在
+  \texttt{code/vla/3\_imitation\_learning/3\_1\_act/train\_act\_cuboid.sh}
+  里；训完把策略部署回 SO-101 做闭环执行，动作维度 \(d_a\)、状态维度
   \(d_s\)、相机路数都会由数据集自动对上，超参沿用默认；
 \item
   \textbf{无真机}：用 SO-101
@@ -1100,8 +1186,12 @@ ACT（无真机用仿真器替代）}\label{ux5728-so-101-ux4e3bux4eceux81c2ux4e
 源码逐层拆解}\label{ux4ee3ux7801ux89e3ux6790lerobot-ux6e90ux7801ux9010ux5c42ux62c6ux89e3}
 
 第 2 节讲''为什么这么设计''，这里讲''代码里到底怎么实现的''。下面把 ACT
-在 LeRobot 里的实现按数据流逐层拆开。代码基于 LeRobot 源码，训练脚本以
-3.1 节的 LIBERO 训练为例、使用默认 \texttt{ACTConfig}。
+在 LeRobot{[}2{]} 里的实现按数据流逐层拆开，训练脚本以 3.1 节的 LIBERO
+训练为例、使用默认 \texttt{ACTConfig}。
+
+引用的源码来自 \textbf{LeRobot v0.5.1}，也就是本书
+\texttt{code/pyproject.toml}
+钉住的那个版本。这个项目迭代很快，读到后面的版本时，类名和默认值可能已经变了------所以下面每处贴出的行，都写清了它在上游仓库里的路径，方便你回自己那份源码里对照。
 
 \subsubsection{3.3.1
 从训练脚本入手}\label{ux4eceux8badux7ec3ux811aux672cux5165ux624b}
@@ -1128,43 +1218,81 @@ ACT（无真机用仿真器替代）}\label{ux5728-so-101-ux4e3bux4eceux81c2ux4e
   \texttt{train(cfg)} --- 启动训练
 \end{enumerate}
 
-脚本的核心代码是：
+脚本
+\texttt{code/vla/3\_imitation\_learning/3\_1\_act/train\_act\_libero.py}
+的 \texttt{main()} 就是这条链：
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\CommentTok{\# 1. 从 lerobot/libero 数据集中筛选 "put the bowl on the plate" 的轨迹}
-\NormalTok{metadata }\OperatorTok{=}\NormalTok{ LeRobotDatasetMetadata(}\StringTok{"lerobot/libero"}\NormalTok{)}
-\NormalTok{episodes }\OperatorTok{=}\NormalTok{ get\_task\_episodes(metadata, }\StringTok{"put the bowl on the plate"}\NormalTok{)}
+\NormalTok{    dataset\_id }\OperatorTok{=} \StringTok{"lerobot/libero"}
+\NormalTok{    target\_task }\OperatorTok{=} \StringTok{"put the bowl on the plate"}
 
-\CommentTok{\# 2. 配置 ACT 策略（使用默认超参）}
-\NormalTok{policy\_cfg }\OperatorTok{=}\NormalTok{ ACTConfig(device}\OperatorTok{=}\StringTok{"cuda"}\NormalTok{, push\_to\_hub}\OperatorTok{=}\VariableTok{False}\NormalTok{)}
+\NormalTok{    metadata }\OperatorTok{=}\NormalTok{ LeRobotDatasetMetadata(dataset\_id)}
+\NormalTok{    episodes }\OperatorTok{=}\NormalTok{ get\_task\_episodes(metadata, target\_task)}
 
-\CommentTok{\# 3. 配置数据集（只用筛选出的 episode）}
-\NormalTok{dataset\_cfg }\OperatorTok{=}\NormalTok{ DatasetConfig(repo\_id}\OperatorTok{=}\StringTok{"lerobot/libero"}\NormalTok{, episodes}\OperatorTok{=}\NormalTok{episodes)}
+\NormalTok{    policy\_cfg }\OperatorTok{=}\NormalTok{ ACTConfig(}
+\NormalTok{        device}\OperatorTok{=}\StringTok{"cuda"}\NormalTok{,}
+\NormalTok{        push\_to\_hub}\OperatorTok{=}\VariableTok{False}\NormalTok{,}
+\NormalTok{    )}
 
-\CommentTok{\# 4. 配置 LIBERO 评估环境（libero\_goal suite, task 8）}
-\NormalTok{env\_cfg }\OperatorTok{=}\NormalTok{ LiberoEnvConfig(task}\OperatorTok{=}\StringTok{"libero\_goal"}\NormalTok{, task\_ids}\OperatorTok{=}\NormalTok{[}\DecValTok{8}\NormalTok{],}
-\NormalTok{                          observation\_height}\OperatorTok{=}\DecValTok{256}\NormalTok{, observation\_width}\OperatorTok{=}\DecValTok{256}\NormalTok{)}
+\NormalTok{    dataset\_cfg }\OperatorTok{=}\NormalTok{ DatasetConfig(}
+\NormalTok{        repo\_id}\OperatorTok{=}\NormalTok{dataset\_id,}
+\NormalTok{        episodes}\OperatorTok{=}\NormalTok{episodes,}
+\NormalTok{        use\_imagenet\_stats}\OperatorTok{=}\VariableTok{False}\NormalTok{,}
+\NormalTok{        video\_backend}\OperatorTok{=}\StringTok{"pyav"}\NormalTok{,}
+\NormalTok{    )}
 
-\CommentTok{\# 5. 组装 pipeline 并训练}
-\NormalTok{cfg }\OperatorTok{=}\NormalTok{ TrainPipelineConfig(dataset}\OperatorTok{=}\NormalTok{dataset\_cfg, env}\OperatorTok{=}\NormalTok{env\_cfg, policy}\OperatorTok{=}\NormalTok{policy\_cfg, ...)}
-\NormalTok{train(cfg)}
+\NormalTok{    env\_cfg }\OperatorTok{=}\NormalTok{ LiberoEnvConfig(}
+\NormalTok{        task}\OperatorTok{=}\StringTok{"libero\_goal"}\NormalTok{,}
+\NormalTok{        task\_ids}\OperatorTok{=}\NormalTok{[}\DecValTok{8}\NormalTok{],}
+\NormalTok{        obs\_type}\OperatorTok{=}\StringTok{"pixels\_agent\_pos"}\NormalTok{,}
+\NormalTok{        observation\_height}\OperatorTok{=}\DecValTok{256}\NormalTok{,}
+\NormalTok{        observation\_width}\OperatorTok{=}\DecValTok{256}\NormalTok{,}
+\NormalTok{    )}
+
+\NormalTok{    cfg }\OperatorTok{=}\NormalTok{ TrainPipelineConfig(}
+\NormalTok{        dataset}\OperatorTok{=}\NormalTok{dataset\_cfg,}
+\NormalTok{        env}\OperatorTok{=}\NormalTok{env\_cfg,}
+\NormalTok{        policy}\OperatorTok{=}\NormalTok{policy\_cfg,}
+\NormalTok{        output\_dir}\OperatorTok{=}\NormalTok{output\_dir,}
+\NormalTok{        batch\_size}\OperatorTok{=}\NormalTok{BATCH\_SIZE,}
+\NormalTok{        num\_workers}\OperatorTok{=}\DecValTok{2}\NormalTok{,}
+\NormalTok{        steps}\OperatorTok{=}\DecValTok{100000}\NormalTok{,}
+\NormalTok{        eval\_freq}\OperatorTok{=}\NormalTok{eval\_freq,}
+\NormalTok{        save\_freq}\OperatorTok{=}\NormalTok{eval\_freq,}
+\NormalTok{        log\_freq}\OperatorTok{=}\DecValTok{5}\NormalTok{,}
+\NormalTok{        save\_checkpoint}\OperatorTok{=}\VariableTok{True}\NormalTok{,}
+\NormalTok{        wandb}\OperatorTok{=}\NormalTok{WandBConfig(enable}\OperatorTok{=}\VariableTok{True}\NormalTok{, project}\OperatorTok{=}\StringTok{"act{-}libero"}\NormalTok{),}
+        \BuiltInTok{eval}\OperatorTok{=}\NormalTok{EvalConfig(}
+\NormalTok{            n\_episodes}\OperatorTok{=}\NormalTok{EVAL\_EPISODES,}
+\NormalTok{            batch\_size}\OperatorTok{=}\DecValTok{1}\NormalTok{,}
+\NormalTok{            use\_async\_envs}\OperatorTok{=}\VariableTok{False}\NormalTok{,}
+\NormalTok{        ),}
+\NormalTok{    )}
+
+\NormalTok{    train(cfg)}
 \end{Highlighting}
 \end{Shaded}
 
+几个值得说明的选择：
+
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2656\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1250\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3750\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2167\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2099\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5734\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
-训练参数 & 值 & 含义 \\
+参数 & 值 & 为什么是这个值 \\
 \midrule\noalign{}
-\texttt{TRAIN\_\allowbreak STEPS} & 100000 & 总训练步数 \\
-\texttt{BATCH\_\allowbreak SIZE} & 256 & 批大小 \\
-\texttt{EVAL\_\allowbreak EPISODES} & 10 & 每次评估的 episode 数 \\
-\texttt{EPOCHS\_\allowbreak PER\_\allowbreak EVAL} & 2 & 每 2 个 epoch 评估一次 \\
-\texttt{LOG\_\allowbreak FREQ} & 5 & 每 5 步记录一次日志 \\
+\texttt{batch\_\allowbreak size} & 256 & 显存放得下就尽量大；ACT 的监督信号是动作块级的，一条样本带 100 步动作 \\
+\texttt{steps} & 100000 & 单任务几十条轨迹，这个量级足够训到成功率进入平台 \\
+\texttt{n\_\allowbreak episodes} & 10 & 一次评估跑 10 个 episode。成功率是 0/1 统计，跑太少方差大到看不出趋势 \\
+\texttt{eval\_\allowbreak freq} / \texttt{save\_\allowbreak freq} & 由 \texttt{EPOCHS\_\allowbreak PER\_\allowbreak EVAL} 推出 & 每 2 个 epoch 评一次；评估要在仿真器里跑完整 rollout，比训练一步贵得多，不能每步都评 \\
+\texttt{use\_\allowbreak imagenet\_\allowbreak stats} & \texttt{False} & 用这份数据集自己的统计量归一化，仿真图像的分布和自然照片差得远 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
+
+\texttt{eval\_freq} 和 \texttt{save\_freq}
+取同一个值，是为了让曲线上任何一个点都能回去复现------每次评估都留一份
+checkpoint。
 
 \texttt{train()} 内部自动处理：
 
@@ -1199,7 +1327,7 @@ ACT（无真机用仿真器替代）}\label{ux5728-so-101-ux4e3bux4eceux81c2ux4e
   \texttt{eval\_policy(env,\ policy,\ ...)} 定期仿真评估
 \end{itemize}
 
-首先要注意：\textbf{ACT 的 chunk supervision 是 dataset
+首先要注意：\textbf{ACT 的动作块监督是 dataset
 层生成的，不是模型内部现拼出来的。}
 也就是说，这段训练脚本虽然短，但背后接起的是一整条以 action chunk
 为中心的数据流，而不是''把单步 BC
@@ -1223,7 +1351,7 @@ ACT（无真机用仿真器替代）}\label{ux5728-so-101-ux4e3bux4eceux81c2ux4e
 \subsubsection{3.3.2
 配置层：ACTConfig}\label{ux914dux7f6eux5c42actconfig}
 
-文件位置 \texttt{policies/act/configuration\_act.py}，核心类：
+文件位置 \texttt{lerobot/policies/act/configuration\_act.py}，核心类：
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1234,7 +1362,7 @@ ACT（无真机用仿真器替代）}\label{ux5728-so-101-ux4e3bux4eceux81c2ux4e
 \end{Shaded}
 
 它继承自
-\texttt{PreTrainedConfig}（\texttt{configs/policies.py}），天然具备：\texttt{input\_features}
+\texttt{PreTrainedConfig}（\texttt{lerobot/configs/policies.py}），天然具备：\texttt{input\_features}
 / \texttt{output\_features} 描述模型的输入输出 feature、\texttt{device}
 / \texttt{use\_amp} 设备和混合精度、\texttt{save\_pretrained()} /
 \texttt{from\_pretrained()} 模型保存加载，以及与
@@ -1302,9 +1430,8 @@ chunk。一个容易混淆的点是：\texttt{chunk\_size}
 \end{tabular}
 \end{center}
 
-注意 \texttt{n\_decoder\_layers\ =\ 1}。原始 ACT 论文代码写了 7 层，但有
-bug 导致实际只用了第 1 层。LeRobot 直接设为 1 以匹配原始行为（见
-\texttt{configuration\_act.py} 的相关注释）。
+这里唯一值得停一下的是 \texttt{n\_decoder\_layers\ =\ 1}，原因在 2.4.2
+节讲过：原实现里后 6 层没被取用，LeRobot 把默认值对齐成 1。
 
 \paragraph{3.3.2.3 CVAE 参数}\label{cvae-ux53c2ux6570}
 
@@ -1350,7 +1477,7 @@ bug 导致实际只用了第 1 层。LeRobot 直接设为 1 以匹配原始行�
 监督}\label{ux6570ux636eux5c42ux628aux5355ux5e27ux53d8ux6210-chunk-ux76d1ux7763}
 
 文件位置
-\texttt{datasets/lerobot\_dataset.py}、\texttt{datasets/factory.py}（\texttt{resolve\_delta\_timestamps}
+\texttt{lerobot/datasets/lerobot\_dataset.py}、\texttt{lerobot/datasets/factory.py}（\texttt{resolve\_delta\_timestamps}
 函数）。
 
 训练脚本里不需要手动构造 \texttt{delta\_timestamps}，\texttt{train()}
@@ -1360,19 +1487,30 @@ bug 导致实际只用了第 1 层。LeRobot 直接设为 1 以匹配原始行�
 \texttt{ACTConfig.action\_delta\_indices} \;\xrightarrow{\texttt{resolve\_delta\_timestamps}}\; \texttt{delta\_timestamps} \;\xrightarrow{\texttt{LeRobotDataset}}\; \texttt{delta\_indices}
 \]
 
-具体代码在 \texttt{datasets/factory.py}：
+具体代码在 \texttt{lerobot/datasets/factory.py}：
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\KeywordTok{def}\NormalTok{ resolve\_delta\_timestamps(cfg: PreTrainedConfig, ds\_meta: LeRobotDatasetMetadata):}
 \NormalTok{    delta\_timestamps }\OperatorTok{=}\NormalTok{ \{\}}
     \ControlFlowTok{for}\NormalTok{ key }\KeywordTok{in}\NormalTok{ ds\_meta.features:}
+        \ControlFlowTok{if}\NormalTok{ key }\OperatorTok{==}\NormalTok{ REWARD }\KeywordTok{and}\NormalTok{ cfg.reward\_delta\_indices }\KeywordTok{is} \KeywordTok{not} \VariableTok{None}\NormalTok{:}
+\NormalTok{            delta\_timestamps[key] }\OperatorTok{=}\NormalTok{ [i }\OperatorTok{/}\NormalTok{ ds\_meta.fps }\ControlFlowTok{for}\NormalTok{ i }\KeywordTok{in}\NormalTok{ cfg.reward\_delta\_indices]}
         \ControlFlowTok{if}\NormalTok{ key }\OperatorTok{==}\NormalTok{ ACTION }\KeywordTok{and}\NormalTok{ cfg.action\_delta\_indices }\KeywordTok{is} \KeywordTok{not} \VariableTok{None}\NormalTok{:}
 \NormalTok{            delta\_timestamps[key] }\OperatorTok{=}\NormalTok{ [i }\OperatorTok{/}\NormalTok{ ds\_meta.fps }\ControlFlowTok{for}\NormalTok{ i }\KeywordTok{in}\NormalTok{ cfg.action\_delta\_indices]}
-        \CommentTok{\# ... 类似处理 observation 和 reward}
-    \ControlFlowTok{return}\NormalTok{ delta\_timestamps }\ControlFlowTok{if} \BuiltInTok{len}\NormalTok{(delta\_timestamps) }\OperatorTok{\textgreater{}} \DecValTok{0} \ControlFlowTok{else} \VariableTok{None}
+        \ControlFlowTok{if}\NormalTok{ key.startswith(OBS\_PREFIX) }\KeywordTok{and}\NormalTok{ cfg.observation\_delta\_indices }\KeywordTok{is} \KeywordTok{not} \VariableTok{None}\NormalTok{:}
+\NormalTok{            delta\_timestamps[key] }\OperatorTok{=}\NormalTok{ [i }\OperatorTok{/}\NormalTok{ ds\_meta.fps }\ControlFlowTok{for}\NormalTok{ i }\KeywordTok{in}\NormalTok{ cfg.observation\_delta\_indices]}
+
+    \ControlFlowTok{if} \BuiltInTok{len}\NormalTok{(delta\_timestamps) }\OperatorTok{==} \DecValTok{0}\NormalTok{:}
+\NormalTok{        delta\_timestamps }\OperatorTok{=} \VariableTok{None}
+
+    \ControlFlowTok{return}\NormalTok{ delta\_timestamps}
 \end{Highlighting}
 \end{Shaded}
+
+三个分支是并列的：reward、action、observation 各自看自己那份
+\texttt{*\_delta\_indices}（顺序同代码）。ACT 只实现了
+\texttt{action\_delta\_indices}，另外两个属性返回 \texttt{None}，所以对
+ACT 来说只有中间那条分支会生效。
 
 \texttt{ACTConfig.action\_delta\_indices} 返回
 \texttt{list(range(100))}，数据集 FPS = 10，所以：
@@ -1382,31 +1520,29 @@ bug 导致实际只用了第 1 层。LeRobot 直接设为 1 以匹配原始行�
 \]
 
 这意味着 dataset 在取一个样本时，会把当前时刻之后连续 100 个 action
-一起取出来。这也说明：\textbf{ACT 的 chunk supervision
-是数据层根据配置主动生成的。}
+一起取出来。这也说明：\textbf{ACT
+的动作块监督是数据层根据配置主动生成的。}
 
-在
-\texttt{LeRobotDataset.\_\_getitem\_\_()}（\texttt{lerobot\_dataset.py}）里：先取当前帧
-\texttt{item\ =\ self.hf\_dataset{[}idx{]}}；如果配置了
-\texttt{delta\_indices}，调用
-\texttt{\_get\_query\_indices(abs\_idx,\ ep\_idx)} 和
-\texttt{\_query\_hf\_dataset(query\_indices)}，把未来若干时刻的 action
-拼进来，同时生成 padding mask
-\texttt{action\_is\_pad}。\texttt{\_get\_query\_indices}（\texttt{lerobot\_dataset.py}）的核心逻辑：
+在 \texttt{LeRobotDataset.\_\_getitem\_\_()}（上游
+\texttt{lerobot/datasets/lerobot\_dataset.py}）里：先取当前帧，如果配置了
+\texttt{delta\_indices}，就调用
+\texttt{\_get\_query\_indices(abs\_idx,\ ep\_idx)} 把未来若干时刻的
+action 拼进来，同时生成补位掩码
+\texttt{action\_is\_pad}。\texttt{\_get\_query\_indices} 本身在上游
+\texttt{lerobot/datasets/dataset\_reader.py}，核心逻辑是：
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{query\_indices }\OperatorTok{=}\NormalTok{ \{}
-\NormalTok{    key: [}\BuiltInTok{max}\NormalTok{(ep\_start, }\BuiltInTok{min}\NormalTok{(ep\_end }\OperatorTok{{-}} \DecValTok{1}\NormalTok{, abs\_idx }\OperatorTok{+}\NormalTok{ delta)) }\ControlFlowTok{for}\NormalTok{ delta }\KeywordTok{in}\NormalTok{ delta\_idx]}
-    \ControlFlowTok{for}\NormalTok{ key, delta\_idx }\KeywordTok{in} \VariableTok{self}\NormalTok{.delta\_indices.items()}
-\NormalTok{\}}
-\NormalTok{padding }\OperatorTok{=}\NormalTok{ \{}
-    \SpecialStringTok{f"}\SpecialCharTok{\{}\NormalTok{key}\SpecialCharTok{\}}\SpecialStringTok{\_is\_pad"}\NormalTok{: torch.BoolTensor(}
-\NormalTok{        [(abs\_idx }\OperatorTok{+}\NormalTok{ delta }\OperatorTok{\textless{}}\NormalTok{ ep\_start) }\OperatorTok{|}\NormalTok{ (abs\_idx }\OperatorTok{+}\NormalTok{ delta }\OperatorTok{\textgreater{}=}\NormalTok{ ep\_end)}
-         \ControlFlowTok{for}\NormalTok{ delta }\KeywordTok{in}\NormalTok{ delta\_idx]}
-\NormalTok{    )}
-    \ControlFlowTok{for}\NormalTok{ key, delta\_idx }\KeywordTok{in} \VariableTok{self}\NormalTok{.delta\_indices.items()}
-\NormalTok{\}}
+\NormalTok{        query\_indices }\OperatorTok{=}\NormalTok{ \{}
+\NormalTok{            key: [}\BuiltInTok{max}\NormalTok{(ep\_start, }\BuiltInTok{min}\NormalTok{(ep\_end }\OperatorTok{{-}} \DecValTok{1}\NormalTok{, abs\_idx }\OperatorTok{+}\NormalTok{ delta)) }\ControlFlowTok{for}\NormalTok{ delta }\KeywordTok{in}\NormalTok{ delta\_idx]}
+            \ControlFlowTok{for}\NormalTok{ key, delta\_idx }\KeywordTok{in} \VariableTok{self}\NormalTok{.delta\_indices.items()}
+\NormalTok{        \}}
+\NormalTok{        padding }\OperatorTok{=}\NormalTok{ \{}
+            \SpecialStringTok{f"}\SpecialCharTok{\{}\NormalTok{key}\SpecialCharTok{\}}\SpecialStringTok{\_is\_pad"}\NormalTok{: torch.BoolTensor(}
+\NormalTok{                [(abs\_idx }\OperatorTok{+}\NormalTok{ delta }\OperatorTok{\textless{}}\NormalTok{ ep\_start) }\OperatorTok{|}\NormalTok{ (abs\_idx }\OperatorTok{+}\NormalTok{ delta }\OperatorTok{\textgreater{}=}\NormalTok{ ep\_end) }\ControlFlowTok{for}\NormalTok{ delta }\KeywordTok{in}\NormalTok{ delta\_idx]}
+\NormalTok{            )}
+            \ControlFlowTok{for}\NormalTok{ key, delta\_idx }\KeywordTok{in} \VariableTok{self}\NormalTok{.delta\_indices.items()}
+\NormalTok{        \}}
 \end{Highlighting}
 \end{Shaded}
 
@@ -1427,19 +1563,18 @@ bug 导致实际只用了第 1 层。LeRobot 直接设为 1 以匹配原始行�
 \texttt{dataset{[}idx{]}} 不再只是单个 \(a_t\)，而是：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2344\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2188\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2188\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2344\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2188\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1562\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 键 & 形状 & 含义 \\
 \midrule\noalign{}
 \texttt{action} & \((k, d_a) = (100, 7)\) & 动作块 \\
-\texttt{action\_\allowbreak is\_\allowbreak pad} & \((k,) = (100,)\) & padding 掩码 \\
+\texttt{action\_\allowbreak is\_\allowbreak pad} & \((k,) = (100,)\) & 补位掩码 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
 如果没有 \texttt{action\_is\_pad}，episode
-尾部那批样本的监督就会被越界部分污染。也就是说，padding mask
-不是边角细节，而是 chunk supervision 能正常工作的必要条件。
+尾部那批样本的监督就会被越界部分污染。也就是说，补位掩码不是边角细节，而是动作块监督能正常工作的必要条件。
 
 \texttt{lerobot/libero} 的 dataset metadata 里，和 ACT
 直接对接的是一组已经扁平化好的 feature：
@@ -1471,6 +1606,10 @@ FPS & 10 \\
 \end{tabular}
 \end{center}
 
+这三个数取自 \texttt{lerobot/libero} 数据集卡片页渲染出来的
+\texttt{meta/info.json}（同页还写着机器人型号 Panda、 40
+个任务）。它们会随上游重新发布而变，自己训之前顺手核一眼即可。
+
 这里有一个很容易混淆但非常重要的点：
 
 \begin{enumerate}
@@ -1491,7 +1630,7 @@ FPS & 10 \\
 \end{enumerate}
 
 当前 LeRobot
-的环境预处理逻辑（\texttt{processor/env\_processor.py}）里，这个压平过程是：
+的环境预处理逻辑（\texttt{lerobot/processor/env\_processor.py}）里，这个压平过程是：
 
 \[
 [\texttt{eef\_pos}(3),\; \texttt{quat2axisangle(eef\_quat)}(3),\; \texttt{gripper\_qpos}(2)]
@@ -1507,8 +1646,8 @@ FPS & 10 \\
 \subsubsection{3.3.4 预处理层：归一化
 pipeline}\label{ux9884ux5904ux7406ux5c42ux5f52ux4e00ux5316-pipeline}
 
-工厂入口 \texttt{policies/factory.py}，对 \texttt{ACTConfig} 最终走到
-\texttt{policies/act/processor\_act.py} 的
+工厂入口 \texttt{lerobot/policies/factory.py}，对 \texttt{ACTConfig}
+最终走到 \texttt{lerobot/policies/act/processor\_act.py} 的
 \texttt{make\_act\_pre\_post\_processors()}。ACT preprocessor 的步骤：
 
 \begin{Shaded}
@@ -1541,9 +1680,9 @@ pipeline}\label{ux9884ux5904ux7406ux5c42ux5f52ux4e00ux5316-pipeline}
 \end{center}
 
 \textbf{preprocess 负责标准化，不是模型内部偷偷做。} LeRobot 的 ACT
-实现其实分工非常清楚：dataset 负责把样本组织成 chunk-level
-监督、processor 负责归一化和设备搬运、policy / model
-负责神经网络前向。postprocessor 的步骤：
+实现其实分工非常清楚：dataset 负责把样本组织成动作块监督、processor
+负责归一化和设备搬运、policy / model 负责神经网络前向。postprocessor
+的步骤：
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1563,25 +1702,25 @@ pipeline}\label{ux9884ux5904ux7406ux5c42ux5f52ux4e00ux5316-pipeline}
 \subsubsection{3.3.5
 模型入口：ACTPolicy}\label{ux6a21ux578bux5165ux53e3actpolicy}
 
-文件位置 \texttt{policies/act/modeling\_act.py}，外层类
+文件位置 \texttt{lerobot/policies/act/modeling\_act.py}，外层类
 \texttt{class\ ACTPolicy(PreTrainedPolicy)} 负责三件事：管理训练接口
 \texttt{forward()}、管理推理接口 \texttt{select\_action()} /
 \texttt{predict\_action\_chunk()}、管理在线执行时的动作队列。构造函数：
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\KeywordTok{def} \FunctionTok{\_\_init\_\_}\NormalTok{(}
-    \VariableTok{self}\NormalTok{,}
-\NormalTok{    config: ACTConfig,}
-    \OperatorTok{**}\NormalTok{kwargs,}
-\NormalTok{):}
-    \BuiltInTok{super}\NormalTok{().}\FunctionTok{\_\_init\_\_}\NormalTok{(config)}
-\NormalTok{    config.validate\_features()}
-    \VariableTok{self}\NormalTok{.model }\OperatorTok{=}\NormalTok{ ACT(config)                    }\CommentTok{\# 核心神经网络}
+\BuiltInTok{super}\NormalTok{().}\FunctionTok{\_\_init\_\_}\NormalTok{(config)}
+\NormalTok{config.validate\_features()}
+\VariableTok{self}\NormalTok{.config }\OperatorTok{=}\NormalTok{ config}
 
-    \ControlFlowTok{if}\NormalTok{ config.temporal\_ensemble\_coeff }\KeywordTok{is} \KeywordTok{not} \VariableTok{None}\NormalTok{:}
-        \VariableTok{self}\NormalTok{.temporal\_ensembler }\OperatorTok{=}\NormalTok{ ACTTemporalEnsembler(...)}
-    \VariableTok{self}\NormalTok{.reset()}
+\VariableTok{self}\NormalTok{.model }\OperatorTok{=}\NormalTok{ ACT(config)}
+
+\ControlFlowTok{if}\NormalTok{ config.temporal\_ensemble\_coeff }\KeywordTok{is} \KeywordTok{not} \VariableTok{None}\NormalTok{:}
+    \VariableTok{self}\NormalTok{.temporal\_ensembler }\OperatorTok{=}\NormalTok{ ACTTemporalEnsembler(}
+\NormalTok{        config.temporal\_ensemble\_coeff, config.chunk\_size}
+\NormalTok{    )}
+
+\VariableTok{self}\NormalTok{.reset()}
 \end{Highlighting}
 \end{Shaded}
 
@@ -1610,8 +1749,11 @@ pipeline}\label{ux9884ux5904ux7406ux5c42ux5f52ux4e00ux5316-pipeline}
 
     \CommentTok{\# KL 散度}
     \ControlFlowTok{if} \VariableTok{self}\NormalTok{.config.use\_vae:}
-\NormalTok{        mean\_kld }\OperatorTok{=}\NormalTok{ (}\OperatorTok{{-}}\FloatTok{0.5} \OperatorTok{*}\NormalTok{ (}\DecValTok{1} \OperatorTok{+}\NormalTok{ log\_sigma\_x2\_hat }\OperatorTok{{-}}\NormalTok{ mu\_hat.}\BuiltInTok{pow}\NormalTok{(}\DecValTok{2}\NormalTok{)}
-                    \OperatorTok{{-}}\NormalTok{ log\_sigma\_x2\_hat.exp())).}\BuiltInTok{sum}\NormalTok{(}\OperatorTok{{-}}\DecValTok{1}\NormalTok{).mean()}
+\NormalTok{        mean\_kld }\OperatorTok{=}\NormalTok{ (}
+\NormalTok{            (}\OperatorTok{{-}}\FloatTok{0.5} \OperatorTok{*}\NormalTok{ (}\DecValTok{1} \OperatorTok{+}\NormalTok{ log\_sigma\_x2\_hat }\OperatorTok{{-}}\NormalTok{ mu\_hat.}\BuiltInTok{pow}\NormalTok{(}\DecValTok{2}\NormalTok{) }\OperatorTok{{-}}\NormalTok{ (log\_sigma\_x2\_hat).exp()))}
+\NormalTok{            .}\BuiltInTok{sum}\NormalTok{(}\OperatorTok{{-}}\DecValTok{1}\NormalTok{)}
+\NormalTok{            .mean()}
+\NormalTok{        )}
 \NormalTok{        loss\_dict[}\StringTok{"kld\_loss"}\NormalTok{] }\OperatorTok{=}\NormalTok{ mean\_kld.item()}
 \NormalTok{        loss }\OperatorTok{=}\NormalTok{ l1\_loss }\OperatorTok{+}\NormalTok{ mean\_kld }\OperatorTok{*} \VariableTok{self}\NormalTok{.config.kl\_weight}
     \ControlFlowTok{else}\NormalTok{:}
@@ -1634,15 +1776,14 @@ pipeline}\label{ux9884ux5904ux7406ux5c42ux5f52ux4e00ux5316-pipeline}
   会先输出整个动作块 \texttt{actions\_hat}，形状
   \((B, k, d_a) = (B, 100, 7)\)
 \item
-  监督信号是 dataset 提供的 chunk-level
-  \texttt{batch{[}ACTION{]}}，形状同样是 \((B, 100, 7)\)，并通过
-  \texttt{action\_is\_pad} 屏蔽越界位置
+  监督信号是 dataset 提供的动作块 \texttt{batch{[}ACTION{]}}，形状同样是
+  \((B, 100, 7)\)，并通过 \texttt{action\_is\_pad} 屏蔽越界位置
 \end{enumerate}
 
 损失函数对应 2.5 节的：
 
 \[
-\mathcal{L} = \underbrace{\mathcal{L}_{\text{L1}}(\mathbf{a},\; \hat{\mathbf{a}})}_{\text{重建损失}} + \;\beta \cdot \underbrace{D_{\text{KL}}\!\left(q(z \mid o_t, \mathbf{a}) \;\|\; \mathcal{N}(0, I)\right)}_{\text{KL 散度}}
+\mathcal{L} = \underbrace{\mathcal{L}_{\text{L1}}(\mathbf{a},\; \hat{\mathbf{a}})}_{\text{重建损失}} + \;\beta \cdot \underbrace{D_{\text{KL}}\!\left(q(z \mid s_t, \mathbf{a}) \;\|\; \mathcal{N}(0, I)\right)}_{\text{KL 散度}}
 \]
 
 \paragraph{\texorpdfstring{3.3.5.2
@@ -1650,6 +1791,7 @@ pipeline}\label{ux9884ux5904ux7406ux5c42ux5f52ux4e00ux5316-pipeline}
 
 \begin{Shaded}
 \begin{Highlighting}[]
+\AttributeTok{@torch.no\_grad}\NormalTok{()}
 \KeywordTok{def}\NormalTok{ select\_action(}\VariableTok{self}\NormalTok{, batch: }\BuiltInTok{dict}\NormalTok{[}\BuiltInTok{str}\NormalTok{, Tensor]) }\OperatorTok{{-}\textgreater{}}\NormalTok{ Tensor:}
     \VariableTok{self}\NormalTok{.}\BuiltInTok{eval}\NormalTok{()}
     \ControlFlowTok{if} \VariableTok{self}\NormalTok{.config.temporal\_ensemble\_coeff }\KeywordTok{is} \KeywordTok{not} \VariableTok{None}\NormalTok{:}
@@ -1659,7 +1801,7 @@ pipeline}\label{ux9884ux5904ux7406ux5c42ux5f52ux4e00ux5316-pipeline}
 
     \CommentTok{\# Action Queue 模式}
     \ControlFlowTok{if} \BuiltInTok{len}\NormalTok{(}\VariableTok{self}\NormalTok{.\_action\_queue) }\OperatorTok{==} \DecValTok{0}\NormalTok{:}
-\NormalTok{        actions }\OperatorTok{=} \VariableTok{self}\NormalTok{.predict\_action\_chunk(batch)[:, :}\VariableTok{self}\NormalTok{.config.n\_action\_steps]}
+\NormalTok{        actions }\OperatorTok{=} \VariableTok{self}\NormalTok{.predict\_action\_chunk(batch)[:, : }\VariableTok{self}\NormalTok{.config.n\_action\_steps]}
         \VariableTok{self}\NormalTok{.\_action\_queue.extend(actions.transpose(}\DecValTok{0}\NormalTok{, }\DecValTok{1}\NormalTok{))}
     \ControlFlowTok{return} \VariableTok{self}\NormalTok{.\_action\_queue.popleft()}
 \end{Highlighting}
@@ -1694,19 +1836,27 @@ pipeline}\label{ux9884ux5904ux7406ux5c42ux5f52ux4e00ux5316-pipeline}
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\KeywordTok{def}\NormalTok{ predict\_action\_chunk(}\VariableTok{self}\NormalTok{, batch: }\BuiltInTok{dict}\NormalTok{[}\BuiltInTok{str}\NormalTok{, Tensor]) }\OperatorTok{{-}\textgreater{}}\NormalTok{ Tensor:}
-    \VariableTok{self}\NormalTok{.}\BuiltInTok{eval}\NormalTok{()}
-    \ControlFlowTok{if} \VariableTok{self}\NormalTok{.config.image\_features:}
-\NormalTok{        batch }\OperatorTok{=} \BuiltInTok{dict}\NormalTok{(batch)}
-\NormalTok{        batch[OBS\_IMAGES] }\OperatorTok{=}\NormalTok{ [batch[key] }\ControlFlowTok{for}\NormalTok{ key }\KeywordTok{in} \VariableTok{self}\NormalTok{.config.image\_features]}
-\NormalTok{    actions }\OperatorTok{=} \VariableTok{self}\NormalTok{.model(batch)[}\DecValTok{0}\NormalTok{]}
-    \ControlFlowTok{return}\NormalTok{ actions  }\CommentTok{\# (B, chunk\_size, action\_dim) = (B, 100, 7)}
+    \AttributeTok{@torch.no\_grad}\NormalTok{()}
+    \KeywordTok{def}\NormalTok{ predict\_action\_chunk(}\VariableTok{self}\NormalTok{, batch: }\BuiltInTok{dict}\NormalTok{[}\BuiltInTok{str}\NormalTok{, Tensor]) }\OperatorTok{{-}\textgreater{}}\NormalTok{ Tensor:}
+        \CommentTok{"""Predict a chunk of actions given environment observations."""}
+        \VariableTok{self}\NormalTok{.}\BuiltInTok{eval}\NormalTok{()}
+
+        \ControlFlowTok{if} \VariableTok{self}\NormalTok{.config.image\_features:}
+\NormalTok{            batch }\OperatorTok{=} \BuiltInTok{dict}\NormalTok{(batch)  }\CommentTok{\# shallow copy so that adding a key doesn\textquotesingle{}t modify the original}
+\NormalTok{            batch[OBS\_IMAGES] }\OperatorTok{=}\NormalTok{ [batch[key] }\ControlFlowTok{for}\NormalTok{ key }\KeywordTok{in} \VariableTok{self}\NormalTok{.config.image\_features]}
+
+\NormalTok{        actions }\OperatorTok{=} \VariableTok{self}\NormalTok{.model(batch)[}\DecValTok{0}\NormalTok{]}
+        \ControlFlowTok{return}\NormalTok{ actions}
 \end{Highlighting}
 \end{Shaded}
 
-注意：\texttt{batch{[}OBS\_IMAGES{]}} 被整理成了一个
-list，而不是保留原始的多个键。底层 \texttt{ACT}
-模型期待的是图像列表，不是分散的键。
+返回的形状是
+\((B, k, d_a) = (B, 100, 7)\)。两处细节值得留意：它和上一节的
+\texttt{select\_action()} 一样带着
+\texttt{@torch.no\_grad()}，所以整条推理路径上都不会建计算图；\texttt{batch{[}OBS\_IMAGES{]}}
+被整理成了一个 list 而不是保留原始的多个键------底层 \texttt{ACT}
+模型期待的是图像列表，不是分散的键，而 \texttt{dict(batch)}
+这一层浅拷贝保证了改键名不会污染调用方传进来的那个 batch。
 
 \subsubsection{3.3.6 核心神经网络：ACT
 类}\label{ux6838ux5fc3ux795eux7ecfux7f51ux7edcact-ux7c7b}
@@ -1721,13 +1871,29 @@ list，而不是保留原始的多个键。底层 \texttt{ACT}
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\VariableTok{self}\NormalTok{.vae\_encoder }\OperatorTok{=}\NormalTok{ ACTEncoder(config, is\_vae\_encoder}\OperatorTok{=}\VariableTok{True}\NormalTok{)        }\CommentTok{\# 4 层 Transformer Encoder}
-\VariableTok{self}\NormalTok{.vae\_encoder\_cls\_embed }\OperatorTok{=}\NormalTok{ nn.Embedding(}\DecValTok{1}\NormalTok{, config.dim\_model)    }\CommentTok{\# [CLS] token}
-\VariableTok{self}\NormalTok{.vae\_encoder\_robot\_state\_input\_proj }\OperatorTok{=}\NormalTok{ nn.Linear(d\_s, dim\_model)   }\CommentTok{\# 状态投影}
-\VariableTok{self}\NormalTok{.vae\_encoder\_action\_input\_proj }\OperatorTok{=}\NormalTok{ nn.Linear(d\_a, dim\_model)        }\CommentTok{\# 动作投影}
+\VariableTok{self}\NormalTok{.vae\_encoder }\OperatorTok{=}\NormalTok{ ACTEncoder(config, is\_vae\_encoder}\OperatorTok{=}\VariableTok{True}\NormalTok{)}
+\VariableTok{self}\NormalTok{.vae\_encoder\_cls\_embed }\OperatorTok{=}\NormalTok{ nn.Embedding(}\DecValTok{1}\NormalTok{, config.dim\_model)}
+\CommentTok{\# Projection layer for joint{-}space configuration to hidden dimension.}
+\ControlFlowTok{if} \VariableTok{self}\NormalTok{.config.robot\_state\_feature:}
+    \VariableTok{self}\NormalTok{.vae\_encoder\_robot\_state\_input\_proj }\OperatorTok{=}\NormalTok{ nn.Linear(}
+        \VariableTok{self}\NormalTok{.config.robot\_state\_feature.shape[}\DecValTok{0}\NormalTok{], config.dim\_model}
+\NormalTok{    )}
+\CommentTok{\# Projection layer for action (joint{-}space target) to hidden dimension.}
+\VariableTok{self}\NormalTok{.vae\_encoder\_action\_input\_proj }\OperatorTok{=}\NormalTok{ nn.Linear(}
+    \VariableTok{self}\NormalTok{.config.action\_feature.shape[}\DecValTok{0}\NormalTok{],}
+\NormalTok{    config.dim\_model,}
+\NormalTok{)}
+\CommentTok{\# Projection layer from the VAE encoder\textquotesingle{}s output to the latent distribution\textquotesingle{}s parameter space.}
 \VariableTok{self}\NormalTok{.vae\_encoder\_latent\_output\_proj }\OperatorTok{=}\NormalTok{ nn.Linear(config.dim\_model, config.latent\_dim }\OperatorTok{*} \DecValTok{2}\NormalTok{)}
 \end{Highlighting}
 \end{Shaded}
+
+投影层的输入维度不是写死的常数，而是从数据集的 feature
+描述里读出来的：状态那一路取
+\texttt{config.robot\_state\_feature.shape{[}0{]}}，动作那一路取
+\texttt{config.action\_feature.shape{[}0{]}}。 这就是 3.2
+节说的''换机器人不用改算法''------维度由数据集说了算。在 LIBERO
+这份数据上 它们分别是 8 和 7。
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.4139\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1255\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1358\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3248\linewidth - 2\tabcolsep\relax}@{}}
@@ -1746,7 +1912,8 @@ list，而不是保留原始的多个键。底层 \texttt{ACT}
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{backbone\_model }\OperatorTok{=}\NormalTok{ torchvision.models.resnet18(}
+\NormalTok{backbone\_model }\OperatorTok{=} \BuiltInTok{getattr}\NormalTok{(torchvision.models, config.vision\_backbone)(}
+\NormalTok{    replace\_stride\_with\_dilation}\OperatorTok{=}\NormalTok{[}\VariableTok{False}\NormalTok{, }\VariableTok{False}\NormalTok{, config.replace\_final\_stride\_with\_dilation],}
 \NormalTok{    weights}\OperatorTok{=}\NormalTok{config.pretrained\_backbone\_weights,}
 \NormalTok{    norm\_layer}\OperatorTok{=}\NormalTok{FrozenBatchNorm2d,}
 \NormalTok{)}
@@ -1754,7 +1921,16 @@ list，而不是保留原始的多个键。底层 \texttt{ACT}
 \end{Highlighting}
 \end{Shaded}
 
-取 ResNet18 的 \texttt{layer4} 输出。对于 \(256 \times 256\) 输入图像：
+骨干网络是按 \texttt{config.vision\_backbone} 这个字符串（默认
+\texttt{"resnet18"}）从 \texttt{torchvision.models} 里取的，
+所以换成别的 ResNet
+变体只要改配置。\texttt{norm\_layer=FrozenBatchNorm2d} 把 BatchNorm
+的统计量冻住： 机器人训练常用很小的 batch，BatchNorm 在小 batch
+下估出来的均值方差噪声很大，冻住反而更稳。
+\texttt{IntermediateLayerGetter} 的作用是只要 \texttt{layer4}
+的特征图，不要 ResNet 后面的池化和分类头。
+
+对于 \(256 \times 256\) 输入图像：
 
 \[
 I^{(c)} \in \mathbb{R}^{3 \times 256 \times 256} \;\xrightarrow{\text{ResNet18 layer4}}\; F^{(c)} \in \mathbb{R}^{512 \times 8 \times 8}
@@ -1771,8 +1947,9 @@ I^{(c)} \in \mathbb{R}^{3 \times 256 \times 256} \;\xrightarrow{\text{ResNet18 l
 \end{Highlighting}
 \end{Shaded}
 
-主干结构可以概括为：\texttt{VAE\ encoder\ +\ 图像\ backbone\ +\ 主\ encoder/decoder\ +\ 动作回归头}。\texttt{Transformer}
-子模块、位置编码和 \texttt{Temporal\ Ensembler} 的实现细节这里不再展开。
+主干结构可以概括为：VAE encoder + 图像骨干网络 + 主 encoder/decoder +
+动作回归头。\texttt{Transformer} 子模块、位置编码和
+\texttt{Temporal\ Ensembler} 的实现细节这里不再展开。
 
 \paragraph{\texorpdfstring{3.3.6.4 \texttt{ACT.forward()}
 逐步拆解（按训练时的数据流）}{3.3.6.4 ACT.forward() 逐步拆解（按训练时的数据流）}}\label{act.forward-ux9010ux6b65ux62c6ux89e3ux6309ux8badux7ec3ux65f6ux7684ux6570ux636eux6d41}
@@ -1783,15 +1960,27 @@ I^{(c)} \in \mathbb{R}^{3 \times 256 \times 256} \;\xrightarrow{\text{ResNet18 l
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{cls\_embed }\OperatorTok{=}\NormalTok{ einops.repeat(}
-    \VariableTok{self}\NormalTok{.vae\_encoder\_cls\_embed.weight, }\StringTok{"1 d {-}\textgreater{} b 1 d"}\NormalTok{, b}\OperatorTok{=}\NormalTok{batch\_size)             }\CommentTok{\# (B, 1, 512)}
-\NormalTok{robot\_state\_embed }\OperatorTok{=} \VariableTok{self}\NormalTok{.vae\_encoder\_robot\_state\_input\_proj(batch[OBS\_STATE])}
-\NormalTok{robot\_state\_embed }\OperatorTok{=}\NormalTok{ robot\_state\_embed.unsqueeze(}\DecValTok{1}\NormalTok{)  }\CommentTok{\# (B, 1, D)}
-\NormalTok{action\_embed }\OperatorTok{=} \VariableTok{self}\NormalTok{.vae\_encoder\_action\_input\_proj(batch[ACTION])               }\CommentTok{\# (B, 100, 512)}
-\NormalTok{vae\_encoder\_input }\OperatorTok{=}\NormalTok{ torch.cat(}
-\NormalTok{    [cls\_embed, robot\_state\_embed, action\_embed], axis}\OperatorTok{=}\DecValTok{1}\NormalTok{)                      }\CommentTok{\# (B, 102, 512)}
+\NormalTok{            cls\_embed }\OperatorTok{=}\NormalTok{ einops.repeat(}
+                \VariableTok{self}\NormalTok{.vae\_encoder\_cls\_embed.weight, }\StringTok{"1 d {-}\textgreater{} b 1 d"}\NormalTok{, b}\OperatorTok{=}\NormalTok{batch\_size}
+\NormalTok{            )  }\CommentTok{\# (B, 1, D)}
+            \ControlFlowTok{if} \VariableTok{self}\NormalTok{.config.robot\_state\_feature:}
+\NormalTok{                robot\_state\_embed }\OperatorTok{=} \VariableTok{self}\NormalTok{.vae\_encoder\_robot\_state\_input\_proj(batch[OBS\_STATE])}
+\NormalTok{                robot\_state\_embed }\OperatorTok{=}\NormalTok{ robot\_state\_embed.unsqueeze(}\DecValTok{1}\NormalTok{)  }\CommentTok{\# (B, 1, D)}
+\NormalTok{            action\_embed }\OperatorTok{=} \VariableTok{self}\NormalTok{.vae\_encoder\_action\_input\_proj(batch[ACTION])  }\CommentTok{\# (B, S, D)}
+
+            \ControlFlowTok{if} \VariableTok{self}\NormalTok{.config.robot\_state\_feature:}
+\NormalTok{                vae\_encoder\_input }\OperatorTok{=}\NormalTok{ [cls\_embed, robot\_state\_embed, action\_embed]  }\CommentTok{\# (B, S+2, D)}
+            \ControlFlowTok{else}\NormalTok{:}
+\NormalTok{                vae\_encoder\_input }\OperatorTok{=}\NormalTok{ [cls\_embed, action\_embed]}
+\NormalTok{            vae\_encoder\_input }\OperatorTok{=}\NormalTok{ torch.cat(vae\_encoder\_input, axis}\OperatorTok{=}\DecValTok{1}\NormalTok{)}
 \end{Highlighting}
 \end{Shaded}
+
+\texttt{S} 就是 \texttt{chunk\_size}，取 100 时序列长度是
+\(100 + 2 = 102\)。两处 \texttt{if\ self.config.robot\_state\_feature}
+是因为 ACT
+也支持没有本体状态、只有图像的数据集------那种情况下序列里少一个
+token，长度变成 \(S+1\)。
 
 输入序列的构成：
 
@@ -1826,34 +2015,52 @@ variance），再用 reparameterization trick 采样
 
 \begin{Shaded}
 \begin{Highlighting}[]
+\NormalTok{mu }\OperatorTok{=}\NormalTok{ log\_sigma\_x2 }\OperatorTok{=} \VariableTok{None}
 \NormalTok{latent\_sample }\OperatorTok{=}\NormalTok{ torch.zeros([batch\_size, }\VariableTok{self}\NormalTok{.config.latent\_dim], dtype}\OperatorTok{=}\NormalTok{torch.float32).to(}
-\NormalTok{    batch[OBS\_STATE].device)}
+\NormalTok{    batch[OBS\_STATE].device}
+\NormalTok{)}
 \end{Highlighting}
 \end{Shaded}
 
-推理时没有未来动作 \(\mathbf{a}_{t:t+k}\)，无法运行 VAE
-Encoder，当前实现会直接令
-\(z = \mathbf{0} \in \mathbb{R}^{32}\)，因为：(1) 训练时 KL 项把后验
-\(q(z \mid o_t, \mathbf{a})\) 约束到 \(\mathcal{N}(0, I)\) 附近；(2)
-\(z = \mathbf{0}\) 是 \(\mathcal{N}(0, I)\) 的均值、概率密度最高；(3)
-Decoder 在训练时见过大量 \(z \approx \mathbf{0}\) 的样本（因为
-\(\beta = 10\) 的强 KL 约束）。\textbf{VAE encoder 只在训练时出现。}
+推理时没有未来动作 \(\mathbf{a}_{t:t+k}\) 可读，VAE Encoder
+根本跑不起来，所以代码里直接把 latent
+填成零张量。这一步为什么站得住脚、代价是什么，2.6.1
+节已经辨析过（它是配着 \(\beta = 10\) 的强 KL
+约束才成立的工程选择，不是''原点密度最高所以最有代表性''）。这里只需要认一件事：\textbf{整份
+VAE encoder 的权重，在推理路径上一次都不会被调用。}
 
 \emph{Step 2：构造 Transformer Encoder 输入。} latent token + robot
 state token + 每路相机展平的 image tokens：
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{encoder\_in\_tokens }\OperatorTok{=}\NormalTok{ [}\VariableTok{self}\NormalTok{.encoder\_latent\_input\_proj(latent\_sample)]  }\CommentTok{\# latent token}
-\NormalTok{encoder\_in\_tokens.append(}\VariableTok{self}\NormalTok{.encoder\_robot\_state\_input\_proj(batch[OBS\_STATE]))  }\CommentTok{\# robot state token}
-\ControlFlowTok{for}\NormalTok{ img }\KeywordTok{in}\NormalTok{ batch[OBS\_IMAGES]:}
-\NormalTok{    cam\_features }\OperatorTok{=} \VariableTok{self}\NormalTok{.backbone(img)[}\StringTok{"feature\_map"}\NormalTok{]              }\CommentTok{\# (B, 512, 8, 8)}
-\NormalTok{    cam\_features }\OperatorTok{=} \VariableTok{self}\NormalTok{.encoder\_img\_feat\_input\_proj(cam\_features) }\CommentTok{\# (B, 512, 8, 8)}
-\NormalTok{    cam\_features }\OperatorTok{=}\NormalTok{ einops.rearrange(cam\_features, }\StringTok{"b c h w {-}\textgreater{} (h w) b c"}\NormalTok{)}
-\NormalTok{    encoder\_in\_tokens.extend(}\BuiltInTok{list}\NormalTok{(cam\_features))}
-\NormalTok{encoder\_in\_tokens }\OperatorTok{=}\NormalTok{ torch.stack(encoder\_in\_tokens, axis}\OperatorTok{=}\DecValTok{0}\NormalTok{)       }\CommentTok{\# (N\_enc, B, 512)}
+\NormalTok{        encoder\_in\_tokens }\OperatorTok{=}\NormalTok{ [}\VariableTok{self}\NormalTok{.encoder\_latent\_input\_proj(latent\_sample)]}
+        \CommentTok{\# Robot state token.}
+        \ControlFlowTok{if} \VariableTok{self}\NormalTok{.config.robot\_state\_feature:}
+\NormalTok{            encoder\_in\_tokens.append(}\VariableTok{self}\NormalTok{.encoder\_robot\_state\_input\_proj(batch[OBS\_STATE]))}
+
+        \ControlFlowTok{if} \VariableTok{self}\NormalTok{.config.image\_features:}
+            \CommentTok{\# For a list of images, the H and W may vary but H*W is constant.}
+            \ControlFlowTok{for}\NormalTok{ img }\KeywordTok{in}\NormalTok{ batch[OBS\_IMAGES]:}
+\NormalTok{                cam\_features }\OperatorTok{=} \VariableTok{self}\NormalTok{.backbone(img)[}\StringTok{"feature\_map"}\NormalTok{]}
+\NormalTok{                cam\_features }\OperatorTok{=} \VariableTok{self}\NormalTok{.encoder\_img\_feat\_input\_proj(cam\_features)}
+\NormalTok{                cam\_features }\OperatorTok{=}\NormalTok{ einops.rearrange(cam\_features, }\StringTok{"b c h w {-}\textgreater{} (h w) b c"}\NormalTok{)}
+\NormalTok{                encoder\_in\_tokens.extend(}\BuiltInTok{list}\NormalTok{(cam\_features))}
+
+        \CommentTok{\# Stack all tokens along the sequence dimension.}
+\NormalTok{        encoder\_in\_tokens }\OperatorTok{=}\NormalTok{ torch.stack(encoder\_in\_tokens, axis}\OperatorTok{=}\DecValTok{0}\NormalTok{)}
 \end{Highlighting}
 \end{Shaded}
+
+（源码里还有一条并列的 \texttt{if\ self.config.env\_state\_feature}
+分支，以及与 token 同步累加的
+\texttt{encoder\_in\_pos\_embed}，这里只摘了 token 那一路。要留意这几个
+\texttt{if} 是\textbf{平级并列}的：
+本体状态那一路缺席，并不影响相机图像照样被编码成 token。）
+\texttt{einops.rearrange(cam\_features,\ "b\ c\ h\ w\ -\textgreater{}\ (h\ w)\ b\ c")}
+是关键的一步：把 \((B, 512, 8, 8)\) 的特征图 按空间位置摊平成 \(64\) 个
+token，并换成 Transformer 要的 \texttt{(序列,\ batch,\ 维度)}
+排布。空间信息不是丢了， 而是交给随后叠加的 2D 正弦位置编码去承担。
 
 以 2 路相机（\(256 \times 256\)）为例，token 数量：
 
@@ -1888,22 +2095,35 @@ Encoder 输出：
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{decoder\_in }\OperatorTok{=}\NormalTok{ torch.zeros((chunk\_size, batch\_size, dim\_model))  }\CommentTok{\# (100, B, 512)}
-\NormalTok{decoder\_out }\OperatorTok{=} \VariableTok{self}\NormalTok{.decoder(}
-\NormalTok{    decoder\_in, encoder\_out,}
-\NormalTok{    encoder\_pos\_embed}\OperatorTok{=}\NormalTok{encoder\_in\_pos\_embed,}
-\NormalTok{    decoder\_pos\_embed}\OperatorTok{=}\VariableTok{self}\NormalTok{.decoder\_pos\_embed.weight.unsqueeze(}\DecValTok{1}\NormalTok{),}
-\NormalTok{)}
+\NormalTok{        decoder\_in }\OperatorTok{=}\NormalTok{ torch.zeros(}
+\NormalTok{            (}\VariableTok{self}\NormalTok{.config.chunk\_size, batch\_size, }\VariableTok{self}\NormalTok{.config.dim\_model),}
+\NormalTok{            dtype}\OperatorTok{=}\NormalTok{encoder\_in\_pos\_embed.dtype,}
+\NormalTok{            device}\OperatorTok{=}\NormalTok{encoder\_in\_pos\_embed.device,}
+\NormalTok{        )}
+\NormalTok{        decoder\_out }\OperatorTok{=} \VariableTok{self}\NormalTok{.decoder(}
+\NormalTok{            decoder\_in,}
+\NormalTok{            encoder\_out,}
+\NormalTok{            encoder\_pos\_embed}\OperatorTok{=}\NormalTok{encoder\_in\_pos\_embed,}
+\NormalTok{            decoder\_pos\_embed}\OperatorTok{=}\VariableTok{self}\NormalTok{.decoder\_pos\_embed.weight.unsqueeze(}\DecValTok{1}\NormalTok{),}
+\NormalTok{        )}
 \end{Highlighting}
 \end{Shaded}
+
+\texttt{decoder\_in} 全是零，形状 \((100, B, 512)\)------100
+个查询彼此完全相同。真正把它们区分开的是
+\texttt{decoder\_pos\_embed}，也就是那份可学习的位置编码：第 \(i\)
+个查询靠位置编码知道''我负责第 \(i\) 步''。 这也是为什么 2.4.2
+节说它们像 DETR 的 object queries。
 
 \emph{Step 5：动作回归。} 线性 action head 投影到动作空间：
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{decoder\_out }\OperatorTok{=}\NormalTok{ decoder\_out.transpose(}\DecValTok{0}\NormalTok{, }\DecValTok{1}\NormalTok{)  }\CommentTok{\# (B, 100, 512)}
-\NormalTok{actions }\OperatorTok{=} \VariableTok{self}\NormalTok{.action\_head(decoder\_out)     }\CommentTok{\# (B, 100, 7)}
-\ControlFlowTok{return}\NormalTok{ actions, (mu, log\_sigma\_x2)}
+\NormalTok{        decoder\_out }\OperatorTok{=}\NormalTok{ decoder\_out.transpose(}\DecValTok{0}\NormalTok{, }\DecValTok{1}\NormalTok{)}
+
+\NormalTok{        actions }\OperatorTok{=} \VariableTok{self}\NormalTok{.action\_head(decoder\_out)}
+
+        \ControlFlowTok{return}\NormalTok{ actions, (mu, log\_sigma\_x2)}
 \end{Highlighting}
 \end{Shaded}
 
@@ -1933,10 +2153,9 @@ Encoder 输出：
   维）、\(I_t \in \mathbb{R}^{n_{\text{cam}} \times 3 \times H \times W}\)（图像，2
   路
   \(256 \times 256\)）、\(\mathbf{a}_{t:t+k} \in \mathbb{R}^{k \times d_a}\)（目标动作块，\(100 \times 7\)）、\texttt{action\_is\_pad}
-  \(\in \{0,1\}^{k}\)（padding 掩码，\((100,)\)）
+  \(\in \{0,1\}^{k}\)（补位掩码，\((100,)\)）
 \item
-  dataset 根据 \texttt{ACTConfig.action\_delta\_indices} 生成
-  chunk-level 监督
+  dataset 根据 \texttt{ACTConfig.action\_delta\_indices} 生成动作块监督
 \item
   preprocessor 负责归一化和设备搬运
 \item
@@ -1985,7 +2204,7 @@ chunk。
 \begin{quote}
 LeRobot 里的 ACT 先由 dataset 的 \texttt{delta\_timestamps}
 生成动作块监督，再由 processor 完成归一化，接着用带 VAE encoder 的
-Transformer 输出 chunk-level 连续动作，最后在推理端把完整 chunk
+Transformer 一次输出整段连续动作，最后在推理端把完整 chunk
 放进动作队列并逐步消费成一步动作。
 \end{quote}
 
@@ -2003,8 +2222,8 @@ Transformer 输出 chunk-level 连续动作，最后在推理端把完整 chunk
   chunk 时要靠 \texttt{action\_is\_pad} 屏蔽，否则监督会被越界部分污染。
 \item
   \textbf{归一化统计量必须随模型走}：preprocessor 用数据集的 mean/std
-  做标准化、postprocessor
-  反标准化（第8讲的安全边界一节已经强调）；统计量缺失会让动作尺度整体出错。
+  做标准化、postprocessor 反标准化（第8讲 3.4
+  节已经强调）；统计量缺失会让动作尺度整体出错。
 \item
   \textbf{\(z=0\) 是确定性推理}：ACT
   推理放弃多模态采样，行为可复现但只走一个模式；想要真正的多模态，要等第
@@ -2025,11 +2244,6 @@ Policy：把去噪过程搬进动作生成}\label{diffusion-policyux628aux53bbux
 
 \begin{quote}
 本节只介绍 Diffusion 的核心原理，为后续 Flow Matching（第 5 节）做铺垫。
-参考：Ho, Jain \& Abbeel (2020) \emph{Denoising Diffusion Probabilistic
-Models}（NeurIPS 2020）；Chi et al.~(2023) \emph{Diffusion Policy:
-Visuomotor Policy Learning via Action Diffusion}（RSS 2023）；Zhao et
-al.~(2023) \emph{Learning Fine-Grained Bimanual Manipulation with
-Low-Cost Hardware}（RSS 2023）。
 \end{quote}
 
 \subsection{4.1
@@ -2063,7 +2277,10 @@ Diffusion
   出发，逐步去噪，恢复出生成的数据 \(z_0\)。
 \end{enumerate}
 
-用数学语言说，Diffusion 假设数据的生成过程可以分解为一系列马尔可夫步骤：
+用数学语言说，Diffusion
+假设数据的生成过程可以分解为一系列马尔可夫步骤。下面按
+\textbf{DDPM}（Denoising Diffusion Probabilistic
+Models，去噪扩散概率模型）这套最经典的表述来讲{[}3{]}：
 
 \[
 p(z_0) = \int p(z_T) \prod_{t=1}^{T} p(z_{t-1} \mid z_t) \, dz_{1:T}
@@ -2102,11 +2319,11 @@ z_t = \underbrace{\sqrt{1-\beta_t}\, z_{t-1}}_{\text{保留一大部分旧信号
 步的基础上做一个很小的扰动：先把原有信号稍微缩小一点，再叠加一小份随机噪声。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1094\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4375\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3906\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1021\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3433\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5546\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 符号 & 含义 & 典型值 \\
 \midrule\noalign{}
-\(\beta_t\) & 第 \(t\) 步的噪声强度 & 从 \(10^{-4}\) 线性增长到 \(0.02\) \\
+\(\beta_t\) & 第 \(t\) 步的噪声强度 & 从 \(10^{-4}\) 线性增长到 \(0.02\)（DDPM 原文取值{[}3{]}） \\
 \(\sqrt{1-\beta_t}\) & 信号保留系数，每步略小于 1 & --- \\
 \(\beta_t \mathbf{I}\) & 每步添加的噪声方差 & --- \\
 \bottomrule\noalign{}
@@ -2312,7 +2529,7 @@ z_0 = \frac{z_t - \sqrt{1 - \bar{\alpha}_t}\, \epsilon}{\sqrt{\bar{\alpha}_t}}
 应该长什么样（用来计算去噪均值
 \(\mu_\theta\)），但它\textbf{不信任}这个一次性估算的结果，只朝着那个方向迈一小步。这正是''预测噪声
 \(\epsilon_\theta\) 比直接预测 \(z_0\)
-更稳定''的实践原因。换句话说，公式给出的是一条数学上的''捷径''；而扩散模型真正学到的是：在预测存在误差的现实条件下，怎样沿着这条捷径\textbf{稳扎稳打地一点点往回走}。
+更稳定''的实践原因。公式给出的是一条数学上的''捷径''，而扩散模型真正学到的是：在预测存在误差的现实条件下，怎样沿着这条捷径\textbf{稳扎稳打地一点点往回走}。
 
 \subsection{4.4 为什么 Diffusion 比 ACT
 更擅长多模态}\label{ux4e3aux4ec0ux4e48-diffusion-ux6bd4-act-ux66f4ux64c5ux957fux591aux6a21ux6001}
@@ -2321,14 +2538,14 @@ z_0 = \frac{z_t - \sqrt{1 - \bar{\alpha}_t}\, \epsilon}{\sqrt{\bar{\alpha}_t}}
 在某些场景下会比 ACT 更有优势：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1277\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2687\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6036\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1190\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2488\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6322\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
  & VAE / CVAE（ACT） & Diffusion（Diffusion Policy） \\
 \midrule\noalign{}
 隐变量 & 一个 \(z\)，低维（如 32 维） & 一串 \(z_T, z_{T-1}, \ldots, z_0\)，与数据同维 \\
 生成方式 & 采样 \(z\) → 一次解码 & 从噪声开始 → 多步迭代去噪 \\
 多模态能力 & 靠 \(z\) 的不同取值区分模式 & 靠迭代过程自然''选择''模式 \\
-推理速度 & 快（一次前向） & 慢（标准 DDPM 需上千步，DDIM 等加速采样可降到约 10 步） \\
+推理速度 & 快（一次前向） & 慢（多步迭代，经典设定要上千步；换采样器可以压下来，见 4.5 节） \\
 训练稳定性 & KL 坍缩等问题 & 通常更稳定 \\
 \bottomrule\noalign{}
 \end{tabular}
@@ -2337,13 +2554,13 @@ z_0 = \frac{z_t - \sqrt{1 - \bar{\alpha}_t}\, \epsilon}{\sqrt{\bar{\alpha}_t}}
 核心区别：VAE 试图用一个低维瓶颈压缩所有信息，而 Diffusion
 在数据的原始维度上逐步精炼，不存在信息瓶颈。
 
-Chi et al.~(2023) 提出的 Diffusion Policy 把 DDPM
+Chi 等人提出的 Diffusion Policy{[}4{]} 把 DDPM
 的框架直接搬到了机器人策略学习中。核心改动是：\textbf{不建模完整的联合分布
 \(p(o, a)\)，而是建模条件分布 \(p(a \mid o)\)。}
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture10/ref/diffusion_policy_arch.jpg}}
+{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture10/ref/fig10-4-diffusion-policy-arch_arxiv-2303.04137.jpg}}
 
 }
 
@@ -2351,10 +2568,19 @@ Chi et al.~(2023) 提出的 Diffusion Policy 把 DDPM
 
 \end{figure}%
 
-上图展示的是 Diffusion Policy
-的一种典型条件去噪实现：左侧是带噪声的动作序列，下方是历史观测，中间的条件网络把两者融合起来，预测当前时间步上的噪声。经过
-\(T\) 次迭代去噪后，右侧得到可执行的动作序列。图中的 \texttt{1DConv}
-对应论文里的 CNN 型时序去噪网络；论文中也讨论了 Transformer 型实现。
+这张图画的是 Diffusion Policy
+的一种典型条件去噪实现：左上是带噪声的动作序列，左下是历史观测的那一叠帧，两者各自过一层
+embedding 后汇合（图中的 \texttt{aggregate}），送进中间那串
+\texttt{1DConv}
+组成的去噪网络，预测这一步该减掉多少噪声。右下角那条回环箭头标着 \(T\)
+denoising steps，意思是整个中间部分要重复跑 \(T\)
+遍，最后右侧才是可执行的动作序列。\texttt{1DConv} 对应论文里的 CNN
+型时序去噪网络；论文中也讨论了 Transformer 型实现。
+
+看图时注意符号：图里用 \(H_a\) 记要生成的动作段长度、\(H_o\)
+记观测窗口长度，而下面正文沿用论文表格里的 \(T_p\) 和
+\(T_o\)。同一个东西两套字母，是因为论文正文和后来的实现各用了一套------本讲
+5.5.2 节讲 Flow Matching Policy 时会切回 \(H\) 那一套。
 
 具体做法：让噪声预测网络 \(\epsilon_\theta\)
 额外接收观测作为条件。若把预测的整段动作记为
@@ -2366,17 +2592,21 @@ Chi et al.~(2023) 提出的 Diffusion Policy 把 DDPM
 \]
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1581\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4684\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3735\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1679\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.7131\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1190\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 符号 & 含义 & 典型值 \\
 \midrule\noalign{}
-\(a_{t:t+T_p-1}\) & 要生成的整段动作预测（prediction horizon） & \(T_p = 16\)（Diffusion Policy 常用，可调） \\
+\(a_{t:t+T_p-1}\) & 要生成的整段动作预测（prediction horizon） & \(T_p = 16\) \\
 \(o_{t-T_o+1:t}\) & 条件观测窗口（observation horizon） & \(T_o = 2\) \\
 \(T_a\) & 每次实际执行后再重规划的动作步数（action horizon） & \(T_a = 8\) \\
 \(\epsilon_\theta\) & 噪声预测网络（U-Net 或 Transformer） & --- \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
+
+上面三个典型值取自 Diffusion Policy
+原文的主实验设定{[}4{]}，换任务时都要重调------尤其 \(T_a\)，它和 ACT 的
+\texttt{n\_action\_steps} 是同一个旋钮。
 
 推理时的流程：
 
@@ -2408,6 +2638,11 @@ CVAE 这一类模型没法采多模态。而 Diffusion Policy
 Diffusion Policy 的代价是推理速度。标准 DDPM
 把生成过程离散成很多个小的去噪步骤，采样步数明显多于 ACT
 的单次前向，这在实时机器人控制中是一个实际瓶颈。
+
+缓解的办法之一是换一个采样器。\textbf{DDIM}（Denoising Diffusion
+Implicit
+Models，去噪扩散隐式模型）{[}5{]}用一条确定性的更新规则，允许在去噪链上跳步，把步数从上千压到十步量级。但这只是把常数降下来：每一步仍然要跑一遍完整的网络前向，多步就是多次前向。想在这一点上再进一步，就要换掉''逐步去噪''这个框架本身------那就是第
+5 节的 Flow Matching。
 
 \subsection{4.6 本节小结}\label{ux672cux8282ux5c0fux7ed3-1}
 
@@ -2453,8 +2688,9 @@ Diffusion Policy（DDIM 加速） & 十步量级 & 跳步、确定性去噪 \\
 \end{center}
 
 即使用 DDIM 加速，Diffusion
-仍然需要多步迭代。在实时机器人控制中，每一步都要跑一次完整的神经网络前向传播，这是一个实际瓶颈。上表是各实现里的常见量级，具体值取决于采样器与误差容限，不宜当成固定结论（5.4.3
-会用 NFE 这个更公平的口径重新对比）。
+仍然需要多步迭代。在实时机器人控制中，每一步都要跑一次完整的神经网络前向传播，这是一个实际瓶颈。上表是各实现里的常见量级，具体值取决于采样器与误差容限，不宜当成固定结论------5.4.3
+节会换成 \textbf{NFE}（number of function
+evaluations，网络前向次数）这个更公平的口径重新对比，因为''一步''在不同求解器下的开销并不一样。
 
 \textbf{为什么 Diffusion 往往需要这么多步？} 一个重要原因在于 Diffusion
 的前向过程带有随机性，导致常见采样轨迹更像是逐步修正、逐步去噪的过程。步数过少时，离散化误差和建模误差都更容易显著暴露出来。
@@ -2466,7 +2702,7 @@ Diffusion Policy（DDIM 加速） & 十步量级 & 跳步、确定性去噪 \\
 \subsection{5.2
 核心直觉：学一条把噪声直推到动作的速度场}\label{ux6838ux5fc3ux76f4ux89c9ux5b66ux4e00ux6761ux628aux566aux58f0ux76f4ux63a8ux5230ux52a8ux4f5cux7684ux901fux5ea6ux573a}
 
-Flow Matching
+Flow Matching{[}6{]}
 的想法非常直接：\textbf{不走弯路。直接学一个向量场，把简单分布沿直线推到目标分布。}
 
 用一个物理类比：
@@ -2515,19 +2751,29 @@ Flow Matching
 \underbrace{z_0 \sim \mathcal{N}(0, I)}_{\text{噪声}} \quad \xrightarrow{\text{沿 } v_\theta \text{ 积分}} \quad \underbrace{z_1}_{\text{生成的数据}}
 \]
 
-下图展示了一个 2D 棋盘格数据集上的 Flow Matching 过程。从 \(t=0\)
-的标准正态噪声出发，分布沿着学到的向量场逐步流动，最终在 \(t=1\)
-时形成清晰的棋盘格结构：
+下图把这条路径画在一个 2D 棋盘格数据集上。最左边 \(t=0\)
+是标准正态噪声，最右边 \(t=1\)
+是数据分布本身，中间三格是它们之间的过渡：一团各向同性的高斯先被收拢，再裂成几块，最后长成清晰的棋盘格：
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture10/ref/2d_flow_matching_visualize_path.png}}
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/ref/fig10-5-flow-matching-path.png}
 
 }
 
-\caption{2D Flow Matching：从噪声到棋盘格的流动过程}
+\caption{五格从左到右是 \(t=0\)、0.25、0.5、0.75、1。\(t=0\)
+是标准正态噪声，\(t=1\) 是棋盘格数据分布，中间三格是
+\(z_t=(1-t)z_0+tz_1\)
+的边际分布------注意结构不是最后一步突然出现的，\(t=0.75\)
+时格子的轮廓已经显形（本书自绘：直接按插值式采样画出解析的概率路径，未训练模型）}
 
 \end{figure}%
+
+要说清楚这五格画的到底是什么：它们不是某个训练好的模型跑出来的采样轨迹，而是\textbf{概率路径本身}------按
+\(z_0 \sim \mathcal{N}(0, I)\)、\(z_1 \sim p_{\text{数据}}\)
+各自独立采样、再按插值式算出 \(z_t\)，把每个 \(t\)
+上得到的那一堆点画出来。Flow Matching
+训练要拟合的正是这条路径：向量场学到位之后，从噪声出发积分，走的就是这五格描述的过程。
 
 \subsubsection{5.2.1 流（Flow）}\label{ux6d41flow}
 
@@ -2567,8 +2813,9 @@ Field）}\label{ux5411ux91cfux573avector-field}
 的关键区别}\label{ux4e0e-diffusion-ux7684ux5173ux952eux533aux522b}
 
 两者最常见的采样形态可以这样对照：经典 DDPM 走的是随机的反向链，而 Flow
-Matching 直接学习驱动连续归一化流（CNF）的向量场，通常用 ODE
-求解器采样。
+Matching 直接学习驱动\textbf{连续归一化流}（continuous normalizing flow,
+CNF------把简单分布沿着一个连续的速度场''流''成复杂分布的模型）的向量场，通常用
+ODE 求解器采样。
 
 \[
 \underbrace{\text{Diffusion（反向 SDE）: } dz = f(z, t)\,dt + g(t)\,dW}_{\text{含随机项 } dW} \quad\longleftrightarrow\quad \underbrace{\text{FM（ODE）: } \frac{dz}{dt} = v_\theta(z, t)}_{\text{确定性积分}}
@@ -2633,19 +2880,26 @@ OT（或近似 OT）\textbf{耦合}配对、或使用相应的 OT
 的做法。
 \end{quote}
 
-下图展示了 1D 情况下的线性插值路径。每条线连接一个噪声点
-\(z_0\)（左侧）和一个数据点 \(z_1\)（右侧），中间的 \(z_t\)
-就是两者的线性混合：
+把这条路径画在一维上，就是下面这根线段：左端点是采到的噪声
+\(z_0\)，右端点是数据集里的样本 \(z_1\)，\(t\) 从 0 走到 1
+的过程就是沿着这根线段从左滑到右，滑到哪儿，\(z_t\) 就是哪儿。
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture10/ref/1D.png}}
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/ref/fig10-5-linear-interpolation-path.png}
 
 }
 
-\caption{1D Flow Matching：噪声到数据的线性插值路径}
+\caption{左列是采到的噪声样本，右列是数据集里的样本（画成双峰）。同一下标的两个点配成一条\textbf{条件路径}，图里画了
+7
+条：每个噪声点各自连向一个数据点，端点是独立采样再配对的，所以这些直线彼此交叉。红色那条被高亮出来，标出
+\(z_0\)、\(z_1\) 与它们之间的插值点 \(z_t\)（本书自绘）}
 
 \end{figure}%
+
+图里要看的是\textbf{多对端点}，这正是上面那个公式给不了的东西：公式只描述一条路径，而实际的训练数据是成千上万对这样的
+\((z_0, z_1)\)，每一对连出一条自己的直线，彼此交叉。单看红色那条，路径确实是直的、速度确实是常数；可把所有条件路径叠在一起，同一个位置在同一时刻会有好几条路径穿过、各自朝不同方向走，平均下来得到的\textbf{边际}流场就不再是直的了。5.3.2
+节末尾会把这件事拆成三句话，其中''学出来的\textbf{边际}流不必是直的''，说的就是图上这些交叉。
 
 \subsubsection{5.3.2
 目标向量场：两个公式就够了}\label{ux76eeux6807ux5411ux91cfux573aux4e24ux4e2aux516cux5f0fux5c31ux591fux4e86}
@@ -2789,8 +3043,8 @@ Midpoint 方法每步需要两次网络前向，但精度更高，总步数可�
 求解器走大步也不会偏太多，所以少数几步就能得到可用结果；而经典 DDPM
 那种逐步修正的采样流程对步长敏感得多，步子一粗，离散化误差立刻显现在样本质量上。
 
-明白了机制，再看数字时就要注意一件事：\textbf{该比的量是
-NFE（网络前向次数）和端到端时延，不是''步数''}------每步的代价并不相同。下表是各家论文与实现里常见的量级，属示例范围、不是通用结论：
+明白了机制，再看数字时就要注意一件事：\textbf{该比的量是 NFE
+和端到端时延，不是''步数''}------每步的代价并不相同。下表是各家论文与实现里常见的量级，属示例范围、不是通用结论：
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3904\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2064\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4032\linewidth - 2\tabcolsep\relax}@{}}
@@ -2842,13 +3096,13 @@ NFE、时延和任务成功率。
 
 \begin{quote}
 \textbf{Diffusion 的经典表述是逐步去噪，Flow Matching
-是沿连续向量场做积分。在常见设定下，后者往往能用更少的网络前向完成采样------但具体快多少，要在同一模型和硬件上实测。}
+是沿连续向量场做积分。在常见设定下，后者往往能用更少的网络前向完成采样------快多少要按
+5.4.3 节那套口径实测。}
 \end{quote}
 
-一种常见的理解方式是：在合适的条件概率路径和目标向量场定义下，diffusion
-可以被放进更一般的 flow-based
-学习框架里来理解。也正因为这个统一视角，Flow Matching 常被看作比经典
-diffusion 表述更一般的一类框架。
+一种常见的理解方式是：在合适的条件概率路径和目标向量场定义下，Diffusion
+可以被放进更一般的流模型框架里来理解。也正因为这个统一视角，Flow
+Matching 常被看作比经典 Diffusion 表述更一般的一类框架。
 
 \subsubsection{5.5.2 Flow Matching Policy：把 Flow Matching
 用到机器人动作生成}\label{flow-matching-policyux628a-flow-matching-ux7528ux5230ux673aux5668ux4ebaux52a8ux4f5cux751fux6210}
@@ -2856,17 +3110,19 @@ diffusion 表述更一般的一类框架。
 和 Diffusion Policy 的思路一样，Flow Matching
 也可以条件化到观测上，用于生成机器人动作。\textbf{核心改动：让速度场网络额外接收观测作为条件。}
 这里动作块用 \(H_a\)、观测窗口用 \(H_o\) 记，对应的就是第 4 节 Diffusion
-Policy 里的 \(T_p\) 与
-\(T_o\)，只是换了字母。下面写的是一个教学版、最常见的条件化 Flow
-Matching
+Policy 里的 \(T_p\) 与 \(T_o\)，只是换了字母。另外把\textbf{流的时间记成
+\(\tau\)}：一旦条件化到观测上，下标里的 \(t\) 已经被''机器人的第 \(t\)
+个控制时刻''占住了，再用 \(t\) 兼指流的时间就会撞车------第 4
+节把扩散步记成 \(i\)
+是出于同一个理由。下面写的是一个教学版、最常见的条件化 Flow Matching
 目标；具体系统在时间采样分布、时间区间、网络结构和噪声参数化上，往往还会做额外改动。训练目标变为：
 
 \[
-\mathcal{L}(\theta) = \mathbb{E}_{t,\, a_{t:t+H_a},\, \epsilon}\left[\left\| v_\theta\!\left((1-t)\, \epsilon + t\, a_{t:t+H_a},\; t,\; o_{t-H_o:t}\right) - (a_{t:t+H_a} - \epsilon)\right\|^2\right]
+\mathcal{L}(\theta) = \mathbb{E}_{\tau,\, a_{t:t+H_a},\, \epsilon}\left[\left\| v_\theta\!\left((1-\tau)\, \epsilon + \tau\, a_{t:t+H_a},\; \tau,\; o_{t-H_o:t}\right) - (a_{t:t+H_a} - \epsilon)\right\|^2\right]
 \]
 
 \[
-t \sim \mathcal{U}([0, 1]), \quad \epsilon \sim \mathcal{N}(0, I), \quad o_{t-H_o:t}, a_{t:t+H_a} \sim \mathcal{D}
+\tau \sim \mathcal{U}([0, 1]), \quad \epsilon \sim \mathcal{N}(0, I), \quad o_{t-H_o:t}, a_{t:t+H_a} \sim \mathcal{D}
 \]
 
 \begin{center}
@@ -2916,13 +3172,11 @@ t \sim \mathcal{U}([0, 1]), \quad \epsilon \sim \mathcal{N}(0, I), \quad o_{t-H_
 \end{tabular}
 \end{center}
 
-这条演进线最终汇入
-VLA：连续动作生成不再只停留在单步回归，而是逐步走向更强的分布建模。Flow
-Matching
-是其中一种很自然的落点，因为它既保留了生成式动作建模的表达力，又更容易把采样过程写成少步数的
-ODE 积分。以 \(\pi_0\) 为代表的一类系统，就把这种思路和视觉-语言
-backbone 结合在了一起------\(\pi_0\)
-的具体架构和训练细节将在第11讲展开。
+把 Flow Matching
+当动作头，图的正是这两条同时成立：分布建模的表达力保住了，采样又能压成少数几步
+ODE
+积分------对一个还要在前面挂着视觉-语言大模型的系统来说，动作头这一端的时延预算本来就所剩无几。\(\pi_0\){[}7{]}
+就是这么搭的，它的具体架构和训练细节在第11讲 3 节展开。
 
 \subsection{5.6 本节小结}\label{ux672cux8282ux5c0fux7ed3-2}
 
@@ -2949,20 +3203,20 @@ ODE
 看这三个方法，最好别按''第一代、第二代、第三代''来记------它们不是一条互相替代的世代链，而是在\textbf{两个正交的维度}上各做了选择：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1562\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6250\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1562\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.7344\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 维度 & 可选项 \\
 \midrule\noalign{}
 时序结构 & 单步动作 / 动作块（chunk）/ 滚动重规划 \\
-分布建模 & 确定性回归 / CVAE / diffusion / flow \\
+分布建模 & 确定性回归 / CVAE / Diffusion / Flow Matching \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
-ACT 选的是「chunk × CVAE」，还额外带上了 Transformer 架构与 temporal
-ensemble；Diffusion Policy 是「chunk + 滚动重规划 × diffusion」；Flow
-Matching 作为动作头是「chunk ×
-flow」。三者的网络结构和训练目标也可以互换搭配，所以实际优劣要看任务、时延预算和数据，而不是看它''属于第几代''。
+ACT 选的是「动作块 × CVAE」，还额外带上了 Transformer 架构与 temporal
+ensembling；Diffusion Policy 是「动作块 + 滚动重规划 × Diffusion」；Flow
+Matching 作为动作头是「动作块 ×
+连续流」。三者的网络结构和训练目标也可以互换搭配，所以实际优劣要看任务、时延预算和数据，而不是看它''属于第几代''。
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1201\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2985\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2887\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2928\linewidth - 2\tabcolsep\relax}@{}}
@@ -2986,8 +3240,8 @@ flow」。三者的网络结构和训练目标也可以互换搭配，所以实�
 \subsection{6.2 一句话总结}\label{ux4e00ux53e5ux8bddux603bux7ed3}
 
 \begin{quote}
-一句话总结：模仿学习从''看图回归一个动作''走向''看图生成一段动作分布''------ACT
-用 CVAE 建模多模态、用 action chunking 做短时规划，Diffusion
+模仿学习从''看图回归一个动作''走向''看图生成一段动作分布''------ACT 用
+CVAE 建模多模态、用 action chunking 做短时规划，Diffusion
 用多步去噪换更强的多模态，Flow Matching
 用确定性连续流换更少的推理步数；三者是同一个问题
 \(p(\mathbf{a}_{t:t+k} \mid o_t)\) 越来越好的解法。
@@ -3000,42 +3254,43 @@ flow」。三者的网络结构和训练目标也可以互换搭配，所以实�
 本讲的三条主线都是''单任务 /
 少任务''的生成式策略：它们解决的是''给定观测，怎么生成一段连续动作''。但真正的通用机器人还要能听懂语言、泛化到没见过的任务------这就要把这些动作建模能力，接到一个视觉-语言大模型的骨干上。
 
-这条线最终汇入
-VLA：连续动作生成不再停留在单步回归，而是逐步走向更强的分布建模。下一讲（第11讲）就从
-OpenVLA 讲起，看 VLA
-如何把图像、语言、机器人状态统一进一个大模型，并把本讲的 flow matching
-作为 \(\pi_0\) 家族的动作头------动作怎么被''流''出来。
+下一讲（第11讲）就从 OpenVLA 讲起，看 VLA
+如何把图像、语言、机器人状态统一进一个大模型，再看 \(\pi_0\)
+家族怎么把本讲这套 Flow Matching
+装成它的动作头------动作是怎么被''流''出来的。
 
-\section{参考资料}\label{ux53c2ux8003ux8d44ux6599}
+\section{参考文献}\label{ux53c2ux8003ux6587ux732e}
 
 {[}1{]} ZHAO T Z, KUMAR V, LEVINE S, et al.~Learning fine-grained
 bimanual manipulation with low-cost hardware{[}EB/OL{]}.
 (2023-04-23){[}2026-06-26{]}. https://arxiv.org/abs/2304.13705.
 
-{[}2{]} CHI C, XU Z, FENG S, et al.~Diffusion policy: visuomotor policy
-learning via action diffusion{[}EB/OL{]}. (2023-03-07){[}2026-06-26{]}.
-https://arxiv.org/abs/2303.04137.
+{[}2{]} CAPUANO F, PASCAL C, ZOUITINE A, et al.~Robot learning: a
+tutorial{[}EB/OL{]}. (2025-10-14){[}2026-06-26{]}.
+https://arxiv.org/abs/2510.12403.
 
 {[}3{]} HO J, JAIN A, ABBEEL P. Denoising diffusion probabilistic
 models{[}EB/OL{]}. (2020-06-19){[}2026-06-26{]}.
 https://arxiv.org/abs/2006.11239.
 
-{[}4{]} CAPUANO F, PASCAL C, ZOUITINE A, et al.~Robot learning: a
-tutorial{[}EB/OL{]}. (2025-10-14){[}2026-06-26{]}.
-https://arxiv.org/abs/2510.12403.
+{[}4{]} CHI C, XU Z, FENG S, et al.~Diffusion policy: visuomotor policy
+learning via action diffusion{[}EB/OL{]}. (2023-03-07){[}2026-06-26{]}.
+https://arxiv.org/abs/2303.04137.
 
-{[}5{]} LIPMAN Y, CHEN R T Q, BEN-HAMU H, et al.~Flow matching for
+{[}5{]} SONG J, MENG C, ERMON S. Denoising diffusion implicit
+models{[}EB/OL{]}. (2020-10-06){[}2026-06-26{]}.
+https://arxiv.org/abs/2010.02502.
+
+{[}6{]} LIPMAN Y, CHEN R T Q, BEN-HAMU H, et al.~Flow matching for
 generative modeling{[}EB/OL{]}. (2022-10-06){[}2026-06-26{]}.
 https://arxiv.org/abs/2210.02747.
 
-{[}6{]} BLACK K, BROWN N, DRIESS D, et al.~\(\pi_0\): a
+{[}7{]} BLACK K, BROWN N, DRIESS D, et al.~\(\pi_0\): a
 vision-language-action flow model for general robot control{[}EB/OL{]}.
 (2024-10-31){[}2026-06-26{]}. https://arxiv.org/abs/2410.24164.
 
 \begin{quote}
-本讲的 AE→VAE→CVAE 演进图、ACT 训练流程示意图、Flow Matching
-二维棋盘格与一维线性插值可视化图为本课程教学自制（本课程实验 EAI-wri-003
-渲染），不引外部来源。
+第 5 节的二维棋盘格流动过程图由本书的 Flow Matching 示例脚本渲染得到。
 \end{quote}
 
 

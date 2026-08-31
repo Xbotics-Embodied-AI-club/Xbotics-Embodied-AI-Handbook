@@ -38,9 +38,11 @@ execute:
 
 # 1 从 LLM 到 VLA：模型是怎么学会"动手"的
 
+第10讲把"动作怎么生成"这件事拆开讲了一遍：ACT 用 CVAE 建模示教分布，Diffusion 与 Flow Matching 把动作当连续量从噪声里去噪出来。但那几个模型都只管"怎么动"——换一句没见过的指令，它们听不懂。这一讲补上另外半边：把视觉理解和语言理解接进来，让模型不只会动，还知道该去动什么。
+
 要理解视觉-语言-动作模型（VLA），最好的切入点是看它从哪儿来。VLA 这个名字本身就是它的三块拼图：**V**ision（看）+ **L**anguage（听懂指令）+ **A**ction（动手）。
 
-![VLA 的整体结构：多模态观测（视觉 / 语言 / 深度图 / 点云 / 触觉 / 力）各自编码，经骨干网络特征推理、融合本体信息后，由动作解码输出机器人动作序列 $[a_1, a_2, \dots, a_{t+H}]$。左侧 VLA = Vision + Language + Action——看一眼、听懂一句话、直接做出动作](../../assets/figures/lecture11/ref/intro/vla_overview.png)
+![VLA 的整体结构：多模态观测（视觉 / 语言 / 深度图 / 点云 / 触觉 / 力）各自编码，经骨干网络特征推理、融合本体信息后，由动作解码输出机器人动作序列 $[a_1, a_2, \dots, a_{t+H}]$。左侧 VLA = Vision + Language + Action——看一眼、听懂一句话、直接做出动作（图片出自参考文献 1，仓库这张在左侧另拼了一块标题板）](../../assets/figures/lecture11/ref/intro/vla_overview.png)
 
 ## 1.1 两条演进路线：理解世界 × 操控世界
 
@@ -58,15 +60,15 @@ VLA 不是凭空出现的，它是两条独立发展的技术路线汇合的产�
 
 **VLM（视觉-语言模型）。** 代表 LLaVA、Qwen-VL、PaliGemma。在 LLM 前面接一个视觉编码器（ViT/SigLIP）+ 投影层，把图像也变成 token 喂进 LLM，于是能做图像描述、视觉问答、看图表。VLM 让模型"睁开了眼睛"，但它的输出仍是文字——只能说，不能动。
 
-**VLA（视觉-语言-动作模型）。** 代表 RT-2、OpenVLA、$\pi_0$、SmolVLA、GR00T。在 VLM 基础上补两块：输入端再加机器人本体感知（关节角、夹爪状态），输出端把文本 token 换成可执行的动作序列。模型从"看懂、说出来"变成"看懂、直接做出来"。
+**VLA（视觉-语言-动作模型）。** 代表 RT-2、OpenVLA、$\pi_0$、SmolVLA、GR00T N1。在 VLM 基础上补两块：输入端再加机器人本体感知（关节角、夹爪状态），输出端把文本 token 换成可执行的动作序列。模型从"看懂、说出来"变成"看懂、直接做出来"。
 
-> 一句话：LLM 会读写，VLM 会看图说话，VLA 会看着画面、听着指令直接动手。每多一步，都是补上一种上一代缺的能力。
+> 一句话：LLM 会读写，VLM 会看图说话，VLA 会看着画面、听着指令直接动手。
 
 ## 1.3 Vision：观测怎么变成模型能懂的 token
 
 VLA 的"看"不止一张 RGB 图。不同的观测模态各有各的编码方式：
 
-![不同观测模态的编码方式：RGB/深度图用 CNN 或 ViT，点云用点云编码器，触觉/力觉用多层感知机，最终都编码成 token 送进模型](../../assets/figures/lecture11/ref/intro/vision_observation_encoding_clean.png){width=80%}
+![各模态各走各的编码器，彼此并行、互不干扰，最后汇成同一条 token 序列送进骨干网络。这个"先各编各的、再拼成一串"的结构，正是 VLA 能同时吃下图像、点云和触觉读数的原因（图片出自参考文献 1）](../../assets/figures/lecture11/ref/intro/vision_observation_encoding_clean.png){width=80%}
 
 - **RGB / 深度图**：用 CNN 或 ViT（把图像切成 patch，过 Transformer Encoder）提特征；
 - **点云**：用专门的点云编码器；
@@ -78,11 +80,11 @@ VLA 的"看"不止一张 RGB 图。不同的观测模态各有各的编码方式
 
 "看懂"之后最关键的一步，是把模型内部的表示**变成动作**。这一步有两个维度：动作空间长什么样，以及怎么对动作建模。
 
-![动作的两个维度：左为动作空间（关节角度空间 / 末端位姿空间），右为动作分布建模——离散动作（均匀离散化 / VQ-VAE / FAST）与连续动作（扩散模型 / 流匹配模型）](../../assets/figures/lecture11/ref/intro/action_decoding_clean.png){width=80%}
+![动作的两个维度：左为动作空间（关节角度空间 / 末端位姿空间），右为动作分布建模——离散动作（均匀离散化 / VQ-BeT / FAST）与连续动作（高斯模型 / 扩散模型 / 流匹配模型）（图片出自参考文献 1）](../../assets/figures/lecture11/ref/intro/action_decoding_clean.png){width=80%}
 
 - **动作空间**：可以是关节角度，也可以是末端执行器位姿；
 - **动作分布建模**——这正是各家 VLA 的根本分野，分两条路线：
-  - **离散动作 → 自回归**：把连续动作切成整数 token（均匀离散化、VQ-VAE，或更高效的 FAST），像生成文字一样逐个解码。优点是直接复用 LLM 架构，缺点是离散化损精度、逐 token 解码慢。代表：RT-2、OpenVLA、$\pi_0$-FAST、VLA-0。
+  - **离散动作 → 自回归**：把连续动作切成整数 token（均匀离散化；向量量化，也就是图里那一路 VQ-BeT——用 VQ-VAE 式的码本把连续量映射成码本编号；或更高效的 FAST），像生成文字一样逐个解码。优点是直接复用 LLM 架构，缺点是离散化损精度、逐 token 解码慢。代表：RT-2、OpenVLA、$\pi_0$-FAST、VLA-0。
   - **连续动作 → 流匹配 / 扩散**：把动作当连续值，用扩散或流匹配从噪声里"去噪/流"出来。优点是连续空间、精度高、天然多模态，代价是架构更复杂、要多步采样。代表：Diffusion Policy、$\pi_0$、$\pi_{0.5}$、SmolVLA。
 
 这两条路线（自回归 token vs 连续流匹配）会贯穿本讲后面所有模型——读每个模型时先问一句"它的动作头走哪条路"，就抓住了它的骨架。
@@ -91,25 +93,28 @@ VLA 的"看"不止一张 RGB 图。不同的观测模态各有各的编码方式
 
 VLA 发展得非常快：2022 年 RT-1、Gato 起步，2023 年 RT-2、ACT、Diffusion Policy 把 VLM 和生成式动作建模带进来，2024 年 OpenVLA、$\pi_0$ 让开源生态爆发，2025 年起走向小型化、开放世界泛化、人形全身（$\pi_{0.5}$、SmolVLA、GR00T N1 等）。
 
-![VLA 发展时间线：从 2022 年的萌芽（RT-1/ACT），到 2024 年开源爆发（OpenVLA/$\pi_0$），再到 2025 年的快速发展（$\pi_{0.5}$/SmolVLA 等）](../../assets/figures/lecture11/ref/intro/vla_timeline.png)
+![VLA 发展时间线：从 2022 年的萌芽（RT-1/ACT），到 2024 年开源爆发（OpenVLA/$\pi_0$），再到 2025 年的快速发展（$\pi_{0.5}$/SmolVLA 等）（图片出自参考文献 1）](../../assets/figures/lecture11/ref/intro/vla_timeline.png)
 
-本讲就从这条时间线上挑出六个有代表性的模型，沿着"两条路线"展开：先看离散自回归的开山之作 **OpenVLA**，再到用流匹配的 **$\pi_0$** 及其家族（**$\pi_0$-FAST**、**$\pi_{0.5}$**），最后是两个把模型压小的代表 **VLA-0** 与 **SmolVLA**。读完这六个，你就能看清 VLA 这条演化链是怎么一步步往前推的。
+本讲就从这条时间线上挑出六个有代表性的模型，沿着"两条路线"展开：先看离散自回归的开山之作 **OpenVLA**，再到用流匹配的 **$\pi_0$** 及其家族（**$\pi_0$-FAST**、**$\pi_{0.5}$**），最后是两个把模型压小的代表 **VLA-0** 与 **SmolVLA**。读完这六个，你就能看清 VLA 这条演化链是怎么一步步往前推的。时间线上没被挑中的那几十个工作、以及更细的分类维度，可以去综述[1]里查。
 
 # 2 OpenVLA：开源视觉-语言-动作模型
 
-![OpenVLA 总览：左侧为大规模机器人训练数据（970K episode），中间为基础 VLM（ViT + Llama 2 7B）微调得到 VLA，右侧为闭环机器人控制策略。模型支持多机器人控制与高效微调，所有数据、权重和代码完全开源](../../assets/figures/lecture11/ref/openvla/openvla_teaser.jpg)
+OpenVLA[2] 是第一个把「完全开源」和「打得过闭源大模型」同时做到的 VLA。下面这张总览图
+把它的三段式讲完了：左边喂进大规模真机数据，中间微调一个现成 VLM，右边输出闭环控制。
+
+![OpenVLA 总览：左侧为大规模机器人训练数据（970K episode），中间为基础 VLM（ViT + Llama 2 7B）微调得到 VLA，右侧为闭环机器人控制策略。模型支持多机器人控制与高效微调，所有数据、权重和代码完全开源（图片出自参考文献 2）](../../assets/figures/lecture11/ref/openvla/openvla_teaser_arxiv-2406.09246.jpg)
 
 ## 2.1 背景与动机
 
-NLP 和 CV 里"大规模预训练 + 下游微调"的范式早已验证，但机器人领域一直走不通，卡在**数据**——真实机器人数据要用硬件实采，成本远高于文本和图片。两个进展打破了僵局：**Open X-Embodiment** 把 20+ 机构、20+ 种机器人的 200 万+ 条轨迹聚到一起，第一次提供了足够大的真实机器人数据；**RT-2** 把预训练 VLM 微调用于机器人控制、首次提出 VLA 概念，证明了 `VLM → VLA` 这条路可行。
+NLP 和 CV 里"大规模预训练 + 下游微调"的范式早已验证，但机器人领域一直走不通，卡在**数据**——真实机器人数据要用硬件实采，成本远高于文本和图片。两个进展打破了僵局：**Open X-Embodiment**[3]（后文简称 OXE）把 20+ 机构、20+ 种机器人的 200 万+ 条轨迹聚到一起，第一次提供了足够大的真实机器人数据；**RT-2**[4] 把预训练 VLM 微调用于机器人控制、首次提出 VLA 概念，证明了 `VLM → VLA` 这条路可行。
 
-问题是，RT-2 及其 550 亿参数的 RT-2-X 都是**闭源**的，已有的开源方案（如 Octo）又不是端到端的 VLM 微调路线。OpenVLA 要补的就是这个缺口：做一个**强、且完全开源**的 VLA——在大规模真实机器人数据上预训练、配一套高效的下游微调框架（支持 LoRA 等参数高效微调），并把代码、权重、数据配置全部公开。
+问题是，RT-2 及其 550 亿参数的 RT-2-X 都是**闭源**的，已有的开源方案（如 Octo[5]）又不是端到端的 VLM 微调路线。OpenVLA 要补的就是这个缺口：做一个**强、且完全开源**的 VLA——在大规模真实机器人数据上预训练、配一套高效的下游微调框架（支持 LoRA 等参数高效微调；LoRA 全称低秩适配 Low-Rank Adaptation，冻住原权重、只训练一对小的低秩矩阵，第12讲会展开），并把代码、权重、数据配置全部公开。
 
 ## 2.2 模型架构
 
-![OpenVLA 模型架构：(1) 输入图像分别经过 DINOv2 和 SigLIP 双视觉编码器提取特征；(2) 通过 MLP Projector 将视觉特征投影到语言模型输入空间；语言指令 "Put eggplant in bowl" 经 Llama Tokenizer 分词后与视觉 token 拼接，按论文中的 "What action should the robot take to \{instruction\}?" 模板组织；(3) Llama 2 7B 自回归生成动作 token，经 Action De-Tokenizer 解码为 7 维机器人动作（$\Delta x$、$\Delta\theta$、$\Delta\text{Grip}$）](../../assets/figures/lecture11/ref/openvla/x1.png)
+![OpenVLA 模型架构：(1) 输入图像分别经过 DINOv2 和 SigLIP 双视觉编码器提取特征；(2) 通过 MLP Projector 将视觉特征投影到语言模型输入空间；语言指令 "Put eggplant in bowl" 先套进图里印着的提示词模板 "What should the robot do to \{task\}? A:"，再经 Llama Tokenizer 分词、与视觉 token 拼接；(3) Llama 2 7B 自回归生成动作 token，经 Action De-Tokenizer 解码为 7 维机器人动作（$\Delta x$、$\Delta\theta$、$\Delta\text{Grip}$）（图片出自参考文献 2）](../../assets/figures/lecture11/ref/openvla/fig11-2-openvla-architecture_arxiv-2406.09246.png)
 
-OpenVLA 是一个 70 亿参数的 VLA 模型，构建在 Prismatic VLM 之上。整体架构非常简洁：图像和语言指令作为输入，经过视觉编码、投影、语言模型处理后，直接输出 token 化的机器人动作。
+OpenVLA 是一个 70 亿参数的 VLA 模型，构建在 Prismatic VLM[6] 之上——那是一套把视觉编码器、投影层和语言模型拼装成 VLM 的开源配方，OpenVLA 直接拿它当底座。整体架构非常简洁：图像和语言指令作为输入，经过视觉编码、投影、语言模型处理后，直接输出 token 化的机器人动作。
 
 ### 2.2.1 视觉编码器：双编码器融合
 
@@ -149,13 +154,16 @@ OpenVLA 的核心骨干是 **Llama 2 7B**，一个 70 亿参数的大语言模�
 1. **视觉 token**：由双视觉编码器 + MLP 投影器生成
 2. **语言 token**：由 Llama 分词器对语言指令进行分词得到
 
-按照论文的任务表述，输入的 prompt 模板可以概括为：
+语言指令不是直接丢进去的，要先套进一个固定模板。OpenVLA 官方发布的模型卡给出的写法是：
 
 ```text
-[视觉 token] What action should the robot take to {language_instruction}?
+[视觉 token] In: What action should the robot take to {<INSTRUCTION>}?
+Out:
 ```
 
-模型以自回归方式输出 7 个动作 token，对应一个时间步的机器人动作。
+模型接着以自回归方式输出 7 个动作 token，对应一个时间步的机器人动作；`Out:` 后面跟的就是这 7 个 token。
+
+顺带说明一处容易看岔的地方：2.2 开头那张架构图上印的模板是 `What should the robot do to {task}? A:`，与这里的写法不同。两者都是"把指令包成一个问句、让模型接着答"的同一件事，实际跑模型时以官方发布实现里的这一版为准。
 
 ### 2.2.3 动作空间与输出
 
@@ -209,7 +217,7 @@ $$
 \text{bin}(a_i)=\lfloor 0.5 \times 256 \rfloor = 128
 $$
 
-也就是说，这个连续动作值最终会被编码成第 128 个离散 bin。直观上看，动作值越靠近区间中间，就会被映射到越靠近中间的 bin；超过区间上下界的值则会被 clip 到 0 或 255。
+这个连续动作值于是被编码成第 128 个 bin。规律很直白：动作值越靠近区间中间，落到的 bin 编号越靠近中间；超出上下界的值会被 clip 到 0 或 255。
 
 ### 2.3.2 分词器词汇表的调整
 
@@ -223,13 +231,17 @@ $$
 a_t = (a_1, a_2, \ldots, a_7) \;\xrightarrow{\text{离散化}}\; (\text{bin}_1, \text{bin}_2, \ldots, \text{bin}_7) \;\xrightarrow{\text{映射}}\; (\text{token}_1, \text{token}_2, \ldots, \text{token}_7)
 $$
 
-这种方法的代价是：被覆盖的低频词汇在微调后不再可用，语言模型的原始语言能力会受到一定影响。但论文的定位本来就是机器人控制而非通用对话，因此作者认为这是可以接受的工程折中。
+这种方法的代价是：被覆盖的低频词汇在微调后不再可用，语言模型的原始语言能力会受到一定影响。但 OpenVLA 的定位本来就是机器人控制而非通用对话，论文把它当作可以接受的工程折中。
+
+![从一个连续动作值到词表里一个槽位的完整流水线。(a) 该维动作在训练集上的分布，两条红色虚线是 $q_1$ 与 $q_{99}$，灰色柱子是被剔掉的前后各 1% 尾巴——min-max 会被这些离群点拉垮，分位数不会。(b) $[q_1, q_{99}]$ 被均分成 256 格，正文那个算例 $a_i=0.05$ 落在正中间，红线标出它就是第 128 格。(c) 代价落在词表哪一段：被顶掉的是最低频的 256 个槽位（本书自绘；(a) 的分布形状为示意，$q_1$、$q_{99}$、$a_i$ 三个数取自正文算例）](../../assets/figures/lecture11/ref/fig11-2-action-tokenization.png){width=100%}
+
+这三格分别对应上面三小节各自讲过、却一直没放在一起的三件事。(a) 回答的是"为什么用分位数而不是 min-max"——灰色那两撮离群动作如果参与定界，中间那一大团常见动作就会被挤进更少的格子里，分辨率白白浪费。(b) 回答的是"一个具体值怎么落格"——注意横轴是被拉直的 $[q_1, q_{99}]$，落点位置就是那个相对位置 0.5，乘 256 取整即得 128。(c) 回答的是"代价在哪"——被换掉的不是随机 256 个词，而是**频率最低**的那 256 个，这正是 OpenVLA 敢做这笔交换的理由：常用词一个没动。
 
 ### 2.3.3 训练目标
 
 有了动作 token 化，OpenVLA 的训练就变成了标准的**自回归 next-token prediction**：
 
-![OpenVLA 的自回归动作解码：LLM 逐个生成动作 token，每个 token 都依赖前面已经生成的所有 token](../../assets/figures/lecture11/ref/openvla/autoregressive_decoding_left.jpg){width=55%}
+![OpenVLA 的自回归动作解码：LLM 逐个生成动作 token，每个 token 都依赖前面已经生成的所有 token（图片出自参考文献 7，是 2.5 节那张自回归 / 并行解码对照图的左半边）](../../assets/figures/lecture11/ref/openvla/autoregressive_decoding_left_arxiv-2502.19645.jpg){width=55%}
 
 $$
 \mathcal{L} = -\sum_{j=1}^{7} \log p_\theta(\text{token}_j \mid I_t, l, \text{token}_{1:j-1})
@@ -274,7 +286,7 @@ OpenVLA 的预训练本质上是对 Prismatic VLM 进行**全参数微调**（fu
 
 关键发现：
 
-- **微调视觉编码器很重要**：冻结视觉编码器会显著降低性能。作者认为预训练的视觉表示尚不足以直接用于机器人控制，需要在机器人数据上进一步调整
+- **微调视觉编码器很重要**：冻结视觉编码器会显著降低性能。论文给出的解释是，预训练的视觉表示尚不足以直接用于机器人控制，需要在机器人数据上进一步调整
 - **训练更久更好**：与 VLM 预训练通常只过 1~2 个 epoch 不同，OpenVLA 训练了约 30 个 epoch，性能持续提升
 - **$224 \times 224$ 足够**：$384 \times 384$ 分辨率在 Bridge 评估中没有带来性能提升，但训练时间增加了 3 倍
 
@@ -290,13 +302,13 @@ OpenVLA 的预训练本质上是对 Prismatic VLM 进行**全参数微调**（fu
 | Last layer only | LLM 最后一层 | 最低 | 较差 |
 | **LoRA (rank=32)** | **1.4%（~98M）** | **较低** | **接近 full fine-tuning** |
 
-LoRA 是最推荐的微调方式：只训练 1.4% 的参数，显存需求大幅降低，但性能接近全参数微调。论文和作者报告都强调，这显著降低了微调门槛；例如可在单张 A100 上完成微调，时间约 15 小时。
+LoRA 是最推荐的微调方式：只训练 1.4% 的参数，显存需求大幅降低，但性能接近全参数微调。论文强调这显著降低了微调门槛：一张 A100 就能跑完一次下游微调，耗时约 15 小时。
 
 ## 2.5 后续改进：OpenVLA-OFT+
 
-OpenVLA 的局限性催生了后续改进工作 **OpenVLA-OFT+**（Open Fine-Tuning+），针对原版的几个核心短板进行了升级。
+OpenVLA 的局限性催生了后续改进工作 **OpenVLA-OFT+**[7]（Open Fine-Tuning+），针对原版的几个核心短板进行了升级。
 
-![OpenVLA-OFT+ 架构：支持多相机输入（第三人称 + 左右腕部相机），视觉编码器仍为 SigLIP + DINOv2，通过 FiLM（Feature-wise Linear Modulation）将本体感知（当前关节角度）和任务描述注入视觉特征。LLM 骨干仍为 Llama 2 7B，但输出端改为并行解码，一次生成 25 步的 action chunk，每步为 14 维绝对关节角度目标。该架构可部署在 ALOHA 双臂机器人上](../../assets/figures/lecture11/ref/openvla/v2-958c61084dee47b18c8f0671dcadbe22_1440w.jpg)
+![OpenVLA-OFT+ 架构：支持多相机输入（第三人称 + 左右腕部相机），视觉编码器仍为 SigLIP + DINOv2，通过 FiLM（Feature-wise Linear Modulation）将本体感知（当前关节角度）和任务描述注入视觉特征。LLM 骨干仍为 Llama 2 7B，但输出端改为并行解码，一次生成 25 步的 action chunk，每步为 14 维绝对关节角度目标。该架构可部署在 ALOHA 双臂机器人上（图片出自参考文献 7）](../../assets/figures/lecture11/ref/openvla/v2-958c61084dee47b18c8f0671dcadbe22_1440w.jpg)
 
 相比原版 OpenVLA，OFT+ 的主要改进包括：
 
@@ -314,18 +326,18 @@ OFT+ 的核心设计变化：
 
 1. **并行解码替代自回归**：原版 OpenVLA 逐个生成 7 个动作 token，推理速度受限于串行 forward pass 次数。OFT+ 使用双向注意力（bidirectional attention），一次 forward pass 并行输出所有动作 token，大幅提升推理速度
 
-![自回归解码（左）vs 并行解码（右）。左侧对应原版 OpenVLA 的自回归动作生成；右侧对应 OFT+ 采用的并行解码方式，可一次性输出整段动作序列](../../assets/figures/lecture11/ref/openvla/v2-cef72e4df43d65d7f5072eaba8117b6b_1440w.jpg)
+![自回归解码（左）vs 并行解码（右）。左侧对应原版 OpenVLA 的自回归动作生成；右侧对应 OFT+ 采用的并行解码方式，可一次性输出整段动作序列（图片出自参考文献 7）](../../assets/figures/lecture11/ref/openvla/v2-cef72e4df43d65d7f5072eaba8117b6b_1440w.jpg)
 
 2. **连续动作回归替代离散分类**：不再将动作离散化为 256 个 bin，而是直接回归连续值，使用 L1 损失训练。这避免了离散化带来的精度损失
 
-3. **Action chunking**：一次输出 25 步动作，结合并行解码，在保持高控制频率的同时实现了短时规划能力
+3. **Action chunking**：动作块（action chunk）是第10讲 2.2 节讲 ACT 时用过的老朋友——一次预测未来若干步动作，而不是每步都重新决策。OFT+ 一次输出 25 步，结合并行解码，在保持高控制频率的同时获得短时规划能力
 
 4. **FiLM 条件注入**：通过 Feature-wise Linear Modulation 将本体感知信息（关节角度）注入视觉特征，让模型能感知机器人自身状态，而不仅仅依赖图像隐含的位姿信息
 
 ## 2.6 上手：跑一次 OpenVLA 推理
 
 前面讲的 256 bin、逐 token 解码，都可以在 LIBERO 仿真里亲手验证。配套代码仓的
-`experiments/vla/4_vla_inference/4_1_openvla_infer/` 加载 OpenVLA 官方在
+`code/vla/4_vla_inference/4_1_openvla_infer/` 加载 OpenVLA 官方在
 LIBERO-10 上微调的 7B checkpoint，闭环推理一次并录像：
 
 ```bash
@@ -333,7 +345,7 @@ cd code
 uv run python vla/4_vla_inference/4_1_openvla_infer/openvla_demo.py
 ```
 
-代码里有两处与 $\pi_0$ 的 demo（第8讲跑过）不同，恰好对应本节讲过的两个机制：
+代码里有两处与 $\pi_0$ 的 demo（第8讲 4.3 节跑过）不同，恰好对应本节讲过的两个机制：
 
 - **加载方式**：这个 checkpoint 不是 LeRobot 格式——HF 仓库里放的是 transformers
   远程模型代码（Prismatic 架构），所以要显式构造 `OpenVLAConfig` 再加载；
@@ -347,9 +359,9 @@ uv run python vla/4_vla_inference/4_1_openvla_infer/openvla_demo.py
 固定初始状态后，任务「put both the alphabet soup and the tomato sauce in the
 basket」在 247 步内完成：
 
-![OpenVLA 在 LIBERO-10 上的成功 rollout 关键帧，从左到右为同一局内的连续时刻：机械臂先后把字母汤罐头与番茄酱罐头放进篮子](../../assets/figures/lecture11/ref/openvla/rollout_keyframes.png){width=98%}
+![OpenVLA 在 LIBERO-10 上一次成功推演（rollout，指策略在环境里从头跑到尾的一整局）的关键帧。本讲后面几张关键帧图都按同一约定读：从左到右是同一局内的连续时刻。这里机械臂先后把字母汤罐头与番茄酱罐头放进篮子（图片出自本书配套代码的实测录像）](../../assets/figures/lecture11/ref/openvla/rollout_keyframes.png){width=98%}
 
-同目录的 `openvla_eval.sh` 是官方 `lerobot-eval` 的标准评测入口：多 episode 自动换
+同目录的 `code/vla/4_vla_inference/4_1_openvla_infer/openvla_eval.sh` 是官方 `lerobot-eval` 的标准评测入口：多 episode 自动换
 初始状态、统计成功率（`pc_success`）并逐集录像，想验证"不是挑了个好局"就用它。
 
 ## 2.7 本节小结
@@ -364,7 +376,7 @@ OpenVLA 是 VLA 领域的一个里程碑式工作，其核心贡献在于：
 
 3. **证明了 VLM $\to$ VLA 微调路线的有效性**：不需要从头设计复杂架构，直接在成熟的 VLM 上微调即可获得强大的机器人控制能力
 
-4. **降低了 VLA 研究的门槛**：完全开源 + LoRA 微调 + INT4 量化，使得在消费级硬件上训练和部署 VLA 成为可能
+4. **降低了 VLA 研究的门槛**：权重、代码、数据配方全部公开，配上 2.4.3 的 LoRA 微调，一张显卡就能把它调到自己的机器人上
 
 > 一句话总结：OpenVLA 用 Prismatic VLM（DINOv2 + SigLIP + Llama 2 7B）作为骨干，将连续动作离散化为 token，通过自回归 next-token prediction 实现端到端的视觉-语言-动作映射，是开源 VLA 的第一个成熟方案。
 
@@ -382,13 +394,16 @@ OpenVLA 的局限性也可以直接概括为四点：
 
 # 3 $\pi_0$：基于 Flow Matching 的视觉-语言-动作流模型
 
-![$\pi_0$ 总览：基于预训练 VLM 骨干和大规模跨机器人数据集训练的通用机器人策略。模型通过独立的 Action Expert 以 flow matching 方式生成连续动作，支持精细流畅的操作技能。模型可以直接通过 prompt 执行任务，也可以在高质量数据上微调以完成复杂多阶段任务（如叠衣服、组装纸箱等）](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/teaser_fig.png)
+$\pi_0$[8] 换掉的是 OpenVLA 最核心的那个部件——动作头。下面这张总览图右侧那些任务
+（叠衣服、装纸箱）之所以做得动，靠的就是它一次生成一整段连续动作的能力。
+
+![$\pi_0$ 总览：基于预训练 VLM 骨干和大规模跨机器人数据集训练的通用机器人策略。模型通过独立的 Action Expert 以 flow matching 方式生成连续动作，支持精细流畅的操作技能。模型可以直接通过 prompt 执行任务，也可以在高质量数据上微调以完成复杂多阶段任务（如叠衣服、组装纸箱等）（图片出自参考文献 8）](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/teaser_fig_arxiv-2410.24164.png)
 
 ## 3.1 背景与动机
 
 ### 3.1.1 从 OpenVLA 到 $\pi_0$：为什么需要新架构？
 
-在第 2 节我们介绍了 OpenVLA——第一个成熟的开源 VLA 方案。OpenVLA 用 Llama 2 7B 做骨干，把连续动作离散化为 token，通过自回归 next-token prediction 实现端到端控制。这条路线简洁有效，但也暴露了几个核心瓶颈：
+2.7 节是站在 OpenVLA 这个模型的角度列局限。换成「要做精细、高频操作」的角度再看一遍，它们会收敛成下面四道门槛——$\pi_0$ 的每一处架构选择，都对着其中一条：
 
 | 问题 | 具体表现 |
 |------|----------|
@@ -399,13 +414,13 @@ OpenVLA 的局限性也可以直接概括为四点：
 
 > 备注：**离散化会带来量化误差，逐 token 解码也会增加延迟**——这两条是实打实的代价。但"自回归分类是点预测"这个说法不准确：自回归分类定义的是一个条件概率分布，通过采样完全可以表达多模态。真正让输出变成单一路径的是**贪婪 / argmax 解码**这个部署选择，而不是自回归建模本身。
 
-上一讲我们介绍了 Flow Matching——一种比 Diffusion 更高效的连续生成方法，用确定性 ODE 替代随机 SDE，在常见设定下只需 5~10 步即可完成采样。$\pi_0$ 的核心思路就是：**把 Flow Matching 作为动作生成头，嫁接到预训练 VLM 上，同时引入专门的 Action Expert 来处理机器人特有的输入输出。**
+第10讲第 5 节介绍过 Flow Matching——一种比 Diffusion 更高效的连续生成方法，用确定性 ODE 替代随机 SDE，在常见设定下个位数到十几步就能完成采样（各家的示例范围见第10讲 5.4.3 节，那里也说清了该比的是网络前向次数而不是"步数"）。$\pi_0$ 的核心思路就是：**把 Flow Matching 作为动作生成头，嫁接到预训练 VLM 上，同时引入专门的 Action Expert 来处理机器人特有的输入输出。**
 
 ### 3.1.2 $\pi_0$ 的核心定位
 
 $\pi_0$（读作 "pi-zero"）由 Physical Intelligence 提出，是一个通用机器人策略（generalist robot policy），也可以理解为一个机器人基础模型（robot foundation model）。它的设计目标是：
 
-1. **继承互联网规模的语义知识**：基于预训练 VLM（PaliGemma）初始化，获得物体识别、空间关系、语言理解等能力
+1. **继承互联网规模的语义知识**：基于预训练 VLM（PaliGemma[9]）初始化，获得物体识别、空间关系、语言理解等能力
 2. **支持高频精细控制**：通过 flow matching 一次生成连续 action chunk，动作以最高 50 Hz 的频率**执行**（注意这是动作执行频率，不是模型每 20 ms 重新推理一次；四个频率概念的区分见 3.3.4）
 3. **跨机器人泛化**：单一模型同时支持单臂、双臂、移动操作等 7 种机器人构型
 4. **通过预训练/后训练范式获得鲁棒性**：类比 LLM 的 pre-training + post-training 流程
@@ -414,20 +429,20 @@ $$
 \underbrace{\text{OpenVLA}}_{\text{自回归离散动作}} \quad\longrightarrow\quad \underbrace{\pi_0}_{\text{Flow Matching 连续动作 + Action Expert}}
 $$
 
-![$\pi_0$ 控制移动机器人叠衣服的完整流程：从烘干机取出衣物、装入篮子、推到折叠台、逐件折叠。模型在 7 种机器人构型、68 个任务上预训练，可直接 prompt 或微调到复杂下游任务](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/fig2_final.jpeg)
+![$\pi_0$ 控制移动机器人叠衣服的完整流程：从烘干机取出衣物、装入篮子、推到折叠台、逐件折叠。模型在 7 种机器人构型、68 个任务上预训练，可直接 prompt 或微调到复杂下游任务（图片出自参考文献 8）](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/fig2_final_arxiv-2410.24164.jpeg)
 
 ## 3.2 模型架构
 
 ### 3.2.1 总体结构：VLM 骨干 + Action Expert
 
-![$\pi_0$ 框架总览：左侧为预训练混合数据（自有精细操作数据集 + 开源 OXE 数据），中间为 flow matching VLA 模型（较大的 VLM 骨干处理图像和语言，较小的 Action Expert 处理机器人状态和动作），VLM 骨干权重从 PaliGemma 初始化以继承互联网规模预训练的表示。右侧为训练后的 $\pi_0$ 模型可控制多种不同动作空间的机器人完成各类任务](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/overview.png)
+![$\pi_0$ 框架总览：左侧为预训练混合数据（自有精细操作数据集 + 开源 OXE 数据），中间为 flow matching VLA 模型（较大的 VLM 骨干处理图像和语言，较小的 Action Expert 处理机器人状态和动作），VLM 骨干权重从 PaliGemma 初始化以继承互联网规模预训练的表示。右侧为训练后的 $\pi_0$ 模型可控制多种不同动作空间的机器人完成各类任务（图片出自参考文献 8）](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/overview_arxiv-2410.24164.png)
 
 $\pi_0$ 的架构可以理解为一个带有两组权重的 Transformer：
 
 1. **VLM 骨干**（约 3B 参数）：基于 PaliGemma，处理图像和语言 token
 2. **Action Expert**（约 300M 参数）：从头初始化，处理机器人状态和动作 token
 
-两组权重可以理解为实现于同一个 Transformer 框架中的两套 expert：它们通过自注意力计算彼此交互，但并不是简单地共享一整套 attention/MLP 参数，而是各自保有与自身宽度匹配的参数集。这种设计可以类比为一种 **按 token 类型固定路由** 的两专家结构，而不是经典稀疏门控 MoE：视觉-语言 token 固定走 VLM 骨干，机器人状态与动作 token 固定走 Action Expert。
+两组权重可以理解为实现于同一个 Transformer 框架中的两套 expert：它们通过自注意力计算彼此交互，但并不是简单地共享一整套 attention/MLP 参数，而是各自保有与自身宽度匹配的参数集。这种设计可以类比为一种 **按 token 类型固定路由** 的两专家结构，而不是经典的稀疏门控混合专家（Mixture-of-Experts, MoE，由一个门控网络按内容动态挑选专家）：视觉-语言 token 固定走 VLM 骨干，机器人状态与动作 token 固定走 Action Expert。
 
 $$
 \text{总参数量} = \underbrace{3\text{B}}_{\text{PaliGemma}} + \underbrace{300\text{M}}_{\text{Action Expert}} = 3.3\text{B}
@@ -482,7 +497,7 @@ $\pi_0$ 使用分块因果注意力掩码（blockwise causal attention mask）�
 2. **块 2 单独一块**：机器人状态 $\mathbf{q}_t$ 在 flow matching 的多步积分中不变，因此它和图像/语言一起构成"整段推理里不变的前缀"，可以缓存 key-value（3.2.5 会展开）。要说清的是，**KV 缓存成立的条件是"前缀内容在多步积分中不变"，而不是"状态必须单独成一块"**——把状态并进块 1 同样能缓存；单独成块主要是为了让状态既能看到图像/语言、又不被前缀双向影响
 3. **块 3 内部全双向**：所有动作 token 互相 attend，使得 action chunk 内部的动作可以相互协调
 
-> 备注：以上是本书按 3 个语义块给出的读法，方便理解可见性关系。真要照着实现，请直接对照官方代码里输入打包、`attention mask` 构造与 KV cache 三处的逻辑（LeRobot 的 `modeling_pi0.py`、openpi 的对应实现），逐 token 核对可见性矩阵——不同版本在块的划分粒度和掩码细节上可能与本节的简化描述不完全一致。
+> 备注：以上是本书按 3 个语义块给出的读法，方便理解可见性关系。真要照着实现，请直接对照官方代码里输入打包、`attention mask` 构造与 KV cache 三处的逻辑（LeRobot 包内 `lerobot/policies/pi0/modeling_pi0.py`，以及 openpi 的对应实现），逐 token 核对可见性矩阵——不同版本在块的划分粒度和掩码细节上可能与本节的简化描述不完全一致。
 
 上面的分块规则在实现里用一个很简洁的方式落地：给每个 token 标一个"组号"（沿序列对因果边界做累积和算出来——每遇到一个边界，组号加一），再规定 **token $i$ 能 attend token $j$，当且仅当 $j$ 的组号 $\le$ $i$ 的组号**。于是图像/语言（组 1）、机器人状态（组 2）、动作（组 3）就自动满足"动作能看前缀、状态只看自己、前缀看不到后面"的分块因果模式；再叠上 padding 掩码，就得到最终送进注意力的二维掩码矩阵。
 
@@ -490,9 +505,9 @@ $\pi_0$ 使用分块因果注意力掩码（blockwise causal attention mask）�
 
 要理解 $\pi_0$ 推理为什么快，先要理解 Transformer 里一个通用的加速技巧——**KV 缓存（KV Cache）**。
 
-![在带因果掩码的注意力里，第 3 个 token 的输出（图中 KQV 的第三行）只由它自己的 query 和前 3 个 token 的 key / value 决定；后面的 token 不会影响它。所以已经算出来的 key / value 在后续步骤里固定不变，可以缓存复用](../../assets/figures/lecture11/ref/intro/kvcache_transformer.png){width=82%}
+![在带因果掩码的注意力里，第 3 个 token 的输出（图中 KQV 的第三行）只由它自己的 query 和前 3 个 token 的 key / value 决定；后面的 token 不会影响它。所以已经算出来的 key / value 在后续步骤里固定不变，可以缓存复用（图片出处待核；图内自带的那段英文说明与本图注说的是同一件事，重排版时应换成中文重绘版）](../../assets/figures/lecture11/ref/intro/kvcache_transformer.png){width=82%}
 
-自回归生成时，模型一个 token 一个 token 地往外吐。注意力里有个关键性质：因为有**因果掩码**，第 $i$ 个 token 的输出只依赖它自己的 query 和**前 $i$ 个 token 的 key / value**——后面还没生成的 token 不会影响它。也就是说，已经算过的那些 key / value，在后续每一步里都**原封不动**。既然不变，就没必要每生成一个新 token 都把整段历史重算一遍：把过去所有 token 的 key / value **缓存**起来，新 token 来了只算它自己这一列、再去 attend 缓存好的历史即可。这就是 KV 缓存——拿显存换计算，把自回归推理从"每步重算全程"降到"每步只算一个新 token"。
+自回归生成时，模型一个 token 一个 token 地往外吐。注意力里有个关键性质：因为有**因果掩码**，第 $i$ 个 token 的输出只依赖它自己的 query 和**前 $i$ 个 token 的 key / value**——后面还没生成的 token 不会影响它。于是已经算过的那些 key / value，在后续每一步里都**原封不动**。既然不变，就没必要每生成一个新 token 都把整段历史重算一遍：把过去所有 token 的 key / value **缓存**起来，新 token 来了只算它自己这一列、再去 attend 缓存好的历史即可。这就是 KV 缓存——拿显存换计算，把自回归推理从"每步重算全程"降到"每步只算一个新 token"。
 
 回到 $\pi_0$：它的推理不是逐 token 自回归，而是 flow matching 的约 10 步 Euler 积分，但 KV 缓存的道理一样适用。关键条件是**前缀（图像、语言、机器人状态）在这 10 步里完全不变**，于是把**前缀的 key / value 只算一次、缓存起来**；之后每个去噪步只让小小的 Action Expert 处理动作 token、去 attend 缓存好的前缀 KV。结果是 3B 的 VLM 骨干整段推理只跑一次、300M 的 Action Expert 跑 10 次——这正是 $\pi_0$ 能把推理压到实时的关键。
 
@@ -516,7 +531,7 @@ $$
 
 ### 3.2.7 Action Expert 的具体配置
 
-PaliGemma 基于 Gemma 2B 语言模型。下表两列分别是 VLM 骨干（`gemma_2b`）与 Action Expert（`gemma_300m`）的 Transformer 配置，数值取自官方实现的模型配置（LeRobot `lerobot/policies/pi0/modeling_pi0.py` 里的 `get_gemma_config`，与 openpi `gemma.py` 一致）：
+PaliGemma 基于 Gemma 2B 语言模型。下表两列分别是 VLM 骨干（`gemma_2b`）与 Action Expert（`gemma_300m`）的 Transformer 配置，数值取自官方实现的模型配置（LeRobot 包内 `lerobot/policies/pi0/modeling_pi0.py` 里的 `get_gemma_config`，与 openpi 包内 `src/openpi/models/gemma.py` 一致；LeRobot 由 `code/platform/lerobot/fetch_lerobot.sh` 拉取，仓库内不存源码树）：
 
 | 参数 | VLM 骨干（`gemma_2b`） | Action Expert（`gemma_300m`） |
 |------|----------------------|---------------|
@@ -544,7 +559,7 @@ $$
 
 其中上标 $\tau \in [0, 1]$ 表示 flow matching 时间步（不是机器人时间步），下标 $t$ 表示机器人时间步。
 
-使用线性高斯概率路径（论文中也称 optimal transport 路径；严格说只有端点按 OT 耦合配对时才是 OT 路径，见上一讲 5.3.1 的备注）：
+使用线性高斯概率路径（论文中也称 optimal transport 路径；严格说只有端点按 OT 耦合配对时才是 OT 路径，见第10讲 5.3.1 节的备注）：
 
 $$
 q(\mathbf{A}^\tau_t \mid \mathbf{A}_t) = \mathcal{N}\!\left(\tau \mathbf{A}_t,\; (1 - \tau)^2 \mathbf{I}\right)
@@ -566,7 +581,7 @@ $$
 | $\epsilon$ | 从标准正态采样的噪声 |
 | $\mathbf{u}$ | 目标去噪向量场，$= \mathbf{A}_t - \epsilon$ |
 
-注意这里的符号约定与上一讲的 Flow Matching 介绍略有不同：上一讲里 $t=0$ 是噪声、$t=1$ 是数据；$\pi_0$ 论文中 $\tau=0$ 也是噪声、$\tau=1$ 也是数据，但带噪动作的构造公式写法不同。上一讲里是 $z_t = (1-t)z_0 + tz_1$（$z_0$ 是噪声），而 $\pi_0$ 中是 $\mathbf{A}^\tau_t = \tau \mathbf{A}_t + (1-\tau)\epsilon$（$\mathbf{A}_t$ 是数据）。两者本质等价，只是变量命名不同。
+这里的符号约定与第10讲 5.3.1 节的 Flow Matching 写法略有不同。两边的端点其实一致：第10讲里 $t=0$ 是噪声、$t=1$ 是数据，$\pi_0$ 论文里 $\tau=0$ 是噪声、$\tau=1$ 是数据。差别只在带噪样本怎么写——第10讲写成 $z_t = (1-t)z_0 + tz_1$（$z_0$ 是噪声），$\pi_0$ 写成 $\mathbf{A}^\tau_t = \tau \mathbf{A}_t + (1-\tau)\epsilon$（$\mathbf{A}_t$ 是数据）。两式等价，只是变量命名不同。
 
 ### 3.3.2 时间步采样：Beta 分布而非均匀分布
 
@@ -576,7 +591,7 @@ $$
 p(\tau) = \text{Beta}\!\left(\frac{s - \tau}{s};\; 1.5,\; 1\right), \quad s = 0.999
 $$
 
-为了避免把这个式子误读成“直接对 $\tau$ 代入普通 Beta 密度”，更直观的理解是：先采样 $z \sim \text{Beta}(1.5, 1)$，再令
+为了避免把这个式子误读成"直接对 $\tau$ 代入普通 Beta 密度"，更直观的理解是：先采样 $z \sim \text{Beta}(1.5, 1)$，再令
 
 $$
 \tau = s(1-z), \quad s = 0.999
@@ -584,7 +599,7 @@ $$
 
 这样得到的时间步会更集中在较小的 $\tau$ 区域，也就是更高噪声的区域。
 
-![Flow matching 时间步采样分布：从偏移 Beta 分布采样 $\tau$，强调低时间步（对应高噪声动作），超过截断值 $s=0.999$ 的时间步不被采样](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/timestep_sampling.png){width=50%}
+![Flow matching 时间步采样分布：从偏移 Beta 分布采样 $\tau$，强调低时间步（对应高噪声动作），超过截断值 $s=0.999$ 的时间步不被采样（图片出自参考文献 8）](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/timestep_sampling_arxiv-2410.24164.png){width=50%}
 
 为什么这样设计？论文的核心论点是：动作预测与图像生成有本质区别。
 
@@ -610,7 +625,7 @@ $\pi_0$ 使用 10 步积分（$\delta = 0.1$），从 $\tau = 0$ 积分到 $\tau
 
 推理的关键优化是 **KV 缓存**：观测 token（图像、语言、状态）在 10 步积分中不变，因此只需在第一步计算它们的 attention key-value，后续 9 步直接复用缓存，只重新计算动作 token 的前向传播。
 
-在 RTX 4090 上的推理时间：
+论文[8]报告的 RTX 4090 上推理耗时拆分：
 
 | 模块 | 耗时 |
 |------|------|
@@ -660,7 +675,7 @@ $\pi_0$ 的训练方案直接借鉴了 LLM 的 pre-training / post-training 范�
 
 ### 3.4.2 预训练数据
 
-![预训练数据组成：左图为各数据集按时间步数量的相对大小，右图为各数据集在预训练混合中的权重占比。预训练混合包含 OXE 开源数据子集和 $\pi$ 自有数据集](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/combined-robot-allocation-chart.png)
+![预训练数据组成：左图为各数据集按时间步数量的相对大小，右图为各数据集在预训练混合中的权重占比。预训练混合包含 OXE 开源数据子集和 $\pi$ 自有数据集（图片出自参考文献 8）](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/combined-robot-allocation-chart_arxiv-2410.24164.png)
 
 预训练数据总量约 10,000 小时，包含两大来源：
 
@@ -700,11 +715,11 @@ $\pi_0$ 的训练方案直接借鉴了 LLM 的 pre-training / post-training 范�
 1. 高层 VLM 观察当前场景，将高层任务（如 "bus the table"）分解为即时子任务（如 "pick up the napkin" → "throw the napkin into the trash"）
 2. $\pi_0$ 接收这些中间语言指令，执行具体的物理操作
 
-这种方法类似于 SayCan 的思路，利用 VLM 的语义推理能力来弥补低层策略在高层规划上的不足。
+这种"高层出指令、低层做动作"的分工，和早期的 SayCan（让语言模型挑出下一步该做哪个技能，再交给已有的技能库去执行）是同一个思路：用 VLM 的语义推理能力，补上低层策略在高层规划上的短板。
 
 ## 3.5 支持的机器人平台
 
-![$\pi_0$ 实验中使用的机器人平台：包括单臂和双臂操作器（6-DoF 和 7-DoF 臂），以及全向和非全向移动操作器。$\pi_0$ 在所有这些平台上联合训练](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/robots_compressed.png)
+![$\pi_0$ 实验中使用的机器人平台：包括单臂和双臂操作器（6-DoF 和 7-DoF 臂），以及全向和非全向移动操作器。$\pi_0$ 在所有这些平台上联合训练（图片出自参考文献 8）](../../assets/figures/lecture11/ref/pi0/arXiv-2410.24164v4/figures/robots_compressed_arxiv-2410.24164.png)
 
 $\pi_0$ 在 7 种不同的机器人构型上联合训练：
 
@@ -724,9 +739,11 @@ $\pi_0$ 在 7 种不同的机器人构型上联合训练：
 
 ### 3.6.1 架构层面的对比
 
-| | OpenVLA | Octo | ACT | Diffusion Policy | $\pi_0$ |
+表里 ACT 与 Diffusion Policy 两列的机制细节在第10讲第 2、3 节讲过，这里只取它们的规模与动作表示做参照。这两列的参数量口径要单说：ACT 的 ~80M 是它论文自报的数量级；Diffusion Policy 那篇没有给一个统一的模型大小，论文里明说了参数量越大表现越好、实际取值受算力和显存限制，所以这一格写不出一个数。
+
+| | OpenVLA[2] | Octo[5] | ACT | Diffusion Policy | $\pi_0$[8] |
 |---|---------|------|-----|-------------------|---------|
-| 参数量 | 7B | 93M | ~10M | ~10M | 3.3B |
+| 参数量 | 7B | 93M | ~80M | 依实现规模而定 | 3.3B |
 | 动作表示 | 离散 token | 连续（diffusion） | 连续（CVAE） | 连续（diffusion） | 连续（flow matching） |
 | Action chunking | 不支持 | 支持 | 支持 | 支持 | 支持（$H=50$） |
 | VLM 预训练 | 是（Prismatic） | 否 | 否 | 否 | 是（PaliGemma） |
@@ -737,8 +754,8 @@ $\pi_0$ 在 7 种不同的机器人构型上联合训练：
 
 ## 3.7 上手：跑一次 $\pi_0$ 推理
 
-$\pi_0$ 的闭环第8讲已经完整跑过（配套代码仓
-`experiments/vla/1_policy_rollout/1_2_pi0_libero_rollout/`），当时把它当黑盒；
+$\pi_0$ 的闭环在第8讲 4.3 节已经完整跑过（配套代码仓
+`code/vla/1_policy_rollout/1_2_pi0_libero_rollout/`），当时把它当黑盒；
 学完本节可以带着结构重看一遍：
 
 ```bash
@@ -754,7 +771,7 @@ PaliGemma 骨干把图像与指令编成前缀、算好 KV 缓存（3.2.5 节）
 任务「push the plate to the front of the stove」（libero_goal）固定初始状态下
 131 步完成：
 
-![$\pi_0$ 在 LIBERO 上的成功 rollout 关键帧，从左到右为同一局内的连续时刻：机械臂把盘子推到炉灶前方](../../assets/figures/lecture11/ref/pi0/rollout_keyframes.png){width=98%}
+![$\pi_0$ 跑通「把盘子推到炉灶前方」的关键帧：机械臂先贴到盘沿，再一路把盘子推向炉灶。这一局的任务与初始状态，后面 $\pi_0$-FAST、$\pi_{0.5}$、SmolVLA 三节会原样复用（图片出自本书配套代码的实测录像）](../../assets/figures/lecture11/ref/pi0/rollout_keyframes.png){width=98%}
 
 后面 4.5、5.5、7.5 节会用同一段闭环代码依次跑 $\pi_0$-FAST、$\pi_{0.5}$ 和 SmolVLA——对照着
 跑，最能体会"路线之争藏在 `select_action` 内部"这句话。
@@ -798,15 +815,15 @@ $$
 \text{token 数} = 50 \times 14 = 700
 $$
 
-这带来两个核心问题：
+这带来三个环环相扣的问题——前两条是机制，第三条是它们在高频任务上的直接后果：
 
 | 问题 | 具体表现 |
 |---|---|
 | 训练收敛极慢 | 高频信号中相邻时间步的动作几乎相同，每个 token 的边际信息量趋近于零，学习信号被严重稀释 |
 | 推理速度慢 | 自回归逐 token 解码 700 个 token，延迟远超实时控制需求 |
-| 高频任务表现崩溃 | 在论文评估中，采用 naive tokenization 的自回归 VLA 在 20Hz 和 50Hz 任务上几乎无法学到有效策略，也难以支撑 DROID 这类更强调泛化的评估 |
+| 高频任务表现崩溃 | 在 FAST 论文[10]的评估中，采用 naive tokenization 的自回归 VLA 在 20Hz 和 50Hz 任务上几乎无法学到有效策略，也难以支撑 DROID 这类更强调泛化的评估 |
 
-![不同采样频率下 naive tokenization 的预测误差：随着采样频率增加，预测误差急剧上升，最终模型退化为只复制第一个动作](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2501.09747v1/figures/case_study.png){width=70%}
+![不同采样频率下 naive tokenization 的预测误差：随着采样频率增加，预测误差急剧上升，最终模型退化为只复制第一个动作（图片出自参考文献 10）](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2501.09747v1/figures/case_study_arxiv-2501.09747.png){width=70%}
 
 ### 4.1.2 为什么边际信息量会趋近于零？
 
@@ -832,7 +849,7 @@ $$
 
 ### 4.2.1 算法流程总览
 
-![FAST 动作 token 化流程：归一化 → DCT 变换 → 量化 → 展平（频率优先） → BPE 压缩](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2501.09747v1/figures/dct_method.png)
+![FAST 动作 token 化流程：归一化 → DCT 变换 → 量化 → 展平（频率优先） → BPE 压缩（图片出自参考文献 10）](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2501.09747v1/figures/dct_method_arxiv-2501.09747.png)
 
 FAST 的 token 化流程分为 5 步：
 
@@ -876,7 +893,7 @@ $$
 [T_k] = [\bar{C}^1_1, \bar{C}^2_1, \ldots, \bar{C}^{|A|}_1, \bar{C}^1_2, \bar{C}^2_2, \ldots]
 $$
 
-这个设计的关键考量是：在自回归预测时，模型先生成低频分量（决定动作的整体形状和方向），再生成高频分量（细节调整）。这类似于先画轮廓再填细节，使得 policy rollout 更加稳定。
+这个设计的关键考量是：在自回归预测时，模型先生成低频分量（决定动作的整体形状和方向），再生成高频分量（细节调整）。这类似于先画轮廓再填细节：即便高频分量预测得不够准，整段动作的走向也已经定下来了，策略推演因此更稳。
 
 ### 4.2.5 BPE 压缩
 
@@ -904,7 +921,8 @@ FAST 中唯一需要学习的部分是 BPE 词表，需要在每个新数据集�
 
 FAST+ 可以作为黑盒 token 化器直接应用于任何机器人的 1 秒动作序列，无需重新训练。实验表明，FAST+ 的性能与针对单个数据集训练的 FAST token 化器相当。
 
-使用方式极其简单：
+使用方式极其简单——下面这几行调的是 Hugging Face 上 `physical-intelligence/fast` 那个
+公开 tokenizer 的接口，不是本书配套仓库里的代码：
 
 ```python
 from transformers import AutoProcessor
@@ -929,7 +947,7 @@ FAST 在每个域中始终为每个机械臂生成约 30 个 token（双臂约 6
 
 ## 4.5 上手：跑一次 $\pi_0$-FAST 推理
 
-配套代码仓的 `experiments/vla/4_vla_inference/4_2_pi0fast_pi05_infer/` 加载 $\pi_0$-FAST
+配套代码仓的 `code/vla/4_vla_inference/4_2_pi0fast_pi05_infer/` 加载 $\pi_0$-FAST
 的 LIBERO 微调 checkpoint 闭环一次：
 
 ```bash
@@ -949,9 +967,10 @@ uv run python vla/4_vla_inference/4_2_pi0fast_pi05_infer/pi0fast_demo.py
   "隔一块等一次"。
 
 同一个任务「push the plate to the front of the stove」（libero_goal），固定初始状态
-下 129 步完成；`pi0fast_eval.sh` 用 `lerobot-eval` 连评 2 个初始状态，全部成功：
+下 129 步完成；`code/vla/4_vla_inference/4_2_pi0fast_pi05_infer/pi0fast_eval.sh` 用
+`lerobot-eval` 连评 2 个初始状态，全部成功：
 
-![$\pi_0$-FAST 在 LIBERO 上的成功 rollout 关键帧，从左到右为同一局内的连续时刻：机械臂把盘子推到炉灶前方](../../assets/figures/lecture11/ref/pi0fast_pi05/rollout_keyframes_pi0fast.png){width=98%}
+![$\pi_0$-FAST 在与 3.7 节完全相同的任务和初始状态下的关键帧，可以与那张图逐格对照：换了动作头路线，走出来的轨迹形状几乎一样（图片出自本书配套代码的实测录像）](../../assets/figures/lecture11/ref/pi0fast_pi05/rollout_keyframes_pi0fast.png){width=98%}
 
 ## 4.6 本节小结
 
@@ -962,12 +981,11 @@ uv run python vla/4_vla_inference/4_2_pi0fast_pi05_infer/pi0fast_demo.py
 | 核心方法 | 基于 DCT + BPE 的动作 token 化，将高频动作信号压缩为少量高信息密度 token |
 | 通用 token 化器 | FAST+ 在 1M 轨迹上训练，可作为黑盒应用于任何机器人 |
 | 训练效率 | 与 diffusion $\pi_0$ 性能匹配，训练时间减少 5 倍 |
-| 首次突破 | 据作者所知，首次在 DROID 数据集上展示了无需 co-training 或 fine-tuning 的 zero-shot 语言条件 VLA policy |
-| 局限 | 推理速度较慢（~750ms vs ~100ms），尚未在移动机器人、灵巧手等平台上验证 policy 性能 |
+| 首次突破 | 论文称其首次在 DROID 数据集上展示了不做协同训练、也不做微调的零样本（zero-shot）语言条件 VLA 策略 |
 
 **局限性**
 
-- 推理速度较慢（~750ms vs ~100ms），限制了高动态任务的应用
+- 推理速度较慢：论文[10]报告单次约 750 ms，而 flow matching 的 $\pi_0$ 约 100 ms——压缩省下的是训练时间，不是推理时间，高动态任务仍然吃紧
 - 尚未在移动机器人、灵巧手、人形机器人等平台上验证 policy 性能
 - 自回归 VLA 与 diffusion VLA 的最优架构仍无定论
 
@@ -988,7 +1006,7 @@ $\pi_0$ 在实验室环境中展示了强大的操作能力，但一个根本问
 | 语义泛化 | 判断哪个抽屉放餐具、哪个是晾碗架 | 互联网视觉-语言知识 |
 | 任务规划 | 将"打扫厨房"分解为具体子任务 | 高层语义推理能力 |
 
-仅靠堆积机器人数据来覆盖所有可能场景是不现实的。$\pi_{0.5}$ 的核心思路是：**通过异构数据协同训练（co-training），从多种知识来源中迁移能力，实现开放世界泛化。**
+仅靠堆积机器人数据来覆盖所有可能场景是不现实的。$\pi_{0.5}$[11] 的核心思路是：**通过异构数据协同训练（co-training），从多种知识来源中迁移能力，实现开放世界泛化。**
 
 ### 5.1.2 $\pi_{0.5}$ 的核心定位
 
@@ -999,13 +1017,13 @@ $\pi_{0.5}$（读作 "pi oh five"）基于 $\pi_0$ 构建，是一个面向开�
 3. **从异构数据中迁移知识**：不仅使用移动操作数据，还利用其他机器人数据、网络数据、语言指令等
 4. **具备高层任务规划能力**：自主将"打扫厨房"分解为"拿起盘子"→"放入水槽"等子任务
 
-![$\pi_{0.5}$ 从异构数据源迁移知识：包括其他机器人、高层子任务预测、语言指令和网络数据，实现在全新家庭环境中的广泛泛化](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2504.16054v1/figures/pibnb-teaser-bedroom.png)
+![$\pi_{0.5}$ 从异构数据源迁移知识：包括其他机器人、高层子任务预测、语言指令和网络数据，实现在全新家庭环境中的广泛泛化（图片出自参考文献 11）](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2504.16054v1/figures/pibnb-teaser-bedroom_arxiv-2504.16054.png)
 
 ## 5.2 模型架构
 
 ### 5.2.1 总体结构
 
-![$\pi_{0.5}$ 模型总览：预训练阶段使用离散 token（FAST）训练标准自回归 Transformer；后训练阶段加入 Action Expert 使用 flow matching 生成连续动作。推理时先推断高层子任务，再生成低层动作](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2504.16054v1/figures/Figure_3.png)
+![$\pi_{0.5}$ 模型总览：预训练阶段使用离散 token（FAST）训练标准自回归 Transformer；后训练阶段加入 Action Expert 使用 flow matching 生成连续动作。推理时先推断高层子任务，再生成低层动作（图片出自参考文献 11）](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2504.16054v1/figures/fig11-5-pi05-model-overview_arxiv-2504.16054.png)
 
 $\pi_{0.5}$ 的架构继承自 $\pi_0$，但做了关键扩展——模型可以同时输出**文本**（用于高层子任务预测和 VLM 任务）和**连续动作**（用于机器人控制）。从推理流程看，可以把它理解为：
 
@@ -1020,7 +1038,7 @@ $$
 | $\hat{\ell}$ | 模型预测的子任务，如 "pick up the plate" |
 | $\mathbf{a}_{t:t+H}$ | 动作块（action chunk），对应 50 个控制步 |
 
-关键设计：**在运行时，模型先生成子任务文本，再把该文本作为低层动作推理的重要上下文。** 这让高层推理和低层控制通过子任务文本衔接，类似于思维链（Chain-of-Thought）推理。需要注意的是，论文的联合训练公式仍将 action expert 写成条件在文本 token 上，因此这里更适合理解为一种推理流程上的分层分解，而不是严格的概率图模型假设。
+关键设计：**在运行时，模型先生成子任务文本，再把该文本作为低层动作推理的重要上下文。** 这让高层推理和低层控制通过子任务文本衔接，类似于思维链（Chain-of-Thought）推理。不过论文的联合训练公式仍将 action expert 写成条件在文本 token 上，因此这里更适合理解为一种推理流程上的分层分解，而不是严格的概率图模型假设。
 
 ### 5.2.2 与 $\pi_0$ 的架构差异
 
@@ -1045,7 +1063,7 @@ $\pi_0$ 中，flow matching 时间步 $\tau$ 与带噪动作通过 MLP 融合后
 
 ### 5.2.4 注意力掩码
 
-![$\pi_{0.5}$ 的注意力掩码模式：图像和 prompt token 使用全前缀掩码；FAST action token 自回归地 attend 到前缀和之前的 action token；Action Expert 的 token attend 到前缀和彼此，但不 attend 到 FAST token](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2504.16054v1/figures/attention_mask.png){width=50%}
+![$\pi_{0.5}$ 的注意力掩码模式：图像和 prompt token 使用全前缀掩码；FAST action token 自回归地 attend 到前缀和之前的 action token；Action Expert 的 token attend 到前缀和彼此，但不 attend 到 FAST token（图片出自参考文献 11）](../../assets/figures/lecture11/ref/pi0fast_pi05/arXiv-2504.16054v1/figures/attention_mask_arxiv-2504.16054.png){width=50%}
 
 $\pi_{0.5}$ 的注意力掩码比 $\pi_0$ 更复杂，因为需要同时处理 FAST 离散 token 和 flow matching 连续 token：
 
@@ -1151,21 +1169,21 @@ cd code
 uv run python vla/4_vla_inference/4_2_pi0fast_pi05_infer/pi05_demo.py
 ```
 
-demo 与 $\pi_0$-FAST 在同一个模块目录（`4_2_pi0fast_pi05_infer/`），代码与 $\pi_0$ 的 demo
-逐行同构——**换模型只是换一行 `POLICY_PATH`**。这本身就是值得体会的一点：$\pi_{0.5}$
-的动作输出仍是 flow matching 连续动作头（5.4.2 节的 10 步积分 + action chunking），
-调用接口与 $\pi_0$ 完全一致；本节讲的离散 token 联合训练、分层推理都发生在训练配方与
-模型内部，对使用者不可见。
+demo 与 $\pi_0$-FAST 在同一个模块目录（`4_2_pi0fast_pi05_infer/`），与 $\pi_0$ 的 demo
+逐行同构——**换模型只是换一行 `POLICY_PATH`**。$\pi_{0.5}$ 的动作输出仍是 flow matching
+连续动作头（5.4.2 节的 10 步积分 + action chunking），本节讲的离散 token 联合训练、
+分层推理都发生在训练配方与模型内部，对使用者不可见。
 
-对照着跑 `pi0fast_demo.py` 和 `pi05_demo.py`，能直观确认本讲反复出现的判断：
-**自回归离散一路与连续动作头一路，在"怎么调用"上毫无差别，路线之争全部藏在
-`select_action` 内部**。
+把 `code/vla/4_vla_inference/4_2_pi0fast_pi05_infer/pi0fast_demo.py` 和
+`code/vla/4_vla_inference/4_2_pi0fast_pi05_infer/pi05_demo.py` 对照着跑一遍，3.7 节留下的那句话就落了地：一条自回归离散、一条连续
+流匹配，在"怎么调用"上毫无差别，路线之争全部藏在 `select_action` 内部。
 
-同一个任务、同一个初始状态下 125 步完成（$\pi_0$-FAST 是 129 步）；`pi05_eval.sh`
+同一个任务、同一个初始状态下 125 步完成（$\pi_0$-FAST 是 129 步）；
+`code/vla/4_vla_inference/4_2_pi0fast_pi05_infer/pi05_eval.sh`
 连评 2 个初始状态成功 1 个——单任务少量 episode 的成功率波动很大，只做冒烟参考，
 系统的成功率对比见各论文汇报的全套件数字：
 
-![$\pi_{0.5}$ 在 LIBERO 上的成功 rollout 关键帧，从左到右为同一局内的连续时刻：机械臂把盘子推到炉灶前方](../../assets/figures/lecture11/ref/pi0fast_pi05/rollout_keyframes_pi05.png){width=98%}
+![$\pi_{0.5}$ 在同一任务、同一初始状态下的关键帧，与 3.7、4.5 两节那两张构成一组三连对照（图片出自本书配套代码的实测录像）](../../assets/figures/lecture11/ref/pi0fast_pi05/rollout_keyframes_pi05.png){width=98%}
 
 ## 5.6 本节小结
 
@@ -1177,7 +1195,7 @@ demo 与 $\pi_0$-FAST 在同一个模块目录（`4_2_pi0fast_pi05_infer/`），
 | 两阶段训练 | 预训练用 FAST 离散 token（高效），后训练加入 flow matching（精细） |
 | 分层推理 | 同一模型先推断子任务文本，再生成低层动作，类似思维链 |
 | 语言指令数据 | 新颖的数据收集方式：人类用语言"遥操作"机器人，为高层策略提供示教 |
-| 开放世界泛化 | 据作者所知，首次展示端到端学习驱动的系统在全新家庭中执行 10-15 分钟的复杂操作任务 |
+| 开放世界泛化 | 论文称其首次展示了端到端学习驱动的系统在全新家庭中执行 10-15 分钟的复杂操作任务 |
 
 **局限性**
 
@@ -1189,11 +1207,13 @@ demo 与 $\pi_0$-FAST 在同一个模块目录（`4_2_pi0fast_pi05_infer/`），
 
 # 6 VLA-0：把动作直接当文本说出来
 
+VLA-0[12] 的主张只有一句话：前面几节给 VLM 做的那些手术，其实一个都不用做。
+
 ## 6.1 背景与动机
 
-### 6.1.1 到目前为止，所有 VLA 都在“改” VLM
+### 6.1.1 到目前为止，所有 VLA 都在"改" VLM
 
-从第 2 节的 OpenVLA 开始，本讲的模型都建立在同一个范式上：拿一个预训练好的视觉-语言模型（VLM），把它改造成能输出机器人动作的策略。问题在于，“怎么让 VLM 输出动作”这件事，大家都觉得需要给 VLM **动手术**。手术大致分两类：
+从第 2 节的 OpenVLA 开始，本讲的模型都建立在同一个范式上：拿一个预训练好的视觉-语言模型（VLM），把它改造成能输出机器人动作的策略。问题在于，"怎么让 VLM 输出动作"这件事，大家都觉得需要给 VLM **动手术**。手术大致分两类：
 
 ::: {tbl-colwidths="[22,22,56]"}
 
@@ -1204,7 +1224,7 @@ demo 与 $\pi_0$-FAST 在同一个模块目录（`4_2_pi0fast_pi05_infer/`），
 
 :::
 
-![现有 VLA 大多要给 VLM “加东西”。从左到右：离散 token VLA（如 OpenVLA）外加动作 detokenizer 与专门的动作 token；生成式动作头 VLA（如 $\pi_0$/$\pi_{0.5}$）外挂一个 Action Expert；定制结构 VLA（如 OpenVLA-OFT）改成并行解码并用 FiLM 注入；而最右侧的 VLA-0（图中标作本文方法）只用文本与图像 token，不加任何额外动作 token、也不加动作头](../../assets/figures/lecture11/ref/vla0/comp_fig_horizontal.png)
+![现有 VLA 大多要给 VLM "加东西"。从左到右：离散 token VLA（如 OpenVLA）外加动作 detokenizer 与专门的动作 token；生成式动作头 VLA（如 $\pi_0$/$\pi_{0.5}$）外挂一个 Action Expert；定制结构 VLA（如 OpenVLA-OFT）改成并行解码并用 FiLM 注入；而最右侧那一列就是 VLA-0，只用文本与图像 token，不加任何额外动作 token、也不加动作头——注意图里把它印成了 `SimpleVLA (Ours)`，与正文用的名字不同，指的是同一个方法（图片出自参考文献 12）](../../assets/figures/lecture11/ref/vla0/comp_fig_horizontal_arxiv-2510.13054.png)
 
 这两类手术都有代价。改词表会破坏 VLM 原有的词汇结构、削弱语言能力（OpenVLA 那一讲已经讲过这个折中）；换专用动作头则要从零训练一个新模块，还往往需要大规模机器人数据预训练才能训好。
 
@@ -1212,30 +1232,30 @@ demo 与 $\pi_0$-FAST 在同一个模块目录（`4_2_pi0fast_pi05_infer/`），
 
 退一步看：机器人动作不过就是**几个数**——末端位姿增量、夹爪开合，七八个浮点数而已。而 VLM 在互联网规模的预训练里，早就学会了读写数字（做数学题、识别票据金额、数物体个数）。
 
-那么一个近乎“偷懒”的想法是：**为什么不干脆让 VLM 把动作当普通文本，直接把数字“说”出来？**
+那么一个近乎"偷懒"的想法是：**为什么不干脆让 VLM 把动作当普通文本，直接把数字"说"出来？**
 
 ```text
 输入：[图像] + "把茄子放进盆里"
 输出（模型直接生成的文本）："128 240 12 5 ..."
 ```
 
-![VLA-0 的核心思路：把图像和指令喂给一个**完全没改动**的 VLM，让它像写普通回答一样，直接吐出一串整数（图中绿色的 Action (Text)），再把这串数字解析回机器人动作。指令是 “Place the cupcake in the bowl”](../../assets/figures/lecture11/ref/vla0/vla0_teaser.png)
+![VLA-0 的核心思路：把图像和指令喂给一个**完全没改动**的 VLM，让它像写普通回答一样，直接吐出一串整数（图中绿色的 Action (Text)），再把这串数字解析回机器人动作。指令是 "Place the cupcake in the bowl"（图片出自参考文献 12）](../../assets/figures/lecture11/ref/vla0/vla0_teaser_arxiv-2510.13054.png)
 
-不造新 token，不加新头，就用模型本来就会的“输出一串数字”的能力。这个最朴素的策略，恰恰一直没人认真试过——大家默认它太简单、肯定打不过精心设计的动作 token 和动作头。
+不造新 token，不加新头，就用模型本来就会的"输出一串数字"的能力。这个最朴素的策略，恰恰一直没人认真试过——大家默认它太简单、肯定打不过精心设计的动作 token 和动作头。
 
 ### 6.1.3 VLA-0 的主张：零改装
 
-VLA-0 把这个想法做到底，并起名 **“zero modification”（零改装）**：
+VLA-0 把这个想法做到底，并起名 **"zero modification"（零改装）**：
 
 1. 拿一个**完全不改**的现成 VLM（官方用 Qwen2.5-VL-3B-Instruct）。
 2. 把动作表示成**文本里的整数**，让模型像写普通回答一样把它们生成出来。
 3. 只做标准的**监督微调（SFT）**，**不做**任何大规模机器人数据预训练。
 
-结论很反直觉：就这么个最简方案，性能反而做到了 SOTA——在 LIBERO 上不仅超过同样数据训练的方法，还压过了用了大规模预训练的 $\pi_0$、GR00T-N1 等大块头。
+结论很反直觉：就这么个最简方案，性能反而做到了 SOTA——在 LIBERO 上不仅超过同样数据训练的方法，还压过了用了大规模预训练的 $\pi_0$、GR00T N1 等大块头。
 
 ## 6.2 方法：动作即文本
 
-VLA-0 的全部技术含量，集中在“怎么把动作表示成文本”这一步上。模型结构本身没有任何改动，所以这一节不讲架构，只讲表示。
+VLA-0 的全部技术含量，集中在"怎么把动作表示成文本"这一步上。模型结构本身没有任何改动，所以这一节不讲架构，只讲表示。
 
 ### 6.2.1 把动作离散化成整数，再打印成数字串
 
@@ -1251,7 +1271,7 @@ $$
 |------|------|----------|
 | $a_i$ | 第 $i$ 维的连续动作值 | —— |
 | $a_{\min}, a_{\max}$ | 该维度的取值范围 | 由数据统计得到 |
-| $N$ | 离散 bin 数（配置项 `num_bins_actions`） | 官方若干百；小模型版本 512 |
+| $N$ | 离散 bin 数 | 本课用的 0.5B 版本取 512（LeRobot 策略配置里的 `n_state_bins`） |
 
 :::
 
@@ -1261,23 +1281,23 @@ $$
 
 ### 6.2.2 受约束解码：逼模型只吐合法的数字
 
-“让模型自由生成文本”有个风险：它可能多说一句话、少写一个数、或者把数字写成中文。动作解析需要**恰好 $H \times A$ 个整数**，格式不能错。
+"让模型自由生成文本"有个风险：它可能多说一句话、少写一个数、或者把数字写成中文。动作解析需要**恰好 $H \times A$ 个整数**，格式不能错。
 
-VLA-0 用**受约束解码（grammar-constrained decoding）**解决：在生成时挂一个语法，强制输出必须是“恰好 N 个整数”的形式（实现上用 xgrammar 这类工具构造一个 `恰好N个数字` 的语法约束）。这样无论模型本身多“话痨”，落到纸面上的一定是一串干净、可解析的数字。
+VLA-0 用**受约束解码（grammar-constrained decoding）**解决：在生成时挂一个语法，强制输出必须是"恰好 N 个整数"的形式（实现上用 xgrammar 这类工具构造一个 `恰好N个数字` 的语法约束）。这样无论模型本身多"话痨"，落到纸面上的一定是一串干净、可解析的数字。
 
-> 备注：受约束解码不改模型权重、不改架构，只是在**推理时**限制采样空间。所以它和“零改装”的主张不冲突——VLM 还是那个 VLM。
+> 备注：受约束解码不改模型权重、不改架构，只是在**推理时**限制采样空间。所以它和"零改装"的主张不冲突——VLM 还是那个 VLM。
 
-### 6.2.3 为什么“只是说数字”反而好用
+### 6.2.3 为什么"只是说数字"反而好用
 
-直觉上，把动作塞进新造的 token（OpenVLA / $\pi_0$-FAST / VQ）或专用动作头，似乎更“专业”。但它们都有一个隐藏成本：**那些新 token 的 embedding、那个新动作头，都是随机初始化、从零学起的**，VLM 在预训练里积累的知识帮不上忙，得靠机器人数据硬训。
+直觉上，把动作塞进新造的 token（OpenVLA / $\pi_0$-FAST / VQ）或专用动作头，似乎更"专业"。但它们都有一个隐藏成本：**那些新 token 的 embedding、那个新动作头，都是随机初始化、从零学起的**，VLM 在预训练里积累的知识帮不上忙，得靠机器人数据硬训。
 
-VLA-0 反过来想：数字“128”“240”这些 token，VLM 在预训练里已经见过无数次，词表和 embedding 都是现成的。**把动作落在模型已有的表示上，就不必从随机初始化开始学一批新的动作 token**——这是一种可能的解释，也是它不需要大规模机器人预训练也能打过部分需要预训练方法的候选原因之一。
+VLA-0 反过来想：数字"128""240"这些 token，VLM 在预训练里已经见过无数次，词表和 embedding 都是现成的。**把动作落在模型已有的表示上，就不必从随机初始化开始学一批新的动作 token**——这是一种可能的解释，也是它不需要大规模机器人预训练也能打过部分需要预训练方法的候选原因之一。
 
 不过要留一句边界：从"预训练见过数字"到"机器人动作迁移得更好"这条因果链，并没有被单独的消融实验证明过。数字在动作序列里主要充当编码符号，未必在用它的自然语言语义；实际收益也可能同时来自受约束解码、离散化方案和整套训练配方。所以把它当作**假设**看，不要当作已证结论。
 
 ### 6.2.4 训练：就是一次普通的 SFT
 
-既然不改结构、不加模块，训练就退化成最标准的事：把“图像 + 指令 → 动作数字串”当成普通的指令微调样本，对 VLM 做监督微调（只在动作那段文本上算 loss）。没有 VQ-VAE 预训练、没有 flow/diffusion 的特殊训练目标、没有多阶段流程。
+既然不改结构、不加模块，训练就退化成最标准的事：把"图像 + 指令 → 动作数字串"当成普通的指令微调样本，对 VLM 做监督微调（只在动作那段文本上算 loss）。没有 VQ-VAE 预训练、没有 flow/diffusion 的特殊训练目标、没有多阶段流程。
 
 ## 6.3 和 OpenVLA 的关系：把离散思路推到极简
 
@@ -1293,11 +1313,11 @@ VLA-0 反过来想：数字“128”“240”这些 token，VLM 在预训练里�
 
 :::
 
-一句话：OpenVLA 证明了“VLA 可以用离散 token 自回归地生成动作”，但为此动了词表；VLA-0 说，连词表都不用动——**动作就是几个数，让模型照着说出来就行**。它是 OpenVLA 离散路线的极简版。
+一句话：OpenVLA 证明了"VLA 可以用离散 token 自回归地生成动作"，但为此动了词表；VLA-0 说，连词表都不用动——**动作就是几个数，让模型照着说出来就行**。它是 OpenVLA 离散路线的极简版。
 
 ## 6.4 两个版本：3B 官方版 与 0.5B 小型版
 
-VLA-0 的“零改装”思路不挑骨干，于是有两档实现，课程后面会用到：
+VLA-0 的"零改装"思路不挑骨干，于是有两档实现，第12讲的微调实验和第15讲的强化学习后训练都会用到：
 
 ::: {tbl-colwidths="[16,26,10,48]"}
 
@@ -1308,19 +1328,21 @@ VLA-0 的“零改装”思路不挑骨干，于是有两档实现，课程后�
 
 :::
 
-> 备注：本讲之后的 VLA-0 微调实验，以及强化学习部分对 VLA-0 的后训练，都采用 **0.5B 的 vla0_smol**。原因是它在单张消费级显卡上就能完成监督微调与后续的强化学习后训练，并且天生接在 LeRobot/SO101 这套实验体系里——这两点 3B 版本都做不到那么顺。
+> 备注：第12讲的 VLA-0 微调实验、以及第15讲对 VLA-0 的强化学习后训练，都采用 **0.5B 的 vla0_smol**。原因是它在单张消费级显卡上就能完成监督微调与后续的强化学习后训练，并且天生接在 LeRobot / SO-101 这套实验体系里——这两点 3B 版本都做不到那么顺。
 
 ## 6.5 上手：跑一次 VLA-0 推理
 
 "动作就是一串数字"最好的证明方式，是把模型的原始输出打印出来看。配套代码仓的
-`experiments/vla/4_vla_inference/4_3_vla0_infer/` 加载 0.5B 的 vla0_smol
-checkpoint（强化学习部分 GRPO 后训练的产物，本地训练产物目录），闭环一次并把
+`code/vla/4_vla_inference/4_3_vla0_infer/` 加载 0.5B 的 vla0_smol
+checkpoint（第15讲 GRPO 后训练跑出来的权重，落在本机训练产物目录下），闭环一次并把
 第一个动作块的原始文本打印出来：
 
 ```bash
 cd code
 uv run python vla/4_vla_inference/4_3_vla0_infer/vla0_demo.py
 ```
+
+这一个 demo 与本讲其余五个不同：它读的权重是**第15讲 GRPO 后训练自己跑出来的产物**，落在本机训练产物目录下，没有可自动下载的公开版本。还没跑过第15讲的话，这里先看下面的输出即可，想亲手跑一遍就换成 `code/vla/4_vla_inference/4_4_smolvla_infer/` 那个——它的权重会自动从 Hub 拉。
 
 ```text
 数字串（8步×7维）: 255 255 255 215 255 253 0 255 255 255 215 255 253 0 ...
@@ -1336,7 +1358,12 @@ uv run python vla/4_vla_inference/4_3_vla0_infer/vla0_demo.py
 任务「pick up the alphabet soup and place it in the basket」（libero_object）
 固定初始状态下 154 步完成：
 
-![VLA-0 在 LIBERO 上的成功 rollout 关键帧，从左到右为同一局内的连续时刻：机械臂拿起字母汤罐头放进篮子](../../assets/figures/lecture11/ref/vla0/rollout_keyframes.png){width=98%}
+![VLA-0 跑通「拿起字母汤罐头放进篮子」的关键帧。画面里的每一个关节增量，都是从上面那串整数解码回来的（图片出自本书配套代码的实测录像）](../../assets/figures/lecture11/ref/vla0/rollout_keyframes.png){width=98%}
+
+想连评多个初始状态，同目录的 `code/vla/4_vla_inference/4_3_vla0_infer/vla0_eval.sh`
+是对应的 `lerobot-eval` 入口。它和另外四个模块有一处不同：指向的是第15讲训练产物
+目录里的本地权重，而不是 Hugging Face 上的公开 checkpoint——没跑过第15讲的 GRPO
+后训练，就没有这份权重。
 
 ## 6.6 本节小结
 
@@ -1346,9 +1373,9 @@ uv run python vla/4_vla_inference/4_3_vla0_infer/vla0_demo.py
 
 **推理时**：图像 + 指令 → VLM 在受约束解码下吐出恰好 $H \times A$ 个整数 → 反离散化还原成连续动作 → 下发机器人。
 
-把它放回本讲的脉络：到 VLA-0 为止，**离散 token 这条路被走到了极简的尽头**——连词表都不必动。接下来的 SmolVLA 会押注另一边：放弃“纯文本说数字”的简单性，改用 **flow matching 的连续动作头**，用一次前向直接生成整段连续动作，把推理速度和效率拉上来。也就是说，VLA-0 与 SmolVLA 是同一量级、都能上 LeRobot 的两个小模型，却代表了**离散 vs. 连续（flow）两种相反的动作头哲学**——接下来的 SmolVLA（第 7 节）就走 flow 这条路。
+把它放回本讲的脉络：到 VLA-0 为止，**离散 token 这条路被走到了极简的尽头**——连词表都不必动。接下来的 SmolVLA 会押注另一边：放弃"纯文本说数字"的简单性，改用 **flow matching 的连续动作头**，用一次前向直接生成整段连续动作，把推理速度和效率拉上来。这两个模型量级相同、都能挂上 LeRobot，动作头哲学却正好相反：一个把动作当文本说出来，一个把动作从噪声里流出来。
 
-参考表（关键事实一览）：
+参考表（关键事实一览，数字均出自论文[12]）：
 
 ::: {tbl-colwidths="[26,74]"}
 
@@ -1359,13 +1386,13 @@ uv run python vla/4_vla_inference/4_3_vla0_infer/vla0_demo.py
 | 对 VLM 改动 | 零（不改词表、不加动作头） |
 | 解码 | 受约束解码，强制恰好 $H\times A$ 个整数 |
 | 训练 | 纯 SFT，无大规模机器人预训练 |
-| LIBERO | 94.7%（超过用了大规模预训练的 $\pi_0$ / GR00T-N1） |
+| LIBERO | 94.7%（超过用了大规模预训练的 $\pi_0$ / GR00T N1） |
 | 真机 SO-100 | 比 SmolVLA 高约 12.5 个百分点 |
 | 主要代价 | 自回归推理慢（约 4 Hz） |
 
 :::
 
-> 一句话总结：VLA-0 不给 VLM 做任何手术，只把动作离散成整数、当普通文本让模型“说”出来，再用受约束解码保证格式，就把 OpenVLA 的离散路线推到了极简，并在零改装、纯 SFT 下做到了 SOTA——代价是自回归推理偏慢。
+> 一句话总结：VLA-0 不给 VLM 做任何手术，只把动作离散成整数、当普通文本让模型"说"出来，再用受约束解码保证格式，就把 OpenVLA 的离散路线推到了极简，并在零改装、纯 SFT 下做到了 SOTA——代价是自回归推理偏慢。
 
 **局限性**
 
@@ -1375,9 +1402,12 @@ uv run python vla/4_vla_inference/4_3_vla0_infer/vla0_demo.py
 
 # 7 SmolVLA：小模型与异步推理
 
-![SmolVLA 架构总览：紧凑的预训练 VLM 丢弃后半层（剪刀图标），剩余层编码语言指令、RGB 图像和机器人状态。合并后的 token 送入交替 cross-attention 和 self-attention 块组成的 Action Expert，通过 flow matching 输出动作序列](../../assets/figures/lecture11/ref/smolvla/arXiv-2506.01844v1/figures/SmolVLA.png)
+SmolVLA[13] 把同一套「VLM 出条件、动作专家出动作」的结构压到了 0.45B。下面这张架构图
+里最显眼的是那把剪刀——VLM 的后半层被整个丢掉了。
 
-本讲前面介绍的 $\pi_0$ 系列（第 3、4、5 节），以及像 NVIDIA GR00T N1 这样的工业级 VLA，分别代表了两条技术路线：大规模异构数据协同训练和跨构型统一架构。这些模型虽然性能强大，但都依赖大量私有数据和昂贵的计算资源（$\pi_0$ 使用 ~10,000 小时机器人数据，GR00T N1 消耗 ~50,000 H100 GPU 小时预训练）。本节介绍 Hugging Face 的 SmolVLA——一个仅 450M 参数的开源 VLA 模型，它从一个截然不同的角度回答了一个关键问题：**在数据和算力都极其有限的条件下，能否训练出一个实用的通用机器人策略？**
+![SmolVLA 架构总览：紧凑的预训练 VLM 丢弃后半层（剪刀图标），剩余层编码语言指令、RGB 图像和机器人状态。合并后的 token 送入交替 cross-attention 和 self-attention 块组成的 Action Expert，通过 flow matching 输出动作序列（图片出自参考文献 13）](../../assets/figures/lecture11/ref/smolvla/arXiv-2506.01844v1/figures/SmolVLA_arxiv-2506.01844.png)
+
+本讲前面介绍的 $\pi_0$ 系列（第 3、4、5 节），以及像 NVIDIA GR00T N1[14] 这样的工业级 VLA，分别代表了两条技术路线：大规模异构数据协同训练和跨构型统一架构。它们性能强大，门槛也同样高：私有数据、多卡集群、上千小时的采集，缺一条都复现不了。本节介绍 Hugging Face 的 SmolVLA——一个仅 450M 参数的开源 VLA 模型，它从截然相反的方向问了一个问题：**在数据和算力都极其有限的条件下，能不能训出一个实用的通用机器人策略？**
 
 ## 7.1 背景与动机
 
@@ -1388,7 +1418,7 @@ uv run python vla/4_vla_inference/4_3_vla0_infer/vla0_demo.py
 | 障碍 | 具体表现 |
 |---|---|
 | 模型规模大 | OpenVLA 7B、$\pi_0$ 3.3B，训练和推理都需要高端 GPU |
-| 数据依赖重 | $\pi_0$ 使用 ~10,000 小时私有机器人数据，GR00T N1 使用 ~8,000 小时多源数据 |
+| 数据依赖重 | $\pi_0$ 使用 ~10,000 小时私有机器人数据，GR00T N1 使用 ~8,000 小时多源数据（两个数字均引自 SmolVLA 论文[13]的对照） |
 | 硬件门槛高 | 评估通常依赖 Franka Panda 等昂贵机器人平台（单台数万美元） |
 
 ### 7.1.2 SmolVLA 的核心思路
@@ -1409,7 +1439,7 @@ SmolVLA 的设计遵循三个核心原则：
 
 | 原则 | 内容 |
 |---|---|
-| 轻量高效 | 跳过 VLM 后半层、减少视觉 token、使用小型预训练 VLM、交替 CA/SA 注意力 |
+| 轻量高效 | 跳过 VLM 后半层、减少视觉 token、使用小型预训练 VLM、交叉注意力（cross-attention, CA）与自注意力（self-attention, SA）交替排列 |
 | 社区数据驱动 | 完全基于公开的社区贡献数据集预训练，不依赖任何私有数据 |
 | 异步推理 | 解耦动作执行与观测处理，消除推理延迟，提升实时响应能力 |
 
@@ -1430,6 +1460,8 @@ $$
 | 总计 | — | — | 450M |
 
 #### （1）与 $\pi_0$ 和 GR00T N1 的架构对比
+
+这张横向对照表整理自 SmolVLA 论文[13]，$\pi_0$ 与 GR00T N1 两列是它对两个大模型的归纳。
 
 | 特性 | SmolVLA | $\pi_0$ | GR00T N1 |
 |---|---|---|---|
@@ -1452,7 +1484,7 @@ SmolVLA 使用 SmolVLM-2 作为 VLM 骨干，这是 Hugging Face 开发的一个
 
 VLM 的输入处理流程：
 
-1. 多个 RGB 相机图像经 SigLIP 编码，通过 pixel shuffle 压缩为每帧 64 个视觉 token
+1. 多个 RGB 相机图像经 SigLIP 编码，再用 pixel shuffle（把相邻空间位置的特征堆到通道维上，用分辨率换通道数）压缩为每帧 64 个视觉 token
 2. 语言指令被 tokenize 为文本 token
 3. 机器人状态被线性投影为 1 个状态 token
 4. 三类 token 拼接后送入语言解码器
@@ -1475,7 +1507,7 @@ $$
 N = \frac{L}{2} \quad \Longrightarrow \quad \text{VLM 和 Action Expert 的计算量各减半}
 $$
 
-实验表明（在 LIBERO 上），使用前 16 层（共 32 层）的效果与使用全部层相当，但计算成本减半。此外，从大 VLM 跳层的效果优于直接使用更小的 VLM（256M），说明大模型的前半层特征质量确实更高。
+论文[13]在 LIBERO 上的实验表明，使用前 16 层（共 32 层）的效果与使用全部层相当，但计算成本减半。此外，从大 VLM 跳层的效果优于直接使用更小的 VLM（256M），说明大模型的前半层特征质量确实更高。
 
 ### 7.2.3 Action Expert：Flow Matching Transformer
 
@@ -1497,7 +1529,7 @@ $$
 
 其中 $\mathbf{o}_t$ 是 VLM 第 $N$ 层输出的特征。推理时使用 10 步前向 Euler 积分生成动作——方向必须和训练时的向量场一致：$\tau$ 从 0 走到 1、速度指向数据，才能积分到动作而不是积回噪声。
 
-在论文的这组消融里，flow matching 比 L1 回归在 LIBERO 上平均成功率高约 5 个百分点（80.25% vs 75.25%）；作者把它归因于生成式建模对多模态动作分布的表达能力。要注意单个消融只能说明该设置下成绩更高，优化、容量、损失尺度或超参差异都还没被排除，确切的因果机制仍需更多受控消融。
+在论文[13]的这组消融里，flow matching 比 L1 回归在 LIBERO 上平均成功率高约 5 个百分点（80.25% vs 75.25%）；作者把它归因于生成式建模对多模态动作分布的表达能力。要注意单个消融只能说明该设置下成绩更高，优化、容量、损失尺度或超参差异都还没被排除，确切的因果机制仍需更多受控消融。
 
 #### （2）交替 Cross-Attention 和因果 Self-Attention
 
@@ -1508,7 +1540,11 @@ $$
 | Cross-Attention (CA) | 动作 token attend 到 VLM 特征 | 将视觉-语言理解注入动作生成 |
 | 因果 Self-Attention (SA) | 动作 token attend 到之前的动作 token | 时序建模，确保动作平滑性 |
 
-这种交替设计的优势在消融实验中得到了验证：
+![三种连接方式在结构上到底差在哪。左：SmolVLA 的 Action Expert，每个块**只放一种**注意力，CA 与 SA 交替堆叠；CA 块的 key/value 来自左侧那个冻结 VLM 的前 $N$ 层输出（灰色虚线箭头），SA 块只在动作 token 序列内部走动。中：$\pi_0$ 把动作 token 和 VLM token 放进同一个序列，全是 SA，靠 MoE 路由分工。右：GR00T N1 是 Flamingo 式，CA 与 SA 挤在同一个块里。底部的下三角格子是 SA 用的因果掩码：绿色格子表示这个查询能看到的位置，只有它自己和它之前的（本书自绘）](../../assets/figures/lecture11/ref/fig11-7-alternating-ca-sa.png){width=100%}
+
+7.2.1 那张对照表里的"交替 CA + 因果 SA / 共享 Transformer + MoE 路由 / Cross-Attention（Flamingo 风格）"三个短语，说的就是图上这三竖列。**关键差别不在用不用 CA，而在 CA 和 SA 是不是被拆进不同的块**：中间那一列根本没有 CA，动作 token 靠"和 VLM token 挤在同一个序列里"来拿信息；右边那一列每个块都要同时算 CA 和 SA；只有左边这一列把两者拆开、轮流上。同样画四个块，左列里只有两个要去 attend VLM，右列四个块每一个都得算一遍 CA 再算一遍 SA——7.1.3 把"CA 与 SA 交替排列"和跳层、减视觉 token 一起列在"轻量高效"这条原则下，指的就是这个。至于左列 SA 块上那个"因果"，指的是底部那张下三角掩码：动作 token 只能往回看，看不到自己后面的动作。
+
+这种交替设计的优势在论文[13]的消融实验中得到了验证（下面三张消融表的数字都出自该文）：
 
 | 注意力机制 | Spatial | Object | Goal | Long | 平均 |
 |---|---|---|---|---|---|
@@ -1516,9 +1552,9 @@ $$
 | 仅 SA | 80 | 94 | 84 | 40 | 74.5 |
 | CA+SA（交替，SmolVLA） | 86 | 99 | 90 | 67 | 85.5 |
 
-交替 CA+SA 比纯 CA 高 6.5%，比纯 SA 高 11%。CA 确保动作与感知和指令对齐，SA 提升时序平滑性——在真实机器人上，不平滑的动作预测会导致不安全或不稳定的行为。
+交替 CA+SA 比纯 CA 高 6.5 个百分点，比纯 SA 高 11 个百分点。CA 确保动作与感知和指令对齐，SA 提升时序平滑性——在真实机器人上，不平滑的动作预测会导致不安全或不稳定的行为。
 
-此外，SA 层使用因果掩码（每个动作 token 只能 attend 到之前的 token），而非双向注意力。实验表明因果注意力（74.5%）显著优于双向注意力（67.5%），防止未来动作信息泄漏对性能至关重要。
+此外，SA 层使用因果掩码（每个动作 token 只能 attend 到之前的 token），而非双向注意力。论文[13]报告因果注意力（74.5%）显著优于双向注意力（67.5%，该行未列入上表），防止未来动作信息泄漏对性能至关重要。
 
 #### （3）状态信息的注入位置
 
@@ -1529,7 +1565,7 @@ SmolVLA 将机器人状态投影为 token 后送入 VLM（作为前缀），而�
 | VLM（前缀） | CA | 89 | 94 | 85 | 53 | 80.3 |
 | Expert（后缀） | CA | 86 | 82 | 78 | 47 | 73.3 |
 
-将状态送入 VLM 比送入 Action Expert 高 7%，说明让 VLM 同时理解视觉、语言和本体感知状态的联合表示更有效。
+将状态送入 VLM 比送入 Action Expert 高 7 个百分点，说明让 VLM 同时理解视觉、语言和本体感知状态的联合表示更有效。
 
 #### （4）Action Chunk 大小
 
@@ -1549,7 +1585,7 @@ SmolVLA 默认预测 $n = 50$ 步的动作 chunk。消融实验表明 chunk 大�
 
 ### 7.3.1 数据来源：LeRobot 社区数据集
 
-与 $\pi_0$（~10,000 小时私有数据）和 GR00T N1（~8,000 小时多源数据）不同，SmolVLA 的预训练数据完全来自公开的社区贡献数据集——在 Hugging Face Hub 上以 `lerobot` 标签共享的机器人数据集。这些数据由全球各地的研究者和爱好者在不同环境中收集，从实验室到家庭，自然地涵盖了多样化的场景。
+7.1.1 那张表里的两个千小时量级，在 SmolVLA 这里一个都不适用：它的预训练数据完全来自公开的社区贡献数据集——在 Hugging Face Hub 上以 `lerobot` 标签共享的机器人数据集。这些数据由全球各地的研究者和爱好者在不同环境中收集，从实验室到家庭，自然地涵盖了多样化的场景。
 
 | 统计量 | 数值 |
 |---|---|
@@ -1598,13 +1634,13 @@ SmolVLA 借鉴 LLM 的训练范式，采用预训练 + 后训练的两阶段方�
 
 关键设计：**VLM 在整个训练过程中完全冻结**，只训练 Action Expert。这与 $\pi_0$（微调 VLM 非语言部分）和 GR00T N1（微调视觉编码器和 DiT）不同，进一步降低了训练成本。
 
-预训练的效果非常显著：在 SO100 真机任务上，不经预训练的 SmolVLA 平均成功率为 51.7%，经社区数据预训练后跃升至 78.3%，绝对提升 26.6%。
+预训练的效果非常显著：在 SO-100 真机任务上，不经预训练的 SmolVLA 平均成功率为 51.7%，经社区数据预训练后跃升至 78.3%，高出 26.6 个百分点。
 
 ## 7.4 异步推理
 
 ### 7.4.1 同步推理的问题
 
-![异步推理示意：策略可以运行在远程服务器上（可能配有 GPU），RobotClient 和 PolicyServer 解耦运行](../../assets/figures/lecture11/ref/smolvla/arXiv-2506.01844v1/figures/async_inference.png)
+![异步推理示意：策略可以运行在远程服务器上（可能配有 GPU），RobotClient 和 PolicyServer 解耦运行（图片出自参考文献 13）](../../assets/figures/lecture11/ref/smolvla/arXiv-2506.01844v1/figures/async_inference_arxiv-2506.01844.png)
 
 现代视觉运动策略输出 action chunk——一次预测多步动作。标准的同步（sync）推理模式下，机器人执行完整个 chunk 后才采集新观测并预测下一个 chunk。这导致两个问题：
 
@@ -1654,22 +1690,25 @@ $$
 
 ## 7.5 上手：跑一次 SmolVLA 推理
 
+配套代码仓的 `code/vla/4_vla_inference/4_4_smolvla_infer/` 加载 SmolVLA 的 LIBERO
+微调 checkpoint 闭环一次：
+
 ```bash
 cd code
 uv run python vla/4_vla_inference/4_4_smolvla_infer/smolvla_demo.py
 ```
 
 代码依旧与 $\pi_0$ 的 demo 逐行同构——这已经是本讲第 5 个共用同一段闭环模板的模型。
-体感上的差别在于**规模**：0.45B 的 SmolVLA 加载和每步推理都比 4_1 的 7B OpenVLA
+体感上的差别在于**规模**：0.45B 的 SmolVLA 加载和每步推理都比 2.6 节那个 7B 的 OpenVLA
 快一个数量级，这就是 7.1 节"可及性"设计目标最直接的兑现。同一个任务
 「push the plate to the front of the stove」126 步完成：
 
-![SmolVLA 在 LIBERO 上的成功 rollout 关键帧，从左到右为同一局内的连续时刻：机械臂把盘子推到炉灶前方](../../assets/figures/lecture11/ref/smolvla/rollout_keyframes.png){width=98%}
+![SmolVLA 在同一任务、同一初始状态下的关键帧。0.45B 的模型，轨迹与前面几个大一个数量级的模型看不出差别（图片出自本书配套代码的实测录像）](../../assets/figures/lecture11/ref/smolvla/rollout_keyframes.png){width=98%}
 
-标准评测入口 `smolvla_eval.sh` 里有个值得一提的细节：这个 checkpoint 训练时相机
+标准评测入口 `code/vla/4_vla_inference/4_4_smolvla_infer/smolvla_eval.sh` 里有个细节值得一提：这个 checkpoint 训练时相机
 名叫 `camera1/2/3`，而 LIBERO 环境给出的两路观测叫 `image/image2`，评测命令用
 `--rename_map` 把观测键改名对齐——特征名对齐是部署 VLA 时最常见的一类"接线"工作
-（第8讲部署四关的口径问题，在这里又出现了一次）。
+（第8讲 3.5 节那张出发前检查单里的口径问题，在这里又出现了一次）。
 
 刚讲完的异步推理没有出现在这段代码里：demo 是同步闭环，异步化是把同一个
 `select_action` 搬进 PolicyServer、与机器人端解耦的部署层改造，模型与本 demo 的
@@ -1683,29 +1722,21 @@ uv run python vla/4_vla_inference/4_4_smolvla_infer/smolvla_demo.py
 |---|---|
 | 极致轻量化架构 | 450M 参数，通过层跳过、视觉 token 压缩、缩小 Action Expert 等手段实现消费级硬件可用 |
 | 交替 CA/SA 注意力 | Action Expert 中交替使用 cross-attention 和因果 self-attention，兼顾感知对齐和时序平滑 |
-| 社区数据预训练 | 论文表明仅用 ~23K 条公开社区数据预训练也能显著提升 VLA 性能（+26.6%） |
+| 社区数据预训练 | 论文表明仅用 ~23K 条公开社区数据预训练也能显著提升 VLA 性能（+26.6 个百分点） |
 | 异步推理 | 模型无关的推理优化，解耦动作执行与观测处理，速度提升 ~30%，吞吐量翻倍 |
 | 完全开源 | 模型权重、训练代码、数据集、硬件设计全部公开，降低社区参与门槛 |
 
 **局限性**
 
-#### （1）当前局限
-
-- **数据集多样性不足**：预训练数据主要来自 SO100 单一构型，跨构型泛化能力有限
+- **数据集多样性不足**：预训练数据主要来自 SO-100 单一构型，跨构型泛化能力有限
 - **数据规模小**：~23K 条轨迹远小于 OpenVLA 的 ~1M 条，扩大数据规模可能带来显著提升
 - **VLM 骨干非最优**：SmolVLM-2 主要针对文档阅读和 OCR 预训练，未必是机器人交互场景的最优选择
 - **任务复杂度有限**：目前主要评估短时简单任务，缺乏长时间多阶段任务的能力
 - **缺乏多模态联合训练**：未像 $\pi_{0.5}$ 那样利用网络多模态数据增强语义理解
 - **仅使用模仿学习**：未探索强化学习等可能带来更灵活策略适应的学习范式
 
-#### （2）未来方向
-
-- **扩大社区数据规模**：随着更多社区贡献者加入，数据量和多样性将持续增长
-- **跨构型预训练**：引入多种机器人构型的数据，提升跨平台泛化能力
-- **更适合机器人的 VLM**：探索针对物理交互场景优化的 VLM 预训练策略
-- **多模态联合训练**：结合机器人数据和网络多模态数据，提升指令跟随和语义理解能力
-- **长时间任务**：引入层次化策略或多级规划机制，处理更复杂的长时间任务
-- **强化学习**：探索 RL 微调以提升策略的灵活性和鲁棒性
+这六条几乎条条指向同一个根源——数据只有 23K 条、且几乎全来自 SO-100 一种构型。
+把社区数据的规模和构型铺开，是这条路线最直接的下一步。
 
 # 8 本讲小结
 
@@ -1716,9 +1747,15 @@ uv run python vla/4_vla_inference/4_4_smolvla_infer/smolvla_demo.py
 - **离散自回归一路**：把动作切成整数、当 token 逐个解码。OpenVLA 用双视觉编码器 + Llama 2 7B 把动作离散成 bin；$\pi_0$-FAST 用 DCT + BPE 把动作压成信息量更高的 token，治好高频下逐维分 bin 的退化；VLA-0 走到极简的尽头——连词表都不改，直接让 VLM 把动作"打印"成数字串。
 - **连续动作头一路**：VLM 出条件，外挂一个生成式动作专家用 flow matching 把噪声"流"成连续动作。$\pi_0$ 用 PaliGemma 骨干 + Action Expert 一次生成动作块；$\pi_{0.5}$ 把离散 FAST 与连续 flow 拼成两阶段，换来开放世界泛化；SmolVLA 把这套压到 450M，再用异步推理把延迟藏起来。
 
+![横轴是动作表示（左端纯离散 token、右端纯连续量），纵轴是参数量（对数轴）。蓝色是离散一路，箭头顺着 OpenVLA → $\pi_0$-FAST → VLA-0 的方向走；绿色是连续一路，$\pi_0$ → SmolVLA。橙色那个横条是 $\pi_{0.5}$：它在这条轴上不是一个点，而是占着中间一整段——预训练阶段用离散 FAST token，后训练阶段换成连续 flow。灰色两个点是第10讲的 ACT 与 Diffusion Policy，只作规模参照（本书自绘；OpenVLA 7B、$\pi_0$ 3.3B、ACT ~80M 取自 3.6.1 的对照表，SmolVLA 0.45B 取自 7.2.1 的对照表，其余各点只按量级摆位置）](../../assets/figures/lecture11/ref/fig11-8-action-head-map.png){width=100%}
+
+图上有两件事是上面两段文字给不了的。一是**演进方向**：两条链的箭头都朝着参数量更小的方向走，离散一路从 OpenVLA 的 7B 一路降到 VLA-0，连续一路从 $\pi_0$ 的 3.3B 降到 SmolVLA 的 0.45B——三年里这个领域真正的共同趋势不是"更大"，而是"在更小的模型上把动作做对"。二是 $\pi_{0.5}$ 那个横条：它是全图唯一不能用一个点表示的模型，因为它的动作表示在训练的两个阶段里是不同的。凡是想问"$\pi_{0.5}$ 到底算离散还是连续"的，答案就是这个横条的形状——两边都算。
+
 ## 8.2 一条演进脉络
 
-把它们串起来，正好是一条清晰的演进链：OpenVLA（离散、自回归）暴露出精度与速度的瓶颈，$\pi_0$ 换上 flow matching 的连续动作头，$\pi_0$-FAST 回头把离散 token 化做高效，$\pi_{0.5}$ 把两者结合冲开放世界，最后 VLA-0 与 SmolVLA 各自从"极简"和"小而快"两个方向，把 VLA 拉到一张消费级显卡也能跑的规模。离散与连续这两种动作头哲学，会一直贯穿后面的内容。
+上面那张地图是静态的分类。把时间轴加回去看，每一步的动因其实都很具体：OpenVLA 同时暴露出精度和速度两个瓶颈，$\pi_0$ 用连续动作头解决精度、用 KV 缓存解决速度；$\pi_0$-FAST 反过来证明了瓶颈不在"离散"本身，而在"逐维逐步分 bin"这种笨拙的离散方式；$\pi_{0.5}$ 索性承认两种表示各有各的好处，分两个阶段各用各的；到了 VLA-0 与 SmolVLA，问题已经从"怎么更强"换成了"怎么让人跑得起来"。
+
+所以离散与连续这场路线之争，到今天也没有分出胜负——它会一直贯穿后面的内容。
 
 > 一句话总结：VLA 在 VLM 之上接入机器人状态、把输出换成可执行动作，而各家模型的根本分野，就在于动作头是"离散 token 自回归"还是"连续流匹配"。
 
@@ -1726,20 +1763,32 @@ uv run python vla/4_vla_inference/4_4_smolvla_infer/smolvla_demo.py
 
 本讲见到的模型都是别人预训练好的通用策略。下一讲就来看怎么把它们微调到自己的机器人上——从全量 SFT 到 LoRA，把一个通用 VLA 真正用起来。
 
-# 参考资料
+# 参考文献
 
-[1] KIM M J, PERTSCH K, KARAMCHETI S, et al. OpenVLA: an open-source vision-language-action model[EB/OL]. (2024-06-13)[2026-06-26]. https://arxiv.org/abs/2406.09246.
+[1] 李昊然, 陈宇辉, 崔文博, 等. 面向具身操作的视觉-语言-动作模型综述[J]. 自动化学报, 2026, 52(1): 18-51.
 
-[2] KIM M J, FINN C, LIANG P. Fine-tuning vision-language-action models: optimizing speed and success[EB/OL]. (2025-02-27)[2026-06-26]. https://arxiv.org/abs/2502.19645.
+[2] KIM M J, PERTSCH K, KARAMCHETI S, et al. OpenVLA: an open-source vision-language-action model[EB/OL]. (2024-06-13)[2026-06-26]. https://arxiv.org/abs/2406.09246.
 
-[3] BLACK K, BROWN N, DRIESS D, et al. $\pi_0$: a vision-language-action flow model for general robot control[EB/OL]. (2024-10-31)[2026-06-26]. https://arxiv.org/abs/2410.24164.
+[3] O'NEILL A, REHMAN A, et al. Open X-Embodiment: robotic learning datasets and RT-X models[EB/OL]. (2023-10-13)[2026-06-26]. https://arxiv.org/abs/2310.08864.
 
-[4] PERTSCH K, STACHOWICZ K, ICHTER B, et al. FAST: efficient action tokenization for vision-language-action models[EB/OL]. (2025-01-16)[2026-06-26]. https://arxiv.org/abs/2501.09747.
+[4] BROHAN A, BROWN N, CARBAJAL J, et al. RT-2: vision-language-action models transfer web knowledge to robotic control[EB/OL]. (2023-07-28)[2026-06-26]. https://arxiv.org/abs/2307.15818.
 
-[5] Physical Intelligence, BLACK K, BROWN N, et al. $\pi_{0.5}$: a vision-language-action model with open-world generalization[EB/OL]. (2025-04-22)[2026-06-26]. https://arxiv.org/abs/2504.16054.
+[5] Octo Model Team, GHOSH D, WALKE H, et al. Octo: an open-source generalist robot policy[EB/OL]. (2024-05-20)[2026-06-26]. https://arxiv.org/abs/2405.12213.
 
-[6] GOYAL A, HADFIELD H, YANG X, et al. VLA-0: building state-of-the-art VLAs with zero modification[EB/OL]. (2025-10-15)[2026-06-26]. https://arxiv.org/abs/2510.13054.
+[6] KARAMCHETI S, NAIR S, BALAKRISHNA A, et al. Prismatic VLMs: investigating the design space of visually-conditioned language models[EB/OL]. (2024-02-12)[2026-06-26]. https://arxiv.org/abs/2402.07865.
 
-[7] SHUKOR M, AUBAKIROVA D, CAPUANO F, et al. SmolVLA: a vision-language-action model for affordable and efficient robotics[EB/OL]. (2025-06-02)[2026-06-26]. https://arxiv.org/abs/2506.01844.
+[7] KIM M J, FINN C, LIANG P. Fine-tuning vision-language-action models: optimizing speed and success[EB/OL]. (2025-02-27)[2026-06-26]. https://arxiv.org/abs/2502.19645.
 
-[8] 李昊然, 陈宇辉, 崔文博, 等. 面向具身操作的视觉-语言-动作模型综述[J]. 自动化学报, 2026, 52(1): 18-51.
+[8] BLACK K, BROWN N, DRIESS D, et al. $\pi_0$: a vision-language-action flow model for general robot control[EB/OL]. (2024-10-31)[2026-06-26]. https://arxiv.org/abs/2410.24164.
+
+[9] BEYER L, STEINER A, SUSANO PINTO A, et al. PaliGemma: a versatile 3B VLM for transfer[EB/OL]. (2024-07-10)[2026-06-26]. https://arxiv.org/abs/2407.07726.
+
+[10] PERTSCH K, STACHOWICZ K, ICHTER B, et al. FAST: efficient action tokenization for vision-language-action models[EB/OL]. (2025-01-16)[2026-06-26]. https://arxiv.org/abs/2501.09747.
+
+[11] Physical Intelligence, BLACK K, BROWN N, et al. $\pi_{0.5}$: a vision-language-action model with open-world generalization[EB/OL]. (2025-04-22)[2026-06-26]. https://arxiv.org/abs/2504.16054.
+
+[12] GOYAL A, HADFIELD H, YANG X, et al. VLA-0: building state-of-the-art VLAs with zero modification[EB/OL]. (2025-10-15)[2026-06-26]. https://arxiv.org/abs/2510.13054.
+
+[13] SHUKOR M, AUBAKIROVA D, CAPUANO F, et al. SmolVLA: a vision-language-action model for affordable and efficient robotics[EB/OL]. (2025-06-02)[2026-06-26]. https://arxiv.org/abs/2506.01844.
+
+[14] NVIDIA, BJORCK J, CASTAÑEDA F, et al. GR00T N1: an open foundation model for generalist humanoid robots[EB/OL]. (2025-03-18)[2026-06-26]. https://arxiv.org/abs/2503.14734.

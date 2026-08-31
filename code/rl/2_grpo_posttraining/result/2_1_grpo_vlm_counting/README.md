@@ -1,6 +1,5 @@
 # GRPO Small VLM Results
 
-- W&B project: `xbotics-rl`
 - Model: `unsloth/Qwen2.5-VL-3B-Instruct-bnb-4bit`
 - Train data: `leonardPKU/clevr_cogen_a_train`
 - Eval data: fixed `SuperCLEVR-200` counting subset
@@ -11,16 +10,14 @@ The verified route uses Qwen2.5-VL 3B because the original Qwen2-VL 2B path hit 
 
 ## Train-before vs train-after comparison
 
-The extended run evaluates the same fixed SuperCLEVR-200 slice before and after GRPO:
+The extended run evaluates the same fixed SuperCLEVR-200 slice before and after GRPO.
+Kept in this directory:
 
-- Base predictions: `eval/base_predictions.jsonl`
-- Adapter predictions: `eval/adapter_predictions.jsonl`
-- Summary: `eval/base_vs_adapter_summary.json`
-- Local summary: `base_vs_adapter_summary.json`
-
-- W&B: <https://wandb.ai/123/xbotics-rl/runs/4m0b2g78>
+- Summary: `base_vs_adapter_summary.json`
 - Adapter: `adapter/adapter_model.safetensors`
-- Checkpoints: `logs/checkpoint-100/`, `logs/checkpoint-200/`, `logs/checkpoint-300/`
+
+Only the two endpoint evaluations were kept; the run produced no per-step curve, so
+the numbers below are before/after values, not a training trajectory.
 
 Training:
 

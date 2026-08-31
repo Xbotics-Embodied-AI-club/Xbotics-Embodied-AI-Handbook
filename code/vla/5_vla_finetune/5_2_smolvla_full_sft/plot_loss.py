@@ -1,5 +1,7 @@
 """把训练控制台日志里的 loss 画成曲线，作为微调收敛的证据图。
 
+在讲12 2.3 节被引用。
+
 lerobot-train 每 log_freq 步打印一行 `step:200 ... loss:0.206 ...`。
 train_smolvla.sh 已把这份控制台输出 tee 到 scratch/train_smolvla.log，
 这里正则抓出 (step, loss) 两列，画一条对数纵轴的曲线存进 result/。

@@ -1,3 +1,10 @@
+"""管线第二步：把人体动作重定向成宇树 G1 的参考轨迹。
+
+调用 GMR：先对齐人与机器人的关键部位、按体型做非均匀缩放，再逐帧解带约束的
+逆运动学，输出 G1 真正能执行的关节角序列。
+
+讲义对应：第14讲 4.4 节。
+"""
 from __future__ import annotations
 
 import os
@@ -12,6 +19,11 @@ from general_motion_retargeting.utils.smpl import get_gvhmr_data_offline_fast, l
 
 
 def required_packages() -> list[str]:
+    """列出这一步额外需要的第三方包。
+
+    Returns:
+        包名列表。
+    """
     return ["general_motion_retargeting"]
 
 
@@ -26,6 +38,20 @@ def _looks_like_gmr_source_root(path: Path) -> bool:
 
 
 def find_gmr_source_root(source_root: str | Path | None = None) -> Path:
+    """定位一份完整的 GMR 源码目录。
+
+    只认「资产和 IK 配置都在」的目录，避免拿到装了一半的包之后在半路才失败。
+
+    Args:
+        source_root: 显式指定的目录；给 None 时自动依次尝试已安装位置与下载目录。
+
+    Returns:
+        GMR 源码根目录。
+
+    Raises:
+        FileNotFoundError: 显式指定的目录不完整。
+        RuntimeError: 自动查找失败。
+    """
     if source_root is not None:
         source_root = Path(source_root).expanduser().resolve()
         if not _looks_like_gmr_source_root(source_root):
@@ -47,10 +73,26 @@ def find_gmr_source_root(source_root: str | Path | None = None) -> Path:
 
 
 def default_gmr_root() -> Path:
+    """给出 GMR 资产的默认下载目录。
+
+    Returns:
+        下载目录路径。
+    """
     return Path(os.environ["DATASETS_ROOT"]) / "models" / "downloaded" / "gmr"
 
 
 def find_smplx_folder(smplx_folder: str | Path | None = None) -> Path:
+    """定位 SMPL-X 人体模型文件所在目录。
+
+    Args:
+        smplx_folder: 显式指定的目录；给 None 时用 GMR 自带的位置。
+
+    Returns:
+        含 SMPL-X 模型的目录。
+
+    Raises:
+        RuntimeError: 找不到中性体型模型文件。
+    """
     if smplx_folder is not None:
         smplx_folder = Path(smplx_folder)
     else:
@@ -90,6 +132,17 @@ def _gmr_ik_config_root():
 
 
 def check_gmr_assets(robot: str = "unitree_g1", smplx_folder: str | Path | None = None) -> None:
+    """开跑之前先确认 GMR 的机器人模型、IK 配置、人体模型都在。
+
+    重定向要跑很久，缺件却要到中途才暴露；一次性把三样都查了，缺什么一起报出来。
+
+    Args:
+        robot: 目标机器人名。
+        smplx_folder: SMPL-X 模型目录，给 None 时自动定位。
+
+    Raises:
+        RuntimeError: 有任何一件缺失，报出全部缺失项。
+    """
     missing = []
     robot_xml = _gmr_asset_root() / "unitree_g1" / "g1_mocap_29dof.xml"
     if robot != "unitree_g1":
@@ -121,6 +174,17 @@ def retarget_gvhmr_to_qpos(
     *,
     smplx_folder: str | Path | None = None,
 ) -> tuple[np.ndarray, float]:
+    """把 GVHMR 的人体动作逐帧重定向成机器人关节角。
+
+    Args:
+        gvhmr_prediction: GVHMR 预测文件。
+        target_fps: 输出帧率。
+        robot: 目标机器人名。
+        smplx_folder: SMPL-X 模型目录。
+
+    Returns:
+        (关节角序列, 实际帧率)。
+    """
     gvhmr_prediction = Path(gvhmr_prediction)
     check_gmr_assets(robot, smplx_folder)
 
@@ -167,6 +231,16 @@ def _motion_dict_from_qpos(qpos: np.ndarray, fps: float) -> dict[str, object]:
 
 
 def write_gmr_pickle(qpos: np.ndarray, fps: float, output_path: str | Path) -> Path:
+    """把重定向结果按 GMR 自己的格式存一份。
+
+    Args:
+        qpos: 关节角序列。
+        fps: 帧率。
+        output_path: 落盘路径。
+
+    Returns:
+        实际写出的文件路径。
+    """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("wb") as handle:
@@ -175,6 +249,15 @@ def write_gmr_pickle(qpos: np.ndarray, fps: float, output_path: str | Path) -> P
 
 
 def write_gmr_csv_from_pickle(pickle_path: str | Path, csv_path: str | Path | None = None) -> Path:
+    """把 GMR 的 pickle 结果转成 CSV，供下一步用 mjlab 回放。
+
+    Args:
+        pickle_path: 输入 pickle。
+        csv_path: 输出 CSV；给 None 时按 pickle 的位置自动拼一个。
+
+    Returns:
+        实际写出的 CSV 路径。
+    """
     pickle_path = Path(pickle_path)
     if csv_path is None:
         csv_path = pickle_path.parent / "csv" / pickle_path.with_suffix(".csv").name
@@ -208,6 +291,15 @@ def retarget_human_motion(
     smplx_folder: str | Path | None = None,
     retargeter: Callable[[str | Path, int, str], tuple[np.ndarray, float]] | None = None,
 ) -> Path:
+    """跑完整的重定向：读预测、查资产、解 IK、落盘。
+
+    Args:
+        gvhmr_prediction: GVHMR 预测文件。
+        output_path: 结果落盘路径。
+
+    Returns:
+        重定向结果的路径。
+    """
     gvhmr_prediction = Path(gvhmr_prediction)
     if not gvhmr_prediction.is_file():
         raise FileNotFoundError(f"GVHMR prediction not found: {gvhmr_prediction}")
@@ -228,6 +320,7 @@ def retarget_human_motion(
 
 def main() -> None:
     # 主要修改这一段：GVHMR 预测文件、输出 pkl、目标机器人与帧率。
+    """对上一步恢复出的人体动作跑一次重定向。"""
     gvhmr_prediction = Path("hmr4d_results.pt")
     output_pkl = Path("unitree_g1_motion.pkl")
     robot = "unitree_g1"

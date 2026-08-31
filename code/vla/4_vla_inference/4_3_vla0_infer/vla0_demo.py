@@ -1,3 +1,8 @@
+"""VLA-0 在 LIBERO 上闭环推理一次，并把第一个动作块的原始数字串打印出来。
+
+第11讲 6.5 节的配套代码。"动作就是一串数字"这句话在这里可以直接看见：模型的全部输出就是
+一行空格分隔的整数，解码不过是按空格切开、再查一张 bin 中心表。
+"""
 from __future__ import annotations
 
 import os
@@ -16,12 +21,12 @@ from lerobot.utils.constants import ACTION, OBS_STATE
 from lerobot.utils.io_utils import write_video
 
 # MuJoCo 的离屏渲染需要 EGL。
-os.environ.setdefault("MUJOCO_GL", "egl")
+os.environ["MUJOCO_GL"] = "egl"
 
-# 关闭 torch compile / inductor，避免首次运行时出现大量 autotune 开销，
-# 让课堂 demo 更稳定、更可复现。
-os.environ.setdefault("TORCHINDUCTOR_DISABLE", "1")
-os.environ.setdefault("TORCH_COMPILE_DISABLE", "1")
+# 关闭 torch compile / inductor：首次运行的 autotune 开销很大，而这里只跑一局，
+# 编译省下的时间远不够抵掉它，还会让两次运行的结果对不上。
+os.environ["TORCHINDUCTOR_DISABLE"] = "1"
+os.environ["TORCH_COMPILE_DISABLE"] = "1"
 
 # 下面这组参数是已经验证过能跑出 success=True 的固定配置。
 # VLA-0：0.5B SmolVLM2 底座，动作就是一串数字 token（每个整数是一个 bin 编号）。
@@ -37,21 +42,36 @@ OUT_PATH = Path("vla/4_vla_inference/4_3_vla0_infer/output/vla0_libero_success.m
 
 
 def set_episode_index(env, episode_index: int) -> None:
-    # LeRobot 的 LIBERO 向量环境外面包了一层 SyncVectorEnv。
-    # 真正控制初始状态的是里面每个子环境的 episode_index / init_state_id。
+    """把 LIBERO 环境切到指定编号的初始状态。
+
+    LeRobot 的 LIBERO 向量环境外面包了一层 SyncVectorEnv，真正决定物体初始摆放的是里面
+    每个子环境的 episode_index / init_state_id，改外层那一层没有用。
+
+    Args:
+        env: make_env 返回的向量环境，这里只跑 1 个子环境。
+        episode_index: 初始状态编号，演示固定用已经验证过能跑成功的那一局。
+    """
     for inner_env in env.envs:
         inner_env.episode_index = episode_index
         inner_env.init_state_id = episode_index
 
 
 def generate_digit_string(m, batch) -> tuple[str, torch.Tensor]:
-    """让 VLA-0 生成一个动作块，返回（原始数字串文本, 连续动作块）。
+    """让 VLA-0 生成一个动作块，把模型吐出的原始数字串和解码后的连续动作一起返回。
 
     这是 rl/2_grpo_posttraining/2_2 里 sample_chunk + decode_actions 的单环境贪婪版：
     1. 观测图 + 状态 + 指令拼成 VLM 输入；
     2. xgrammar 约束解码，保证模型只可能输出数字串；
     3. 数字串按空格切开：horizon×action_dim 个整数，每个整数是一个 bin 编号，
        查 bin 中心表映射回 [-1, 1] 的连续动作。
+
+    Args:
+        m: VLA0SmolPolicy 内部的模型本体，带 processor、compiled_grammar 与 bin 配置。
+        batch: 已经过预处理管线的一帧观测，含图像、OBS_STATE 与 task 文本。
+
+    Returns:
+        (数字串原文, 连续动作块) 二元组。动作块形状 (1, action_horizon, action_dim)；
+        若配置里 relative_actions 为真，块已加回当前状态、变成绝对目标。
     """
     images = m.prepare_images(batch)
     padded, _ = m.create_input_tokens(states=batch[OBS_STATE], images=images,
@@ -89,7 +109,11 @@ def generate_digit_string(m, batch) -> tuple[str, torch.Tensor]:
 
 
 def main() -> None:
-    # 固定随机种子，保证每次讲课演示时拿到相同的 rollout。
+    """加载策略、建好 LIBERO 环境、闭环跑完一局，把整段 rollout 写成 mp4。
+
+    跑不出成功就直接抛异常，不会静悄悄留下一段失败录像——一次演示要么给出成功的结果，
+    要么明确报错，不能只是"看起来运行过了"。
+    """
     torch.manual_seed(SEED)
     np.random.seed(SEED)
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)

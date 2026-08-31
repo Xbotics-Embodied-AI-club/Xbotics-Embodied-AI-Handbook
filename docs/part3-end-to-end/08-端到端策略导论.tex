@@ -65,6 +65,46 @@
 \fi
 \makeatother
 
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{241,243,245}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.40,0.45,0.13}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\ExtensionTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.28,0.35,0.67}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.46,0.62}{#1}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.07,0.07,0.07}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
 
 \usepackage{longtable,booktabs,array}
 \newcounter{none} % for unnumbered tables
@@ -115,6 +155,8 @@
  
 
 
+\usepackage{fvextra}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,commandchars=\\\{\}}
 \usepackage{changepage}
 \usepackage{xcolor}
 \usepackage{dirtree}
@@ -194,28 +236,35 @@
 \section{1 两种机器人：手写 pipeline 还是端到端
 policy}\label{ux4e24ux79cdux673aux5668ux4ebaux624bux5199-pipeline-ux8fd8ux662fux7aefux5230ux7aef-policy}
 
-让一台机械臂把桌上的方块放进盘子，有两种截然不同的做法。一种是把''怎么动''这件事一步步算出来，每一环都人写规则；另一种是直接用一个网络从相机画面映射到电机指令。这一讲从这两种机器人的对比讲起，引出后面六讲的共同主角------\textbf{策略（policy）}。
+第7讲我们已经让机械臂把红色方块从 A 区搬到了 B
+区、把竖直的瓶子放进了收纳盒。用的办法是一条\textbf{人写的流水线}：先估出物体位姿，再算出预抓取、抓取、抬升、放置、退出这五个关键位姿，串成一个状态机，最后逐段执行、逐段校验，失败了还要按阶段回溯排查。它能跑通------代价是每一环的规则都得我们自己写出来。
+
+这一讲把同一件事换一种做法：不再写规则，而是直接用一个神经网络，从相机画面映射到机器人指令。两种做法摆在一起对比，会引出第8到13讲共同的主角------\textbf{策略（policy）}。
 
 \subsection{1.1
 传统机器人怎么干活：一条手写的流水线}\label{ux4f20ux7edfux673aux5668ux4ebaux600eux4e48ux5e72ux6d3bux4e00ux6761ux624bux5199ux7684ux6d41ux6c34ux7ebf}
 
-传统做法会把''怎么动''\textbf{显式地}用人写的模型一步步算出来：先感知与建图，再用
-RRT、MPC
-这类算法规划一条轨迹，最后交给控制器执行------每一环都是人设计的算法。
+传统做法会把''怎么动''\textbf{显式地}用人写的模型一步步算出来：先感知与建图，再规划一条轨迹，最后交给控制器执行。规划这一步常用两类算法------\textbf{RRT}（快速扩展随机树，Rapidly-exploring
+Random
+Tree）在自由空间里随机撒点、连成一条不碰东西的路径；\textbf{MPC}（模型预测控制，Model
+Predictive
+Control）则用动力学模型往前推演几步，再决定当下这一步怎么动。每一环都是人设计出来的。
 
-把''生成机器人运动''的方法摊开看，大致分成两支：左边是这种\textbf{显式建模}（运动学、规划、控制），右边是这一讲要讲的\textbf{隐式建模}（从示教中学习、强化学习）：
+把''生成机器人运动''的方法摊开看，大致分成两支{[}1{]}：左边是这种\textbf{显式建模}（explicit
+modeling：运动学、规划、控制），右边是这一讲要讲的\textbf{隐式建模}（implicit
+modeling：从示教中学习、强化学习）：
 
 \begin{figure}[H]
 
-{\centering \includegraphics[width=0.5\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture08/ref/81_generating-motion-explicit-vs-implicit.jpg}
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture08/ref/fig08-1-motion-taxonomy.png}
 
 }
 
-\caption{生成机器人运动的两条路：左侧显式建模（运动学、规划、控制），右侧隐式建模（模仿学习、强化学习）}
+\caption{生成机器人运动分成两支：左支显式建模，下挂正运动学、逆运动学、规划与控制（RRT、MPC）三类人写规则的方法；右支隐式建模，下挂深度强化学习与从专家示教中学习。右支底下那个加粗的绿框标出了本讲的落点------观测直接进、动作直接出（本书自绘）}
 
 \end{figure}%
 
-显式流水线的好处是每一步都看得见、查得到------哪里出错就去修哪一段，可解释、可调试。
+图上要看的不只是''分成两支''，还有那个绿色落点：这一讲以及往后的第9--13讲，全都站在右边这一支上。左支的好处写在它下面------每一步都看得见、查得到，哪里出错就去修哪一段，可解释、可调试。
 
 \subsection{1.2
 流水线的死穴：有些环节根本写不出规则}\label{ux6d41ux6c34ux7ebfux7684ux6b7bux7a74ux6709ux4e9bux73afux8282ux6839ux672cux5199ux4e0dux51faux89c4ux5219}
@@ -229,32 +278,35 @@ RRT、MPC
 \subsection{1.3
 换个思路：让一个网络从观测直接到动作}\label{ux6362ux4e2aux601dux8defux8ba9ux4e00ux4e2aux7f51ux7edcux4eceux89c2ux6d4bux76f4ux63a5ux5230ux52a8ux4f5c}
 
-端到端策略给出的答案是：\textbf{不再把任务拆成感知---规划---控制三段分别设计，而是用一个神经网络，从图像与状态直接预测任务级的动作表示}，靠联合训练省掉人工写死的中间接口。相机像素进去，动作出来------但要注意这个''动作''通常还不是电机级命令：它更常是关节目标、末端增量或一段动作块，后面仍要经过坐标变换、控制器和安全约束才真正落到电机上。
+端到端（end-to-end）策略给出的答案是：\textbf{不再把任务拆成感知---规划---控制三段分别设计，而是用一个神经网络，从图像与状态直接预测任务级的动作表示}，靠联合训练省掉人工写死的中间接口。相机像素进去，动作出来------但要注意这个''动作''通常还不是电机级命令：它更常是关节目标、末端增量或一段动作块，后面仍要经过坐标变换、控制器和安全约束才真正落到电机上。
 
 \begin{quote}
 备注：端到端\textbf{不是}要取代一切。端到端强调的是目标函数可以联合优化，不是输出必须直达电机。正逆运动学、安全限位、底层伺服这些有成熟解析解的部分仍然保留；端到端替代的，是那几个''写不出规则''的环节。
 \end{quote}
 
 最早把这件事讲清楚的两个工作，一个在自动驾驶、一个在机械臂。NVIDIA 的
-PilotNet
-让摄像头画面直接进一个卷积网络、输出方向盘转角，中间不再有''车道线检测→路径规划→转向控制''的人工流水线：
+\textbf{DAVE-2}{[}2{]}
+让摄像头画面直接进一个卷积网络、输出方向盘转角，中间不再有''车道线检测→路径规划→转向控制''的人工流水线。这个名字来自
+2016 年那篇原始论文；同一组人在 2017 年的后续工作里把它改称
+\textbf{PilotNet}{[}3{]}，今天多数人是用后一个名字记住它的：
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture08/ref/813_pilotnet-end2end.png}}
+{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture08/ref/813_pilotnet-end2end_arxiv-1604.07316.png}}
 
 }
 
-\caption{PilotNet：摄像头图像经一个卷积网络直接输出方向盘转角，端到端反向传播训练}
+\caption{NVIDIA DAVE-2（后称
+PilotNet）：摄像头图像经一个卷积网络直接输出方向盘转角，端到端反向传播训练}
 
 \end{figure}%
 
 Levine
-等人在机械臂上做了同样的事，并把本讲的题眼问了出来------把感知和控制\textbf{联合}端到端地训，会不会比分开设计更好？他们用一个网络把图像直接映射到电机扭矩，并在其视觉运动控制实验中报告：联合训练感知与控制，优于所比较的分阶段基线。要注意这是这批任务、这批数据、这组基线下的结果，并不等于所有任务都该取消模块化设计。
+等人{[}4{]}在机械臂上做了同样的事，用一个网络把图像直接映射到电机扭矩。他们问的是同一个问题：把感知和控制\textbf{联合}训练，会不会比分开设计更好？在他们那组视觉运动控制任务上，答案是肯定的------联合训练的策略优于所比较的分阶段基线。这是那批任务、那批数据、那组基线下的结果，不等于所有任务都该取消模块化设计。
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture08/ref/813_levine-visuomotor-arch.png}}
+{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture08/ref/813_levine-visuomotor-arch_arxiv-1504.00702.png}}
 
 }
 
@@ -274,22 +326,26 @@ Levine
 策略（policy）就是一个从\textbf{观测}到\textbf{动作}的函数：你给它当前看到的东西，它告诉你下一步该怎么动。
 \end{quote}
 
-放进机器人和环境的互动里看最清楚：智能体（机器人）从环境收到观测，输出一个动作作用回环境，环境再给出新的观测------如此往复。这张经典的''智能体---环境''回路就是策略工作的舞台：
+放进机器人和环境的互动里看最清楚：\textbf{智能体}（agent，在这里就是机器人）从环境收到观测，输出一个动作作用回环境，环境再给出新的观测------如此往复。这张经典的''智能体---环境''回路就是策略工作的舞台：
 
 \begin{figure}[H]
 
-{\centering \includegraphics[width=0.5\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture08/ref/821_agent-env-loop.jpg}
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture08/ref/fig08-2-agent-env-loop.png}
 
 }
 
-\caption{智能体与环境的交互回路：智能体根据观测输出动作，环境接收动作后返回新的观测，循环往复}
+\caption{智能体与环境只有两条边的闭环：智能体（策略
+\(\pi\)）看到观测就给出动作
+\(a_t\)，动作作用到环境上，环境被改变后返回新的观测
+\(o_{t+1}\)，如此循环（本书自绘）}
 
 \end{figure}%
 
-图里用了强化学习的习惯记号（状态 \(s_t\)、动作 \(a_t\)、奖励
-\(r_t\)），本讲先只关注''观测进、动作出''这一条主线，奖励要到第14讲的强化学习才登场。写成符号是
+这张图上只有两条边------动作出去、观测回来，这一讲要的正是这两条。图下那行灰字提醒的是：强化学习那套习惯记号里还有第三条边（奖励
+\(r_{t+1}\)），第14讲会把它接上，本讲先不碰。写成符号是
 \(a = \pi(o)\)；更一般地写成一个分布
-\(\pi(a \mid o)\)------同一个观测下，合理的动作往往不止一个，这件事到第10讲学生成式策略时会成为核心出发点。
+\(\pi(a \mid o)\)------同一个观测下，合理的动作往往不止一个。这件事会成为第10讲
+1.4 节的核心出发点。
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0879\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3994\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5127\linewidth - 2\tabcolsep\relax}@{}}
@@ -338,31 +394,44 @@ chunk）。
 \subsection{2.3 策略的谱系：从只看状态到看懂语言的
 VLA}\label{ux7b56ux7565ux7684ux8c31ux7cfbux4eceux53eaux770bux72b6ux6001ux5230ux770bux61c2ux8bedux8a00ux7684-vla}
 
-把''观测里加不加图像、加不加语言''当坐标，策略就排成一条谱系：只看本体状态的
-\textbf{state policy} → 加图像的\textbf{视觉运动策略}（如 ACT、Diffusion
-Policy）→ 再加语言指令的\textbf{语言条件策略}（如 RT-1）→
-把视觉、语言、动作统一进一个大模型的 \textbf{VLA}（如
-\(\pi_0\)）。越往右，策略''看懂''的东西越多、能听的指令越泛。这条谱系正好是本课程''端到端策略''这一大块（第8--13讲）的地图，最右端的
-VLA 会从第11讲起展开。
+把''观测里加不加图像、加不加语言''当坐标，策略就排成一条谱系。
 
-谱系最右端的 VLA
-到底''统一''了什么？一句话：把''看懂图像''的视觉模型、``看懂文字''的语言模型、``控制行为''的动作模型合成一个------让机器人既能看、又能听，再把这份理解直接变成动作：
+最左端是\textbf{状态策略}（state
+policy）：观测里只有关节角、末端位置这类本体数字，没有图像。往右一步，观测里加进相机画面，就是\textbf{视觉运动策略}（visuomotor
+policy）------第10讲要动手训的 ACT（动作分块 Transformer，Action
+Chunking with Transformers）和 Diffusion
+Policy（用扩散模型生成动作）都属于这一档。再往右，观测里加进一句自然语言指令，同一个网络就能按''把碗放到盘子上''还是''把杯子推到左边''做不同的事，这类叫\textbf{语言条件策略}（language-conditioned
+policy），Google 的 RT-1{[}5{]}
+是代表作。最右端把视觉、语言、动作三件事统一进一个大模型，就是\textbf{视觉-语言-动作模型}（Vision-Language-Action，VLA）{[}6{]}，本讲实验要用的
+\(\pi_0\) 就是其中一个。
+
+越往右，策略''看懂''的东西越多、能听的指令越泛。把这条谱系画成一条轴：
 
 \begin{figure}[H]
 
-{\centering \includegraphics[width=0.55\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture08/ref/823_vla-three-pillars.png}
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture08/ref/fig08-2-policy-spectrum.png}
 
 }
 
-\caption{视觉-语言-动作模型把视觉模型（看懂图像）、语言模型（看懂文字）、动作模型（控制行为）三者合一，让机器人能感知、推理并连贯地行动}
+\caption{策略谱系的四档，从左到右依次是状态策略（state
+policy）、视觉运动策略（visuomotor
+policy）、语言条件策略（language-conditioned）与视觉-语言-动作模型（VLA）。每一格中间那行加粗字是\textbf{这一档的观测里比左邻多进来的东西}------只有本体数字
+/ ＋相机图像 / ＋语言指令 /
+＋大模型统一表征，下面一行是它换来的能力与代表方法。最右端那条红色虚线标出第11讲起展开的落点（本书自绘）}
 
 \end{figure}%
+
+图要读的是那一列加粗的''＋``号：四档之间不是四种并列的方法，而是\textbf{同一个
+\(\pi(a\mid o)\)
+一路往观测里加东西}------先加画面、再加语言、最后加进一个能把两者一起理解的大模型。观测里多进来一样，能听懂的指令就宽一层，这也是为什么最右端的
+VLA
+能对''把碗放到盘子上''和''把杯子推到左边''做出不同的事。这条谱系正好是本课程''端到端策略''这一大块（第8--13讲）的地图，最右端的
+VLA 会从第11讲起展开。
 
 \subsection{2.4 本节小结}\label{ux672cux8282ux5c0fux7ed3}
 
 策略就是''观测→动作''的那个函数，写作
-\(\pi(a\mid o)\)。它的两个接口------观测里放什么、动作怎么表达------决定了它是一个只看状态的
-state policy，还是一个能听语言的
+\(\pi(a\mid o)\)。它的两个接口------观测里放什么、动作怎么表达------决定了它是一个只看状态的状态策略，还是一个能听语言的
 VLA，也决定了它好不好训、好不好部署。下一节就来看，当我们真把一个策略学出来、搬上机器人时，会在哪些地方栽跟头。
 
 \section{3 从训练到部署：为什么 loss
@@ -372,31 +441,34 @@ VLA，也决定了它好不好训、好不好部署。下一节就来看，当�
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture08/ref/830_train-deploy-roundtrip.png}}
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture08/ref/fig08-3-train-deploy-roundtrip.png}
 
 }
 
-\caption{训练时示教数据经过''统一动作口径、归一化''进入网络；部署时网络输出必须用同一套约定''反归一化、还原口径''逆着走回来，最后由裁剪限位兜底}
+\caption{上排是训练时：示教数据先统一动作口径（绝对 /
+相对）、再各维归一化，然后进网络；下排是部署时，网络输出沿着\textbf{相反方向}走回来------先反归一化（乘回
+σ、加回
+μ）、再还原动作口径（相对口径需累加），最后由裁剪限位兜底。中间两条竖虚线标出两处衔接：口径与统计量，两端必须各用同一套（本书自绘）}
 
 \end{figure}%
 
-上图就是本节的路线图：上排是训练时数据的去路，下排是部署时数据的回路，中间两条虚线是最容易断掉的两处衔接------动作口径（3.3）和归一化统计量（3.4）。在拆这两处衔接之前，先回答一个更基本的问题：怎么判断一个策略到底行不行（3.1、3.2）。
+上图就是本节的路线图。上排画的是训练时数据怎么进网络，下排画的是部署时数据怎么原路走回来；中间那两条虚线，标出了最容易断掉的两处衔接------动作口径（3.3）和归一化统计量（3.4）。在拆这两处衔接之前，先回答一个更基本的问题：怎么判断一个策略到底行不行（3.1、3.2）。
 
 \subsection{3.1
 训练损失低不等于任务成功}\label{ux8badux7ec3ux635fux5931ux4f4eux4e0dux7b49ux4e8eux4efbux52a1ux6210ux529f}
 
 最容易踩的认知误区，是盯着训练损失（loss）下降就以为大功告成。
 
-策略的训练目标通常是''让预测动作接近示教动作''，这是一个\textbf{单步}的监督指标。但任务成功是一个\textbf{闭环}的结果：要一步接一步走到底、把方块真的放进盘子。单步每步差一点点，几十步累积下来可能完全跑偏；反过来，loss
+策略的训练目标通常是''让预测动作接近示教动作''，这是一个\textbf{单步}的监督指标。但任务成功是一个\textbf{闭环}的结果：要一步接一步走到底、把方块真的送进容器。单步每步差一点点，几十步累积下来可能完全跑偏；反过来，loss
 不是最低的那个
 checkpoint，真机成功率反而更高，也很常见。也不存在一个通用的数值，说''loss
-降到多少就能部署''------离线指标（验证损失、动作误差、覆盖率、时延与校准检查）用来做训练监控、checkpoint
-粗筛和故障诊断，最终的任务能力则要在仿真或真机上按统一协议闭环跑一遍才算数。
+降到多少就能部署''------验证集损失、预测动作与示教动作的逐维误差这类\textbf{离线指标}，作用是训练监控、checkpoint
+粗筛和故障诊断；最终的任务能力，要在仿真或真机上按统一协议闭环跑一遍才算数。
 
 \begin{quote}
-一句话：loss
+loss
 衡量的是''像不像示教''，成功率衡量的是''任务成没成''，两者经常对不上------所以选模型不能只看
-loss 曲线。两类指标是分工，不是互斥：离线筛，闭环定。
+loss 曲线。这两类指标是分工，不是互斥：离线筛，闭环定。
 \end{quote}
 
 \subsection{3.2 闭环里误差会滚雪球：为什么必须 rollout
@@ -416,10 +488,13 @@ loss 曲线。两类指标是分工，不是互斥：离线筛，闭环定。
 
 \end{figure}%
 
-注意图里的转折点：轨迹还在绿色带内时，偏差几乎看不出来；\textbf{走出带子的那一刻}，模型面对的是示教里从未出现过的状态，输出开始失去依据，轨迹加速飘走。这个现象叫\textbf{分布漂移}（covariate
-shift），是模仿学习的经典难题，Ross 等人提出的 DAgger
-就是冲它去的（第10讲会看到生成式策略怎么缓解分布漂移；DAgger
-这条交互式纠正的路，留到第16讲讲人在环方法时展开）。
+注意图里的转折点：轨迹还在绿色带内时，偏差几乎看不出来；\textbf{走出带子的那一刻}，模型面对的是示教里从未出现过的状态，输出开始失去依据，轨迹加速飘走。这个现象叫\textbf{分布漂移}（distribution
+shift）；在模仿学习里它有个更精确的名字叫\textbf{协变量偏移}（covariate
+shift），指的正是''策略自己走出来的状态分布''和''示教数据的状态分布''对不上。它是模仿学习的经典难题，Ross
+等人提出的 \textbf{DAgger}{[}7{]}（数据聚合，Dataset
+Aggregation：让策略先跑，再请专家对跑出来的状态补标正确动作，把这批数据加回训练集重训）就是冲它去的。第10讲
+1.2 节会从生成式策略的角度再碰一次这个问题，DAgger
+这条交互式纠正的路，则留到第16讲 8.6 节的人在环方法展开。
 
 结论很硬：\textbf{策略到底行不行，得让它在环境里真正跑一遍（rollout）、看任务成没成------离线指标做不了这个判决。}
 离线指标仍然有它的位置：粗筛
@@ -441,7 +516,8 @@ delta）。这是这一讲最该记牢的细节之一------它既影响网络好
 
 }
 
-\caption{同一步运动的两种记法：相对口径报''动多少''（+0.02），绝对口径报''去哪儿''（1.20）；数字不同，含义也完全不同}
+\caption{同一步运动的两种记法：相对口径报''动多少''（+0.02），绝对口径报''去哪儿''（1.20）；数字不同，含义也完全不同（本书自绘；三个数的来源是上面那个
+1.18 转到 1.20 的算例）}
 
 \end{figure}%
 
@@ -459,12 +535,12 @@ delta）。这是这一讲最该记牢的细节之一------它既影响网络好
 1
 厘米''这种增量。两种口径各有长短，没有绝对的好坏：绝对口径每一步都瞄准一个固定坐标，动作表示本身不会累积漂移，但网络得记住''整个工作空间长什么样''；相对口径是''局部修正''，跨起点泛化好、通常也更好学，代价是部署时要一步步把增量累加回绝对位置。口径的选择本身就影响性能------Diffusion
 Policy
-的实验里，仅仅换一种动作表示（速度口径换成位置口径），多个任务的成功率就明显不同。
+那篇论文专门做过这项对照{[}8{]}：方法完全不变，只把动作表示从速度口径换成位置口径，多个任务上的成功率就明显不同。
 
 真正的分水岭在于：\textbf{训练和部署两端，必须用同一种口径去解释同一个数字。}
-注意相对口径有个数值特点------一个 30Hz
-采集、动作温和的抓取任务，相邻两帧的关节增量常常只有 0.01～0.03
-弧度，几乎贴着 0。由此引出两个对称的坑，下图左右各画了一个：
+这里要留意相对口径的一个数值特点：增量的绝对值天然很小。粗算一下就知道------采集频率
+30Hz、关节以每秒零点几弧度这种温和速度转动，相邻两帧之间就只差 0.01
+弧度上下，几乎贴着 0。由此引出两个对称的坑，下图左右各画了一个：
 
 \begin{figure}[H]
 
@@ -482,7 +558,7 @@ Policy
 \item
   \textbf{左图，训练侧弄错------把相对数据当绝对目标训}：本该是''+0.02''的增量，被错当成绝对目标喂给网络。网络于是学会''不管现在在哪，都输出一个
   0.02
-  左右的绝对目标''------机械臂径直扎向接近零位的姿态；到那之后，每步目标几乎不变、真实位移只有一个最小单位的量级，还会被预测噪声整个淹没。症状：\textbf{先猛地一动，然后几乎不动}。此时
+  左右的绝对目标''------机械臂径直扎向接近零位的姿态。到了那儿之后，每一步给出的目标几乎都是同一个数，机械臂原地不动；那点残余的位移比网络的预测噪声还小，看上去就是在抖。症状：\textbf{先猛地一动，然后几乎不动}。此时
   loss 依然很漂亮、网络本身也没毛病，机器人却罢工了。
 \item
   \textbf{右图，部署侧弄错------把绝对目标当相对增量发}：训练时动作是绝对目标（比如
@@ -506,7 +582,7 @@ Policy
 \subsection{3.4
 归一化：把统计量和模型绑在一起}\label{ux5f52ux4e00ux5316ux628aux7edfux8ba1ux91cfux548cux6a21ux578bux7ed1ux5728ux4e00ux8d77}
 
-第二处容易断掉的衔接是\textbf{归一化}。
+第二处容易断掉的衔接是\textbf{归一化}（normalization）------把不同量纲的数值统一缩放到相近的区间。
 
 \textbf{为什么非归一化不可。}
 一份机器人数据里，不同物理量的数值范围天差地别：关节角可能在
@@ -526,14 +602,18 @@ Policy
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture08/ref/834_normalization-ranges.png}}
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture08/ref/fig08-3-normalization-ranges.png}
 
 }
 
 \caption{左：相机像素、关节角、夹爪开合三种量的原始数值范围相差悬殊；右：各维各自归一化后，统一落到
-{[}-1, +1{]}}
+{[}-1, +1{]}（本书自绘）}
 
 \end{figure}%
+
+左图里关节角和夹爪开合那两条几乎看不见的细条就是问题所在：\([-3.14, 3.14]\)
+和 \([0, 1]\) 摆在 0 到 255
+的像素旁边，被压成了两道竖线。右图三条一样长------归一化要做的不是把数值改小，而是把各维放到同一把尺子上。
 
 常见两种做法。第一种是\textbf{均值-方差（mean /
 std）}：\(\hat{x} = (x - \mu) / \sigma\)，用这一维的均值 \(\mu\)
@@ -563,8 +643,30 @@ std）}：\(\hat{x} = (x - \mu) / \sigma\)，用这一维的均值 \(\mu\)
 \end{figure}%
 
 好处在左图一眼可见：min / max 会被那几个毛刺整个带偏，q01 / q99
-则稳稳贴住数据主体。所以分位数归一化更抗离群点------\(\pi_0\)、LeRobot
-这类框架默认用的就是它。
+则稳稳贴住数据主体。所以分位数归一化更抗离群点。
+
+但\textbf{不要把它当成放之四海的默认值}------连同一个系列的两代模型都不一样。把
+LeRobot v0.5.1 里几个常用策略的默认归一化摊开看：
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3750\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1719\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1719\linewidth - 2\tabcolsep\relax}@{}}
+\toprule\noalign{}
+策略（LeRobot v0.5.1） & 状态侧 & 动作侧 \\
+\midrule\noalign{}
+\(\pi_0\) & 均值-方差 & 均值-方差 \\
+\(\pi_{0.5}\) & 分位数 & 分位数 \\
+ACT & 均值-方差 & 均值-方差 \\
+Diffusion Policy & 最小-最大 & 最小-最大 \\
+SmolVLA & 均值-方差 & 均值-方差 \\
+\bottomrule\noalign{}
+\end{tabular}
+\end{center}
+
+分位数确实被用了，但用它的是 \(\pi_{0.5}\)；\(\pi_0\)
+自己走的还是均值-方差。\(\pi_0\) 的官方实现 openpi
+里也是同一个口径：分位数归一化那个开关对 \(\pi_0\) 是显式关掉的，从
+\(\pi_{0.5}\)
+起才打开。每个策略都在自己的配置里分别声明图像、状态、动作三路各用哪种归一化（上表只列了状态与动作两路），换策略、换版本都要回去看一眼实际用的是哪种------照搬别处的假设，就是这一节剩下要讲的那类翻车。
 
 举个具体的数走一遍归一化的''来回''。某关节在训练集上统计出
 \(\mu = 0.3\)、\(\sigma = 0.5\)。示教里一个目标 0.8，归一化后是
@@ -577,21 +679,21 @@ std）}：\(\hat{x} = (x - \mu) / \sigma\)，用这一维的均值 \(\mu\)
 
 \textbf{关键在于：这套统计量（\(\mu, \sigma\) 或 q01 /
 q99）是从训练集统计出来的，是模型的一部分}------它通常和权重放在一起，存成一个不起眼的小文件。部署时如果只带走了权重、把统计量落下了，或者拿错成另一份数据（另一个
-\texttt{asset\_id}）的统计量，那就是一个\textbf{部署错误}，应当当场暴露出来。别指望框架会好心地帮你兜住：不同实现的行为并不一致------有的直接报错，有的用默认值，有的加载另一套资产，也有的真就把
-1.0 原样发出去（本该还原成
-0.8）。所以启动时就要校验统计量的键、维度、版本和数值范围，\textbf{禁止静默回退}；否则整条动作的尺度会系统性错位，而你只看到下图这两种症状：
+\texttt{asset\_id}）的统计量，那就是一个\textbf{部署错误}，应当当场暴露出来。别指望框架会好心地帮你兜住。不同实现在这件事上的行为并不一致：有的直接报错停下，有的则悄悄回退到一套默认值、或者加载另一份资产接着跑。后一种最危险------本该还原成
+0.8 的动作被原样当成 1.0
+发了出去，日志里一句提示都没有。所以启动时就要校验统计量的键、维度、版本和数值范围，\textbf{禁止静默回退}；否则整条动作的尺度会系统性错位，而你只看到下图这两种症状：
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture08/ref/834_scale-error-symptoms.png}}
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture08/ref/fig08-3-scale-error-symptoms.png}
 
 }
 
-\caption{左：动作被系统性放大，每步都迈过头、围绕目标来回过冲，看起来在''抖''；右：动作被系统性缩小，每步只挪一点点、迟迟够不到目标，看起来''不动''}
+\caption{左：动作被系统性放大，每步都迈过头、围绕目标来回过冲，看起来在''抖''；右：动作被系统性缩小，每步只挪一点点、迟迟够不到目标，看起来''不动''。两图里绿色虚线都是本该到达的目标（本书自绘）}
 
 \end{figure}%
 
-尺度被放大，机器人每一步都迈过头、围着目标来回过冲------看起来在\textbf{抖}；尺度被缩小，每一步只挪一点点、迟迟够不到目标------看起来\textbf{不动}。这种错和
+两条红线的形状本身就是诊断依据：左图围着绿线上下穿行，幅度只是缓慢收窄，四十步都没停下来；右图是一条单调的缓坡，四十步走完还不到目标距离的三分之一。这种错和
 3.3
 的坑同一个性质：网络、权重都没问题，全错在''模型和它的附属统计量分了家''。
 
@@ -602,8 +704,7 @@ q99）是从训练集统计出来的，是模型的一部分}------它通常和�
 \subsection{3.5
 裁剪、限位与出发前检查单}\label{ux88c1ux526aux9650ux4f4dux4e0eux51faux53d1ux524dux68c0ux67e5ux5355}
 
-就算前面都对，真机上还要留一道兜底闸：把动作\textbf{裁剪}（clip）到合理范围、限制最大速度、加上关节限位。策略偶尔吐出一个离谱的值时，这道闸能把它拦在幅值之内。但要清楚它的能力边界：裁剪只管\textbf{单次}幅值，管不了轨迹整体------连续多个贴着边界的动作、坐标系搞错、绝对/相对口径搞反，照样能做出危险运动。所以它是\textbf{最低层的数值保护}，上面还要叠加加速度/jerk
-限制、工作空间约束、碰撞监测、看门狗、急停，以及先低速分阶段验证再放速度。
+就算前面都对，真机上还要留一道兜底闸：把动作\textbf{裁剪}（clip）到合理范围、限制最大速度、加上关节限位。策略偶尔吐出一个离谱的值时，这道闸能把它拦在幅值之内。但要清楚它的能力边界：裁剪只管\textbf{单次}幅值，管不了轨迹整体------连续多个贴着边界的动作、坐标系搞错、绝对/相对口径搞反，照样能做出危险运动。所以它是\textbf{最低层的数值保护}，上面还要叠加一层层约束：限加速度、限加加速度（jerk，也就是加速度的变化率，管的是动作平不平顺），再加上工作空间约束、碰撞监测、看门狗、急停，以及先低速分阶段验证、确认没问题再放速度。
 
 最后，把本节的内容收成一张\textbf{出发前检查单}，部署前逐行过一遍：
 
@@ -644,18 +745,20 @@ VLA------\textbf{\(\pi_0\)}------当作黑盒策略，在仿真环境 LIBERO
 微调配置与权重。本讲实验固定用 LeRobot 提供的
 \texttt{lerobot/pi0\_libero\_finetuned\_v044}（代码见
 \texttt{code/vla/1\_policy\_rollout/1\_2\_pi0\_libero\_rollout/pi0\_demo.py}）；openpi
-那条线上对应的是 \texttt{pi05\_libero} 配置与
-checkpoint。换版本要连着配置、归一化资产、评测脚本一起换，不能只换权重文件。
+那条线上对应的是 \texttt{pi0\_libero} 配置与
+checkpoint------同一个仓库里还并列着
+\texttt{pi0\_fast\_libero}、\texttt{pi05\_libero}
+这些名字很像的变体，它们背后是不同的模型，别拿错。换版本要连着配置、归一化资产、评测脚本一起换，不能只换权重文件。
 
 \subsection{\texorpdfstring{4.1 先认识主角：\(\pi_0\)
 当一个黑盒策略}{4.1 先认识主角：\textbackslash pi\_0 当一个黑盒策略}}\label{ux5148ux8ba4ux8bc6ux4e3bux89d2pi_0-ux5f53ux4e00ux4e2aux9ed1ux76d2ux7b56ux7565}
 
 \(\pi_0\) 是 Physical Intelligence
-提出的视觉-语言-动作模型：一个视觉-语言骨干网络看懂图像和指令，后面接一个''动作专家''生成连续动作。
+提出的视觉-语言-动作模型{[}9{]}：一个视觉-语言骨干网络看懂图像和指令，后面接一个''动作专家''生成连续动作。
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture08/ref/841_pi0-architecture.png}}
+{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture08/ref/841_pi0-architecture_arxiv-2410.24164.png}}
 
 }
 
@@ -665,27 +768,62 @@ checkpoint。换版本要连着配置、归一化资产、评测脚本一起换�
 \end{figure}%
 
 \begin{quote}
-备注：\(\pi_0\) 内部用 flow matching 生成动作，这套机制留到第10讲（Flow
-Matching）和第11讲（\(\pi_0\)
-家族）再拆。\textbf{本讲只把它当一个''观测进、动作出''的黑盒}------恰好印证第
+备注：\(\pi_0\) 内部用 flow matching 生成动作，这套机制留到第10讲 5
+节（Flow Matching）和第11讲 3
+节（\(\pi_0\)）再拆。\textbf{本讲只把它当一个''观测进、动作出''的黑盒}------恰好印证第
 2 节对策略的定义。
 \end{quote}
 
 \subsection{4.2 搭好舞台：LIBERO
 仿真环境}\label{ux642dux597dux821eux53f0libero-ux4effux771fux73afux5883}
 
-LIBERO
+LIBERO{[}10{]}
 是一个机器人操作的仿真基准，用程序化的方式生成了一批桌面操作任务，分成空间、物体、目标、长程四个套件。没有真机时，它就是我们验证策略的标准台子：
 
 \begin{figure}[H]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture08/ref/842_libero-task-suites.png}}
+{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture08/ref/842_libero-task-suites_arxiv-2306.03310.png}}
 
 }
 
 \caption{LIBERO 程序化生成的四个任务套件：空间、物体、目标与长程}
 
 \end{figure}%
+
+在跑策略之前，先花几分钟把这个环境本身摸清楚------观测里有什么、动作是几维、发一个动作末端会往哪动。这三件事正是
+2.2 节那两个接口在一个具体环境里的样子。完整脚本在
+\texttt{code/vla/1\_policy\_rollout/1\_1\_libero\_env/libero\_demo.py}，建一个环境只要这几行：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{env\_cfg }\OperatorTok{=}\NormalTok{ LiberoEnvConfig(}
+\NormalTok{    task}\OperatorTok{=}\StringTok{"libero\_spatial"}\NormalTok{,}
+\NormalTok{    task\_ids}\OperatorTok{=}\NormalTok{[}\DecValTok{0}\NormalTok{],}
+\NormalTok{    obs\_type}\OperatorTok{=}\StringTok{"pixels\_agent\_pos"}\NormalTok{,   }\CommentTok{\# 图像 + 本体状态 两路观测}
+\NormalTok{    observation\_height}\OperatorTok{=}\DecValTok{256}\NormalTok{,}
+\NormalTok{    observation\_width}\OperatorTok{=}\DecValTok{256}\NormalTok{,}
+\NormalTok{)}
+
+\NormalTok{envs }\OperatorTok{=}\NormalTok{ make\_env(env\_cfg, n\_envs}\OperatorTok{=}\DecValTok{1}\NormalTok{)}
+\NormalTok{env  }\OperatorTok{=}\NormalTok{ envs[}\StringTok{\textquotesingle{}libero\_spatial\textquotesingle{}}\NormalTok{][}\DecValTok{0}\NormalTok{]}
+\end{Highlighting}
+\end{Shaded}
+
+\texttt{obs\_type="pixels\_agent\_pos"}
+这一个参数就把观测的口径定死了：图像一路、本体状态一路。换成别的取值，策略拿到的观测就变了------而策略的输入接口是训练时就固定下来的，对不上就跑不了。
+
+动作那一头同样要当场确认，不要靠猜：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{action\_space }\OperatorTok{=}\NormalTok{ env.single\_action\_space}
+\BuiltInTok{print}\NormalTok{(}\SpecialStringTok{f"Action space: }\SpecialCharTok{\{}\NormalTok{action\_space}\SpecialCharTok{\}}\SpecialStringTok{"}\NormalTok{)}
+\ControlFlowTok{assert}\NormalTok{ action\_space.shape }\OperatorTok{==}\NormalTok{ (}\DecValTok{7}\NormalTok{,)}
+\end{Highlighting}
+\end{Shaded}
+
+7 维，就是 4.5 节要核对的那个动作口径。这句 \texttt{assert}
+值得留着：环境版本一变，维度对不上会当场炸，总好过让一个维度错位的动作悄悄发到机器人上。
 
 \subsection{4.3
 闭环跑起来：看一眼、动一下}\label{ux95edux73afux8dd1ux8d77ux6765ux770bux4e00ux773cux52a8ux4e00ux4e0b}
@@ -696,7 +834,132 @@ LIBERO
 节反复强调的\textbf{闭环
 rollout}：策略不是预测一次就完事，而是要在自己造成的后果里一直走下去。
 
+代码在
+\texttt{code/vla/1\_policy\_rollout/1\_2\_pi0\_libero\_rollout/pi0\_demo.py}。第一步是把策略连同它的归一化统计量一起加载进来：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{    policy\_path }\OperatorTok{=} \StringTok{"lerobot/pi0\_libero\_finetuned\_v044"}
+\NormalTok{    policy\_cfg }\OperatorTok{=}\NormalTok{ PreTrainedConfig.from\_pretrained(policy\_path)}
+\NormalTok{    policy\_cfg.device }\OperatorTok{=} \StringTok{"cuda"} \ControlFlowTok{if}\NormalTok{ torch.cuda.is\_available() }\ControlFlowTok{else} \StringTok{"cpu"}
+\NormalTok{    policy }\OperatorTok{=}\NormalTok{ get\_policy\_class(policy\_cfg.}\BuiltInTok{type}\NormalTok{).from\_pretrained(}
+\NormalTok{        policy\_path, config}\OperatorTok{=}\NormalTok{policy\_cfg, strict}\OperatorTok{=}\VariableTok{False}
+\NormalTok{    )}
+\NormalTok{    preprocessor, postprocessor }\OperatorTok{=}\NormalTok{ make\_pre\_post\_processors(policy\_cfg, pretrained\_path}\OperatorTok{=}\NormalTok{policy\_path)}
+\end{Highlighting}
+\end{Shaded}
+
+最后那行是 3.4 节的主角落到代码上的样子。\texttt{preprocessor}
+做正向归一化，\texttt{postprocessor} 做反归一化，两者的统计量都从
+\texttt{policy\_path}
+这一个来源读出来------统计量和权重同进同出，不会分家。如果哪天你写的推理脚本里只有
+\texttt{from\_pretrained}
+而没有这一行，那就是把归一化整个跳过了，动作尺度会系统性错位。
+
+装好之后，闭环本身只有十来行：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+        \ControlFlowTok{for}\NormalTok{ \_ }\KeywordTok{in} \BuiltInTok{range}\NormalTok{(max\_steps):}
+\NormalTok{            observation\_batch }\OperatorTok{=}\NormalTok{ preprocess\_observation(observation)}
+\NormalTok{            observation\_batch }\OperatorTok{=}\NormalTok{ add\_envs\_task(env, observation\_batch)}
+\NormalTok{            observation\_batch }\OperatorTok{=}\NormalTok{ env\_preprocessor(observation\_batch)}
+\NormalTok{            observation\_batch }\OperatorTok{=}\NormalTok{ preprocessor(observation\_batch)}
+
+            \ControlFlowTok{with}\NormalTok{ torch.inference\_mode():}
+\NormalTok{                action }\OperatorTok{=}\NormalTok{ policy.select\_action(observation\_batch)}
+
+\NormalTok{            action }\OperatorTok{=}\NormalTok{ postprocessor(action)}
+\NormalTok{            action }\OperatorTok{=}\NormalTok{ env\_postprocessor(\{}\StringTok{"action"}\NormalTok{: action\})[}\StringTok{"action"}\NormalTok{].cpu().numpy()}
+
+\NormalTok{            observation, \_, terminated, truncated, info }\OperatorTok{=}\NormalTok{ env.step(action)}
+\NormalTok{            frames.append(env.envs[}\DecValTok{0}\NormalTok{].render())}
+\end{Highlighting}
+\end{Shaded}
+
+把它对着第 3
+节那张来回路的图读一遍，每一行都能找到位置：四行预处理是''去路''，\texttt{select\_action}
+是网络本身，两行后处理是''回程''（先反归一化、再还原成环境的动作口径），\texttt{env.step}
+把动作作用回环境、换来下一帧观测。第 2 节说策略是一个 \(a = \pi(o)\)
+的函数，在这里就是中间那两行；剩下的全是在给这个函数配上正确的输入输出口径。
+
+一段成功的 rollout 会被写成模块目录下的
+\texttt{output/pi0\_libero\_success.mp4}。脚本在写视频之前先拦了两道：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+        \ControlFlowTok{if} \KeywordTok{not}\NormalTok{ frames:}
+            \ControlFlowTok{raise} \PreprocessorTok{RuntimeError}\NormalTok{(}\StringTok{"no frames"}\NormalTok{)}
+        \ControlFlowTok{if} \KeywordTok{not}\NormalTok{ success:}
+            \ControlFlowTok{raise} \PreprocessorTok{RuntimeError}\NormalTok{(}\StringTok{"no success"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+这两行不是防御性编程的样板，而是 3.1
+节那条结论的代码版：\textbf{跑完不等于跑对}。没有它们，一次''程序正常退出但任务没完成''的运行看起来和成功没有区别------而这恰恰是本讲反复强调的那类故障的样子。
+
+跑通之后那段视频抽成四帧，长这样：
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture11/ref/pi0/rollout_keyframes.png}
+
+}
+
+\caption{一次成功 rollout
+的四个关键帧，从左到右是同一局内的连续时刻：机械臂从初始位姿探下去、贴住盘沿，再一路把盘子推向炉灶。任务是
+libero\_goal
+的「把盘子推到炉灶前方」，图片出自本节这段代码------\texttt{code/vla/1\_policy\_rollout/1\_2\_pi0\_libero\_rollout/pi0\_demo.py}（固定初始状态，131
+步完成）；第11讲 3.7 节复用的就是这一局}
+
+\end{figure}%
+
+对着这四帧再回看上面那个循环：每一帧画面都是上一个动作造成的后果，也是下一次
+\texttt{select\_action} 的输入------第 3
+节说的''用自己的动作决定自己下一步看到什么''，在这里是字面意思。四帧之间没有任何人写的分段逻辑：没有''预抓取位姿''、没有状态机、没有阶段校验，全程只有观测进、动作出。这正是第
+1 节那条对比的落点。
+
 \subsection{4.4
+一个对照实验：把图像换成白噪声}\label{ux4e00ux4e2aux5bf9ux7167ux5b9eux9a8cux628aux56feux50cfux6362ux6210ux767dux566aux58f0}
+
+闭环跑通了，但还剩一个问题没回答：\(\pi_0\)
+真的在看图像吗？还是说这个任务本身太固定，光靠本体状态和语言指令就能蒙对？
+
+这个问题不能靠读代码回答，得做对照实验：\textbf{其他一切不动，只把送进网络的图像换成白噪声}，再跑一遍同样的任务，比较两次的成功率。脚本是
+\texttt{code/vla/1\_policy\_rollout/1\_2\_pi0\_libero\_rollout/pi0\_test.py}，替换只发生在观测进网络之前的那一步：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{def}\NormalTok{ replace\_images\_with\_white\_noise(observation\_batch: }\BuiltInTok{dict}\NormalTok{[}\BuiltInTok{str}\NormalTok{, Any]) }\OperatorTok{{-}\textgreater{}} \BuiltInTok{dict}\NormalTok{[}\BuiltInTok{str}\NormalTok{, Any]:}
+    \ControlFlowTok{for}\NormalTok{ key, value }\KeywordTok{in}\NormalTok{ observation\_batch.items():}
+        \ControlFlowTok{if}\NormalTok{ key.startswith(}\StringTok{"observation.images."}\NormalTok{) }\KeywordTok{and}\NormalTok{ torch.is\_tensor(value):}
+\NormalTok{            observation\_batch[key] }\OperatorTok{=}\NormalTok{ torch.rand\_like(value)}
+    \ControlFlowTok{return}\NormalTok{ observation\_batch}
+\end{Highlighting}
+\end{Shaded}
+
+注意它只动 \texttt{observation.images.}
+开头的键------本体状态、语言指令、动作口径、归一化统计量全都保持原样。这是对照实验的关键：\textbf{一次只改一个变量}，否则成功率掉下来你也说不清是被哪一项改掉的。
+
+把 \texttt{image\_mode} 分别设成 \texttt{"real"} 和
+\texttt{"white\_noise"}
+各跑一遍，把两次的成功率填进这张表，结论自己就出来了：
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1875\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1562\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1875\linewidth - 2\tabcolsep\relax}@{}}
+\toprule\noalign{}
+图像输入 & 其余输入 & 套件成功率 \\
+\midrule\noalign{}
+真实相机图 & 不变 & ＿＿＿ \\
+均匀白噪声 & 不变 & ＿＿＿ \\
+\bottomrule\noalign{}
+\end{tabular}
+\end{center}
+
+怎么读这张表：\textbf{白噪声那一行掉得越多，说明这个策略越依赖视觉。}
+如果两行差不多，那就要警惕了------要么这个任务的初始状态太固定、闭着眼睛按固定轨迹走也能成，要么图像那一路根本没接进网络。第二种情况在自己搭推理流水线时并不罕见，而它在成功率上可能一点都不显眼，只有做了这个对照才看得出来。
+
+\subsection{4.5
 拿着检查单核对这次部署}\label{ux62ffux7740ux68c0ux67e5ux5355ux6838ux5bf9ux8fd9ux6b21ux90e8ux7f72}
 
 跑通只是第一步。真正把这一讲学透，是拿出 3.5 那张出发前检查单，把这次
@@ -757,7 +1020,7 @@ loss，部署时把动作口径、归一化统计量、安全边界对齐，这�
 VLA 的起点。
 \end{quote}
 
-\section{参考资料}\label{ux53c2ux8003ux8d44ux6599}
+\section{参考文献}\label{ux53c2ux8003ux6587ux732e}
 
 {[}1{]} CAPUANO F, PASCAL C, ZOUITINE A, et al.~Robot learning: a
 tutorial{[}EB/OL{]}. (2025-10-14){[}2026-06-30{]}.
@@ -767,32 +1030,36 @@ https://arxiv.org/abs/2510.12403.
 learning for self-driving cars{[}EB/OL{]}. (2016-04-25){[}2026-06-30{]}.
 https://arxiv.org/abs/1604.07316.
 
-{[}3{]} LEVINE S, FINN C, DARRELL T, et al.~End-to-end training of deep
+{[}3{]} BOJARSKI M, YERES P, CHOROMANSKA A, et al.~Explaining how a deep
+neural network trained with end-to-end learning steers a car{[}EB/OL{]}.
+(2017-04-25){[}2026-06-30{]}. https://arxiv.org/abs/1704.07911.
+
+{[}4{]} LEVINE S, FINN C, DARRELL T, et al.~End-to-end training of deep
 visuomotor policies{[}EB/OL{]}. (2015-04-02){[}2026-06-30{]}.
 https://arxiv.org/abs/1504.00702.
 
-{[}4{]} BROHAN A, BROWN N, CARBAJAL J, et al.~RT-1: robotics transformer
+{[}5{]} BROHAN A, BROWN N, CARBAJAL J, et al.~RT-1: robotics transformer
 for real-world control at scale{[}EB/OL{]}.
 (2022-12-13){[}2026-06-30{]}. https://arxiv.org/abs/2212.06817.
 
-{[}5{]} ZHONG Y, BAI F, CAI S, et al.~A survey on vision-language-action
+{[}6{]} ZHONG Y, BAI F, CAI S, et al.~A survey on vision-language-action
 models: an action tokenization perspective{[}EB/OL{]}.
 (2025-07-02){[}2026-06-30{]}. https://arxiv.org/abs/2507.01925.
 
-{[}6{]} ROSS S, GORDON G J, BAGNELL J A. A reduction of imitation
+{[}7{]} ROSS S, GORDON G J, BAGNELL J A. A reduction of imitation
 learning and structured prediction to no-regret online
 learning{[}EB/OL{]}. (2010-11-02){[}2026-06-30{]}.
 https://arxiv.org/abs/1011.0686.
 
-{[}7{]} CHI C, XU Z, FENG S, et al.~Diffusion policy: visuomotor policy
+{[}8{]} CHI C, XU Z, FENG S, et al.~Diffusion policy: visuomotor policy
 learning via action diffusion{[}EB/OL{]}. (2023-03-07){[}2026-06-30{]}.
 https://arxiv.org/abs/2303.04137.
 
-{[}8{]} BLACK K, BROWN N, DRIESS D, et al.~\(\pi_0\): a
+{[}9{]} BLACK K, BROWN N, DRIESS D, et al.~\(\pi_0\): a
 vision-language-action flow model for general robot control{[}EB/OL{]}.
 (2024-10-31){[}2026-06-30{]}. https://arxiv.org/abs/2410.24164.
 
-{[}9{]} LIU B, ZHU Y, GAO C, et al.~LIBERO: benchmarking knowledge
+{[}10{]} LIU B, ZHU Y, GAO C, et al.~LIBERO: benchmarking knowledge
 transfer for lifelong robot learning{[}EB/OL{]}.
 (2023-06-05){[}2026-06-30{]}. https://arxiv.org/abs/2306.03310.
 

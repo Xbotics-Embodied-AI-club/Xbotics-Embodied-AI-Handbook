@@ -25,11 +25,33 @@ from model import ActorCritic, compute_gae  # noqa: E402
 
 
 def default_checkpoint_root(run_name: str) -> Path:
+    """给出这次训练存权重的目录。
+
+    权重是大文件，按仓库约定落在共享数据根下、不进 git，所以路径从环境变量拼出来。
+
+    Args:
+        run_name: 本次训练的名字，同时用作目录名。
+
+    Returns:
+        存放 checkpoint 的目录路径。
+    """
     datasets_root = Path(os.environ["DATASETS_ROOT"])
     return datasets_root / "models" / "trained" / "xbotics_rl_g1_walk" / run_name
 
 
 def save_checkpoint(path, model, optimizer, iteration, training_settings):
+    """存一份可续训、也可直接拿去评测的权重。
+
+    优化器状态和这次训练的全部设置一起存下来，评测脚本才能凭 checkpoint 自己重建
+    出维度一致的网络，不必再猜环境配置。
+
+    Args:
+        path: 目标文件路径。
+        model: 要保存的 `ActorCritic`。
+        optimizer: 当前优化器。
+        iteration: 当前是第几次迭代。
+        training_settings: 本次训练的全部设置，一并写进文件。
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
@@ -57,6 +79,14 @@ class G1WalkRolloutDataset(IterableDataset):
         yield self.sample_rollout()
 
     def sample_rollout(self):
+        """用当前策略采一段轨迹，并用 critic 估值 + GAE 算出优势。
+
+        与 v1 唯一的区别就在这里：权重从「回报减常数均值」换成了「回报减 critic 估值」
+        再做 GAE 平滑。
+
+        Returns:
+            含 obs / critic_obs / actions / returns / advantages 与本轮平均奖励的字典。
+        """
         env = self.env
         num_envs = env.num_envs
         obs, critic_obs = env.get_observations()
@@ -106,6 +136,10 @@ class G1WalkRolloutDataset(IterableDataset):
 
 
 class G1WalkData(L.LightningDataModule):
+    """把持久环境交给 Trainer 的 LightningDataModule。
+
+    环境要跨迭代活着（仿真状态连续推进），所以由它长期持有，而不是每轮新建。
+    """
     def __init__(self, env, model, num_steps_per_env, gamma, lam):
         super().__init__()
         self.env = env
@@ -115,6 +149,14 @@ class G1WalkData(L.LightningDataModule):
         self.lam = lam
 
     def train_dataloader(self):
+        """每个 epoch 重建一次数据集。
+
+        重建就意味着重新采样——on-policy 要求数据来自当前策略，这一条由 Trainer 的
+        `reload_dataloaders_every_n_epochs=1` 和这里配合实现。
+
+        Returns:
+            包着在线数据集的 DataLoader；`batch_size=None` 表示数据集自己吐整批。
+        """
         dataset = G1WalkRolloutDataset(self.env, self.model, self.num_steps_per_env, self.gamma, self.lam)
         return DataLoader(dataset, batch_size=None)
 
@@ -142,6 +184,11 @@ class G1WalkLightningA2C(L.LightningModule):
         self.learning_rate = 1.0e-3
 
     def setup(self, stage):
+        """训练开始前建好权重目录并起一个 W&B run。
+
+        Args:
+            stage: Lightning 传入的阶段名，只在 "fit" 阶段做事。
+        """
         if stage != "fit":
             return
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -151,10 +198,26 @@ class G1WalkLightningA2C(L.LightningModule):
         )
 
     def configure_optimizers(self):
+        """把 actor、critic 和动作标准差一起交给优化器。
+
+        与 v1 的区别：critic 这次要真训了。
+
+        Returns:
+            Adam 优化器。
+        """
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
         return self.optimizer
 
     def training_step(self, batch, batch_idx):
+        """算一个 batch 的 A2C loss：策略梯度项 + critic 回归项 + 熵奖励。
+
+        Args:
+            batch: 采样端产出的一整段数据。
+            batch_idx: Lightning 传入的批序号，本实现用不到。
+
+        Returns:
+            本步的 loss。
+        """
         log_probs, entropy, values, _means = self.model.evaluate(
             batch["obs"], batch["critic_obs"], batch["actions"]
         )
@@ -180,12 +243,34 @@ class G1WalkLightningA2C(L.LightningModule):
         return loss
 
     def teardown(self, stage):
+        """训练结束后收尾，把 W&B run 正常关掉。
+
+        Args:
+            stage: Lightning 传入的阶段名。
+        """
         if self.wandb_run is not None:
             self.wandb_run.finish()
 
 
 def run_training(run_name, num_envs, max_iterations, num_steps_per_env, save_interval, device,
                  seed=1, checkpoint_dir=None, wandb_project="rl_class", wandb_mode="online"):
+    """起一次完整训练：建环境、建模型、交给 Trainer 跑完。
+
+    Args:
+        run_name: 本次训练的名字，用作权重目录名与 W&B run 名。
+        num_envs: 并行环境数。
+        max_iterations: 训练迭代次数，一次迭代 = 采一段 rollout + 更新。
+        num_steps_per_env: 每个环境每轮采多少步。
+        save_interval: 每多少次迭代存一次权重。
+        device: 仿真与训练所在设备。
+        seed: 随机种子。
+        checkpoint_dir: 权重目录，给 None 时按 run_name 自动拼。
+        wandb_project: W&B 项目名。
+        wandb_mode: W&B 模式，离线跑改成 offline 即可。
+
+    Returns:
+        最后一次存盘的 checkpoint 路径。
+    """
     checkpoint_dir = checkpoint_dir or default_checkpoint_root(run_name)
     gamma, lam = 0.99, 0.95
 
@@ -223,6 +308,7 @@ def run_training(run_name, num_envs, max_iterations, num_steps_per_env, save_int
 
 
 def main():
+    """按课堂预算跑一次 A2C 训练。"""
     run_training(
         run_name="g1-walk-a2c",
         num_envs=4096,

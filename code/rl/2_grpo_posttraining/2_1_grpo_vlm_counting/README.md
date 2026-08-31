@@ -10,7 +10,7 @@
 | 文件 | 职责 |
 |---|---|
 | `train_grpo_qwen2_vl.py` | 全流程：数据 → 奖励函数 → GRPO 训练 → 评测/预测，Lightning `trainer.fit(model, data)` |
-| `train_grpo_qwen2_vl.ipynb` | 同内容的课堂走读版（中文分节） |
+| `train_grpo_qwen2_vl.ipynb` | 同内容的逐行走读版（中文分节） |
 
 数据在 `../data/clevr_counting/`（CLEVR 数数训练集 + SuperCLEVR-200 评测子集，
 含来源清单）；训后 LoRA adapter 与评测摘要在 `../result/2_1_grpo_vlm_counting/`。

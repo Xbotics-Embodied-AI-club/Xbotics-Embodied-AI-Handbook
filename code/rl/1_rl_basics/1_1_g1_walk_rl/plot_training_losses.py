@@ -31,6 +31,15 @@ ORDER = ["g1-walk-reinforce", "g1-walk-a2c", "g1-walk-ppo"]
 
 
 def moving_average(values, window):
+    """算滑动平均，用来从逐次迭代的原始曲线里把趋势拉出来。
+
+    Args:
+        values: 逐次迭代的原始数值。
+        window: 窗口长度。开头不足一窗时按已有点数取平均。
+
+    Returns:
+        与输入等长的滑动平均序列。
+    """
     out, running = [], 0.0
     for i, v in enumerate(values):
         running += v
@@ -48,7 +57,16 @@ PANELS = [
 ]
 
 def robust_ylim(series):
-    """训练曲线常有个别尖峰，按分位数定纵轴范围，免得一根尖刺把其余全压平。"""
+    """按分位数给纵轴定范围。
+
+    训练曲线常有个别尖峰，直接用最大最小值会让一根尖刺把其余部分全压成一条平线。
+
+    Args:
+        series: 若干条曲线的数值列表。
+
+    Returns:
+        (下界, 上界)；没有任何数据时返回 None。
+    """
     flat = sorted(v for s in series for v in s)
     if not flat:
         return None

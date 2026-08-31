@@ -24,11 +24,36 @@ from model import ActorCritic, compute_gae  # noqa: E402
 
 
 def default_checkpoint_root(run_name: str) -> Path:
+    """给出这次训练存权重的目录。
+
+    权重是大文件，按仓库约定落在共享数据根下、不进 git，所以路径从环境变量拼出来。
+
+    Args:
+        run_name: 本次训练的名字，同时用作目录名。
+
+    Returns:
+        存放 checkpoint 的目录路径。
+    """
     datasets_root = Path(os.environ["DATASETS_ROOT"])
     return datasets_root / "models" / "trained" / "xbotics_rl_g1_walk" / run_name
 
 
 def adapt_learning_rate_to_kl(optimizer, kl, desired_kl, min_lr=1.0e-5, max_lr=1.0e-2):
+    """按新旧策略的 KL 距离自动收放学习率。
+
+    clip 只让「走太远」无利可图，并不真的锁住步长；再加这一层，KL 超标就减速、
+    偏小就加速，把每次更新的幅度稳在一条窄带里。
+
+    Args:
+        optimizer: 要调整的优化器。
+        kl: 本次更新前后策略的 KL 距离。
+        desired_kl: 希望维持的 KL 水平。
+        min_lr: 学习率下限。
+        max_lr: 学习率上限。
+
+    Returns:
+        调整后的学习率。
+    """
     current_lr = optimizer.param_groups[0]["lr"]
     kl_value = float(kl.detach().cpu())
     if kl_value > 2.0 * desired_kl:
@@ -40,6 +65,18 @@ def adapt_learning_rate_to_kl(optimizer, kl, desired_kl, min_lr=1.0e-5, max_lr=1
 
 
 def save_checkpoint(path, model, optimizer, iteration, training_settings):
+    """存一份可续训、也可直接拿去评测的权重。
+
+    优化器状态和这次训练的全部设置一起存下来，评测脚本才能凭 checkpoint 自己重建
+    出维度一致的网络，不必再猜环境配置。
+
+    Args:
+        path: 目标文件路径。
+        model: 要保存的 `ActorCritic`。
+        optimizer: 当前优化器。
+        iteration: 当前是第几次迭代。
+        training_settings: 本次训练的全部设置，一并写进文件。
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
@@ -70,6 +107,14 @@ class G1WalkRolloutDataset(IterableDataset):
         yield from self.iter_mini_batches(rollout)
 
     def sample_rollout(self):
+        """用当前策略采一段轨迹，并记下旧策略的对数概率与分布参数。
+
+        采样时就把这些量存下来，是因为训练阶段要拿它们算概率比值和 KL；等到更新时
+        策略已经变了，补不回来。
+
+        Returns:
+            含整段 rollout 与 GAE 优势的字典。
+        """
         env = self.env
         num_envs = env.num_envs
         obs, critic_obs = env.get_observations()
@@ -126,6 +171,16 @@ class G1WalkRolloutDataset(IterableDataset):
         }
 
     def iter_mini_batches(self, rollout):
+        """把一整段 rollout 打散成若干 minibatch，重复吐几轮。
+
+        PPO 的数据复用就实现在这里：Lightning 那边一行不用改，多轮复用完全由数据集完成。
+
+        Args:
+            rollout: `sample_rollout` 的产出。
+
+        Yields:
+            一个个 minibatch 字典。
+        """
         batch_size = rollout["actions"].shape[0] * rollout["actions"].shape[1]
         mini_batch_size = batch_size // self.num_mini_batches
         usable_size = mini_batch_size * self.num_mini_batches
@@ -165,6 +220,14 @@ class G1WalkData(L.LightningDataModule):
         self.num_mini_batches = num_mini_batches
 
     def train_dataloader(self):
+        """每个 epoch 重建一次数据集。
+
+        重建就意味着重新采样——on-policy 要求数据来自当前策略，这一条由 Trainer 的
+        `reload_dataloaders_every_n_epochs=1` 和这里配合实现。
+
+        Returns:
+            包着在线数据集的 DataLoader；`batch_size=None` 表示数据集自己吐整批。
+        """
         dataset = G1WalkRolloutDataset(
             env=self.env,
             model=self.model,
@@ -205,6 +268,11 @@ class G1WalkLightningPPO(L.LightningModule):
         self.desired_kl = 0.01
 
     def setup(self, stage):
+        """训练开始前建好权重目录并起一个 W&B run。
+
+        Args:
+            stage: Lightning 传入的阶段名，只在 "fit" 阶段做事。
+        """
         if stage != "fit":
             return
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -217,13 +285,28 @@ class G1WalkLightningPPO(L.LightningModule):
         )
 
     def configure_optimizers(self):
+        """把全部参数交给一个 Adam。
+
+        Returns:
+            Adam 优化器。
+        """
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
         return self.optimizer
 
     def on_train_epoch_start(self):
+        """每轮开始时清空本轮的指标缓存。"""
         self.epoch_records = []
 
     def training_step(self, mini_batch, batch_idx):
+        """算一个 minibatch 的 PPO loss，并把指标攒进本轮缓存。
+
+        Args:
+            mini_batch: 数据集吐出的一个 minibatch。
+            batch_idx: Lightning 传入的批序号，本实现用不到。
+
+        Returns:
+            本步的 loss。
+        """
         loss, policy_loss, value_loss, entropy_loss, kl = self.loss_for_batch(mini_batch)
         self.latest_kl = kl.detach()
         record = {
@@ -239,9 +322,15 @@ class G1WalkLightningPPO(L.LightningModule):
         return loss
 
     def on_before_optimizer_step(self, optimizer):
+        """每次真正迈步之前，先按 KL 把学习率调好。
+
+        Args:
+            optimizer: Lightning 传入的优化器。
+        """
         adapt_learning_rate_to_kl(self.optimizer, self.latest_kl, self.desired_kl)
 
     def on_train_epoch_end(self):
+        """把本轮各 minibatch 的指标平均后上报，并按需存盘。"""
         iteration = self.current_epoch + 1
         metrics = {key: sum(r[key] for r in self.epoch_records) / len(self.epoch_records) for key in self.epoch_records[0]}
         metrics["lr"] = self.optimizer.param_groups[0]["lr"]
@@ -251,6 +340,16 @@ class G1WalkLightningPPO(L.LightningModule):
             save_checkpoint(self.latest_checkpoint, self.model, self.optimizer, iteration, self.training_settings)
 
     def loss_for_batch(self, batch):
+        """算一个 minibatch 上的三项 loss 与 KL。
+
+        KL 在 `no_grad` 下算：它只用来调学习率，不参与反向传播。
+
+        Args:
+            batch: 一个 minibatch。
+
+        Returns:
+            (总 loss, 策略 loss, 价值 loss, 熵, KL)。
+        """
         log_probs, entropy, values, action_means = self.model.evaluate(
             batch["obs"], batch["critic_obs"], batch["actions"]
         )
@@ -276,18 +375,52 @@ class G1WalkLightningPPO(L.LightningModule):
         return loss, policy_loss, value_loss, entropy_loss, kl
 
     def value_loss(self, values, old_values, returns):
+        """critic 的回归损失，可选对新估值做对称裁剪。
+
+        裁剪的思路与策略侧的 clip 一脉相承：不让 critic 的估值一次跳得离旧估值太远。
+
+        Args:
+            values: 当前 critic 的估值。
+            old_values: 采样时记下的旧估值。
+            returns: 回归目标。
+
+        Returns:
+            标量损失。
+        """
         if not self.use_clipped_value_loss:
             return torch.square(values - returns).mean()
         value_clipped = old_values + (values - old_values).clamp(-self.clip_param, self.clip_param)
         return torch.max(torch.square(values - returns), torch.square(value_clipped - returns)).mean()
 
     def teardown(self, stage):
+        """训练结束后收尾，把 W&B run 正常关掉。
+
+        Args:
+            stage: Lightning 传入的阶段名。
+        """
         if self.wandb_run is not None:
             self.wandb_run.finish()
 
 
 def run_training(run_name, num_envs, max_iterations, num_steps_per_env, save_interval, device,
                  seed=1, checkpoint_dir=None, wandb_project="rl_class", wandb_mode="online"):
+    """起一次完整训练：建环境、建模型、交给 Trainer 跑完。
+
+    Args:
+        run_name: 本次训练的名字，用作权重目录名与 W&B run 名。
+        num_envs: 并行环境数。
+        max_iterations: 训练迭代次数，一次迭代 = 采一段 rollout + 更新。
+        num_steps_per_env: 每个环境每轮采多少步。
+        save_interval: 每多少次迭代存一次权重。
+        device: 仿真与训练所在设备。
+        seed: 随机种子。
+        checkpoint_dir: 权重目录，给 None 时按 run_name 自动拼。
+        wandb_project: W&B 项目名。
+        wandb_mode: W&B 模式，离线跑改成 offline 即可。
+
+    Returns:
+        最后一次存盘的 checkpoint 路径。
+    """
     checkpoint_dir = checkpoint_dir or default_checkpoint_root(run_name)
     gamma, lam = 0.99, 0.95
     num_learning_epochs, num_mini_batches = 5, 4
@@ -327,6 +460,7 @@ def run_training(run_name, num_envs, max_iterations, num_steps_per_env, save_int
 
 
 def main():
+    """按课堂预算跑一次完整 PPO 训练。"""
     run_training(
         run_name="g1-walk-ppo",
         num_envs=4096,

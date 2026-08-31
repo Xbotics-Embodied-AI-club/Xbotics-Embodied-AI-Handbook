@@ -1,5 +1,8 @@
 """LIBERO 同状态组环境：GRPO 的采样前提是「同一初始状态下比较一组 rollout 的相对好坏」。
 
+第15讲 8.2 节把这里的组 rollout 与数数实验逐项对照，5.1 节解释了为什么
+"仿真器可以精确重置"是 GRPO 搬上机器人的必要条件。
+
 这里把 LIBERO 包装成向量化环境：一组 n 个子环境被强制设成同一个初始状态，
 策略在上面采样 n 条轨迹，任务成败（0/1）就是每条轨迹的稀疏奖励。
 组内奖励有成有败，才有相对优势信号——这是训练脚本里前沿状态池存在的原因。
@@ -23,14 +26,35 @@ from model import sample_chunk
 
 
 def build_group_env(task_id, n):
-    """建一个 n 路向量化 LIBERO 环境（libero_object 套件的第 task_id 个任务）。"""
+    """建一个 n 路向量化 LIBERO 环境（libero_object 套件的第 task_id 个任务）。
+
+    Args:
+        task_id: 套件内的任务序号。
+        n: 并行子环境数，也就是 GRPO 的组大小。
+
+    Returns:
+        tuple: (向量化环境, 环境配置)。配置后面还要拿去建观测/动作的预处理管线。
+    """
+
     cfg = LiberoEnv(task="libero_object", task_ids=[task_id])
     d = make_env(cfg, n_envs=n, use_async_envs=False)
     return next(iter(next(iter(d.values())).values())), cfg
 
 
 def set_same_init_state(env, idx):
-    """把向量环境里所有子环境的初始状态锁成同一个 idx——同状态组是 GRPO 的前提。"""
+    """把向量环境里所有子环境的初始状态锁成同一个 idx——同状态组是 GRPO 的前提。
+
+    LIBERO 默认给每个子环境轮换不同的初始状态，那样采出来的一组轨迹彼此不可比，
+    组内相对优势就失去意义，所以这里要把轮换关掉。
+
+    Args:
+        env: 向量化环境。
+        idx: 初始状态编号，超出可用范围时自动取模。
+
+    Returns:
+        int: 成功锁定的子环境数量，用来确认这一步真的生效了。
+    """
+
     n = 0
     for sub in env.envs:
         s = getattr(sub, "unwrapped", sub)
@@ -43,7 +67,18 @@ def set_same_init_state(env, idx):
 
 
 def slice_record(rec, g):
-    """从一批生成记录里切出第 g 个环境自己的那一条。"""
+    """从一批生成记录里切出第 g 个环境自己的那一条。
+
+    一次生成同时服务 n 个子环境，但优势是逐条轨迹算的，所以记录也要拆开存。
+
+    Args:
+        rec: `sample_chunk` 留下的整批生成记录。
+        g: 子环境序号。
+
+    Returns:
+        dict: 只含第 g 条的记录，张量维度保持为 1 以便直接复算 logprob。
+    """
+
     return {k: (v[g:g + 1] if torch.is_tensor(v) else v) for k, v in rec.items()}
 
 
@@ -51,8 +86,23 @@ def rollout_group(policy, env, pre, env_pre, post, env_post, seed, group_size,
                   init_idx, temperature, max_steps_cap, collect_records=True):
     """在同一初始状态上采一组 rollout。
 
-    返回 (records, rewards)：records[g] 是第 g 条轨迹每次生成动作块时的输入/输出记录
-    （训练时要用它复算 logprob），rewards[g] 是该条轨迹的 0/1 成败。
+    Args:
+        policy: VLA-0 策略。
+        env: 向量化环境。
+        pre: 策略侧观测预处理。
+        env_pre: 环境侧观测预处理。
+        post: 策略侧动作后处理。
+        env_post: 环境侧动作后处理。
+        seed: 随机种子，训练里按迭代号与状态号错开，免得每轮采到同一批轨迹。
+        group_size: 组大小，等于并行子环境数。
+        init_idx: 这一组共用的初始状态编号。
+        temperature: 采样温度；传 None 走贪婪解码。
+        max_steps_cap: 截断超长 episode，省掉失败轨迹的尾巴；传 0 表示不截断。
+        collect_records: 评测时置 False，不留生成记录可以省下大量显存。
+
+    Returns:
+        tuple: (records, rewards)。records[g] 是第 g 条轨迹每次生成动作块时的
+        输入/输出记录，训练时要用它复算 logprob；rewards[g] 是该条轨迹的 0/1 成败。
     """
     m = policy.model
     policy.reset()

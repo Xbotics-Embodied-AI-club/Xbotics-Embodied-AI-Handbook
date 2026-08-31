@@ -45,6 +45,17 @@ class QNetwork(nn.Module):
         )
 
     def forward(self, obs):
+        """一次前向：一批观测进，每个动作的 Q 值出。
+
+        和 v1 查表最大的区别在这里——相近的观测会得到相近的输出，一次更新能惠及
+        一整片邻域，不必像表格那样每一格都自己撞够次数。
+
+        Args:
+            obs: 形状 (batch, state_dim) 的观测张量。
+
+        Returns:
+            形状 (batch, n_actions) 的 Q 值张量。
+        """
         return self.net(obs)
 
 
@@ -62,6 +73,16 @@ class ReplayBuffer:
         self.size = 0
 
     def push(self, state, action, reward, next_state, done):
+        """把一条转移写进环形缓冲区；池满之后覆盖最旧的那条。
+
+        Args:
+            state: 当前观测。
+            action: 执行的动作下标。
+            reward: 即时奖励。
+            next_state: 下一观测。
+            done: 是否真正失败（terminated），超时截断不算——超时时后面还有回报，
+                不该把 bootstrap 掐掉。
+        """
         idx = self.position % self.capacity
         self.states[idx] = state
         self.actions[idx] = action
@@ -72,6 +93,18 @@ class ReplayBuffer:
         self.size = min(self.size + 1, self.capacity)
 
     def sample(self, batch_size):
+        """均匀随机抽一个 minibatch。
+
+        随机抽样本身就是稳定器：同一条轨迹里相邻的转移高度相关，按时间顺序喂给网络
+        等于反复用同一批相关样本冲刷梯度；打散之后一个 batch 里混着不同回合、
+        不同阶段的经验，梯度估计干净得多。
+
+        Args:
+            batch_size: 这一批要抽多少条转移。
+
+        Returns:
+            `(states, actions, rewards, next_states, dones)` 五个 numpy 数组。
+        """
         idxs = np.random.randint(0, self.size, size=batch_size)
         return (
             self.states[idxs], self.actions[idxs], self.rewards[idxs],
@@ -99,7 +132,17 @@ class CollectorState:
 
 
 def warmup_buffer(env, buffer, stats, warmup_steps):
-    """训练开始前先用纯随机策略把回放池灌到 warmup_steps 条，避免小批量从空池里采样。"""
+    """训练开始前先用纯随机策略把回放池灌到 warmup_steps 条。
+
+    没有这一步，最早那几个 batch 会从几乎空的池子里反复抽同几条样本，网络先被这几条
+    带偏，后面很难拉回来。
+
+    Args:
+        env: 已 reset 过的 CartPole 环境。
+        buffer: 待灌注的回放池。
+        stats: 采集状态（当前观测、回合回报、计数器），会被就地更新。
+        warmup_steps: 灌多少步随机经验。
+    """
     for _ in range(warmup_steps):
         action = env.action_space.sample()
         next_obs, reward, terminated, truncated, _ = env.step(action)
@@ -133,6 +176,11 @@ class CartPoleReplayDataset(IterableDataset):
         self.epsilon_decay_steps = epsilon_decay_steps
 
     def collect(self):
+        """用当前策略在环境里采 steps_per_epoch 步，全部写进回放池。
+
+        采样和训练在这一级是分开的两段：先采一段，再从池子里抽很多批来学——
+        "采一次、学很多次"正是 off-policy 能把每条经验榨干的地方。
+        """
         stats = self.stats
         for _ in range(self.steps_per_epoch):
             stats.global_env_step += 1
@@ -173,6 +221,12 @@ class CartPoleReplayDataset(IterableDataset):
 
 
 class CartPoleDQNData(L.LightningDataModule):
+    """持有环境、回放池与统计量。
+
+    对照 v1 的 `CartPoleTabularData`：多出来的成员只有一个 `buffer`——
+    on-policy 到 off-policy 的差别，在数据这一层就是"多了个池子"。
+    """
+
     def __init__(self, env, model, buffer, stats, steps_per_epoch, batches_per_epoch, batch_size,
                  epsilon_start, epsilon_end, epsilon_decay_steps):
         super().__init__()
@@ -188,6 +242,11 @@ class CartPoleDQNData(L.LightningDataModule):
         self.epsilon_decay_steps = epsilon_decay_steps
 
     def train_dataloader(self):
+        """先采一段新经验进池，再交给 DataLoader 从池里抽小批量。
+
+        Returns:
+            每次迭代吐一个 minibatch 的 DataLoader（`batch_size=None`，数据集自己成批）。
+        """
         dataset = CartPoleReplayDataset(
             self.env, self.model, self.buffer, self.stats,
             self.steps_per_epoch, self.batches_per_epoch, self.batch_size,
@@ -220,7 +279,17 @@ class DQN(L.LightningModule):
         self.grad_steps = 0
 
     def act(self, obs, epsilon):
-        """ε-greedy：以 ε 概率随机探索，否则对在线网络的 Q 值取 argmax。"""
+        """ε-greedy：以 ε 概率随机探索，否则对在线网络的 Q 值取 argmax。
+
+        这里的 `argmax` 正是 DQN 迈不进连续控制的原因——动作是有限几个才枚举得过来。
+
+        Args:
+            obs: 环境给的原始连续观测。
+            epsilon: 这一步的探索概率。
+
+        Returns:
+            动作下标（0 或 1）。
+        """
         if np.random.rand() < epsilon:
             return int(np.random.randint(self.n_actions))
         with torch.no_grad():
@@ -228,9 +297,26 @@ class DQN(L.LightningModule):
         return int(torch.argmax(q_values, dim=1).item())
 
     def configure_optimizers(self):
+        """只优化在线网络。
+
+        目标网络是它的延迟拷贝，靠定期整体复制参数更新，不参与梯度下降——
+        真让它跟着一起训，回归目标就又开始跟着网络晃了。
+
+        Returns:
+            在线网络参数上的 Adam 优化器。
+        """
         return torch.optim.Adam(self.online.parameters(), lr=self.learning_rate)
 
     def training_step(self, batch, batch_idx):
+        """一个 minibatch 的 DQN 更新：算 TD 目标、回归、按节奏同步目标网络。
+
+        Args:
+            batch: 从回放池抽出的 `(states, actions, rewards, next_states, dones)`。
+            batch_idx: Lightning 传入的批序号，这里用不到。
+
+        Returns:
+            这一批的均方误差损失。
+        """
         states, actions, rewards, next_states, dones = batch
 
         q_values = self.online(states).gather(1, actions.unsqueeze(1)).squeeze(1)
@@ -259,6 +345,7 @@ class DQN(L.LightningModule):
         return loss
 
     def on_train_end(self):
+        """训练结束时把整条回报曲线落盘，供画对照图和回代核对数字用。"""
         self.result_path.parent.mkdir(parents=True, exist_ok=True)
         self.result_path.write_text(json.dumps({
             "algo": "dqn",
@@ -270,6 +357,7 @@ class DQN(L.LightningModule):
 
 
 def main():
+    """跑完整条 DQN 训练：建环境与回放池、灌 warmup、`trainer.fit`、落盘。"""
     # 固定随机种子：同一台机器上重跑能得到完全一样的曲线，书里报的数字才可复现。
     seed = 1
     torch.manual_seed(seed)

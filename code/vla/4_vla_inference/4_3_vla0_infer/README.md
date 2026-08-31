@@ -4,7 +4,7 @@ VLA-0 把自回归离散推到极简：不加动作头、不扩词表，动作�
 数字串，模型像聊天一样"说"出来，xgrammar 约束解码保证输出合法。demo 会把第一个
 动作块的原始数字串打印出来——那就是模型的全部输出。
 
-- `vla0_demo.ipynb` — 课堂走读版（分节讲解）
+- `vla0_demo.ipynb` — 逐行走读版（分节讲解）
 - `vla0_demo.py` — 脚本版，跑通即产出 `output/vla0_libero_success.mp4`
 - `vla0_eval.sh` — 官方 `lerobot-eval` 标准评测入口（多 episode pc_success + 自动录像）
 

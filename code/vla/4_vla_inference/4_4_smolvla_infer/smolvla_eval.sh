@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SmolVLA LIBERO 微调 checkpoint 标准评测。
 # 与同目录 smolvla_demo.py 等价的官方命令行入口：lerobot-eval 自带向量环境、多 episode
-# 统计（pc_success）与自动录像，评测/复现用它最方便；demo .py 则用于课堂逐行走读。
+# 统计（pc_success）与自动录像，评测/复现用它最方便；demo .py 则用于逐行走读。
 # 在 code/ 目录运行：bash vla/4_vla_inference/4_4_smolvla_infer/smolvla_eval.sh
 set -euo pipefail
 

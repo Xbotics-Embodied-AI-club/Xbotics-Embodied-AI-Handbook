@@ -1,3 +1,8 @@
+"""用 $\\pi_0$ 在 LIBERO 里跑通第一个策略闭环：观测进、动作出、录成视频。
+
+第8讲 4.3 节的配套代码。把 $\\pi_0$ 当成一个黑盒策略，在 libero_goal 的一个任务上
+闭环跑到底，成功后把整段 rollout 导出成 mp4。
+"""
 from __future__ import annotations
 
 import os
@@ -14,61 +19,72 @@ from lerobot.policies.factory import get_policy_class, make_pre_post_processors
 from lerobot.utils.io_utils import write_video
 import lerobot.policies  # noqa: F401
 
-# MuJoCo 的离屏渲染需要 EGL。
-os.environ.setdefault("MUJOCO_GL", "egl")
+# MuJoCo 的离屏渲染需要 EGL，这样没有桌面环境也能渲出画面。
+os.environ["MUJOCO_GL"] = "egl"
 
-# 关闭 torch compile / inductor，避免首次运行时出现大量 autotune 开销，
-# 让课堂 demo 更稳定、更可复现。
-os.environ.setdefault("TORCHINDUCTOR_DISABLE", "1")
-os.environ.setdefault("TORCH_COMPILE_DISABLE", "1")
-
-# 下面这组参数是已经验证过能跑出 success=True 的固定配置。
-POLICY_PATH = "lerobot/pi0_libero_finetuned_v044"
-TASK_SUITE = "libero_goal"
-TASK_ID = 5
-EPISODE_INDEX = 2
-MAX_STEPS = 180
-FPS = 10
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-SEED = 7
-OUT_PATH = Path("vla/1_policy_rollout/1_2_pi0_libero_rollout/output/pi0_libero_success.mp4")
+# 关掉 torch 的编译与自动调优。开着的话首次运行要先花几分钟做 autotune，
+# 而且每次挑中的 kernel 不一定相同，演示时结果不好复现。
+os.environ["TORCHINDUCTOR_DISABLE"] = "1"
+os.environ["TORCH_COMPILE_DISABLE"] = "1"
 
 
 def set_episode_index(env, episode_index: int) -> None:
-    # LeRobot 的 LIBERO 向量环境外面包了一层 SyncVectorEnv。
-    # 真正控制初始状态的是里面每个子环境的 episode_index / init_state_id。
-    # 这里只跑 1 个环境，所以直接把第 0 个子环境切到我们选好的成功初始状态。
+    """把向量环境里的子环境切到指定的 LIBERO 预设初始状态。
+
+    LeRobot 的 LIBERO 环境外面包了一层 SyncVectorEnv，真正决定初始状态的是里面
+    每个子环境的 episode_index / init_state_id，从外层的向量环境改不到。
+
+    Args:
+        env: make_env 返回的向量环境。
+        episode_index: LIBERO 预设初始状态的序号。
+    """
     for inner_env in env.envs:
         inner_env.episode_index = episode_index
         inner_env.init_state_id = episode_index
 
 
 def main() -> None:
-    # 固定随机种子，保证每次讲课演示时拿到相同的 rollout。
-    torch.manual_seed(SEED)
-    np.random.seed(SEED)
-    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    """在一个 LIBERO 任务上闭环跑一遍 $\\pi_0$，成功则把 rollout 存成 mp4。
 
-    # 1. 读取 Hugging Face 上保存的 pi0 配置。
-    # 2. 把 device 改成当前机器可用的 cuda / cpu。
-    # 3. 加载策略本体和它对应的 preprocess / postprocess 流水线。
-    # strict=False 是为了兼容当前 lerobot 版本和权重里少量 buffer 命名差异。
-    policy_cfg = PreTrainedConfig.from_pretrained(POLICY_PATH)
-    policy_cfg.device = DEVICE
-    policy = get_policy_class(policy_cfg.type).from_pretrained(POLICY_PATH, config=policy_cfg, strict=False)
-    preprocessor, postprocessor = make_pre_post_processors(policy_cfg, pretrained_path=POLICY_PATH)
+    Raises:
+        RuntimeError: 一帧画面都没渲染出来，或这一次 rollout 没有完成任务。
+    """
+    # 固定随机种子，让每次演示拿到同一段 rollout。
+    seed = 7
+    torch.manual_seed(seed)
+    np.random.seed(seed)
 
-    # 构建 LIBERO 环境。这里只保留和成功案例匹配的最小参数。
+    # 这份权重是 π0 在 LIBERO 上微调过的版本。π0 的基座没见过 LIBERO 仿真数据，
+    # 换成基座权重零样本跑，成功率会掉到接近 0。
+    policy_path = "lerobot/pi0_libero_finetuned_v044"
+    policy_cfg = PreTrainedConfig.from_pretrained(policy_path)
+    policy_cfg.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # strict=False：权重里有少量 buffer 的命名和当前 lerobot 版本对不上，
+    # 这些 buffer 不参与前向计算，跳过它们不影响推理结果。
+    policy = get_policy_class(policy_cfg.type).from_pretrained(
+        policy_path, config=policy_cfg, strict=False
+    )
+
+    # 归一化统计量跟着权重一起存，这两个 processor 就是 3.4 节说的
+    # "正向归一化"与"反归一化"，训练和推理共用同一套统计量。
+    preprocessor, postprocessor = make_pre_post_processors(policy_cfg, pretrained_path=policy_path)
+
+    task_suite = "libero_goal"
+    task_id = 5
+    max_steps = 180
     env_cfg = LiberoEnvConfig(
-        task=TASK_SUITE,
-        task_ids=[TASK_ID],
+        task=task_suite,
+        task_ids=[task_id],
         obs_type="pixels_agent_pos",
         observation_height=256,
         observation_width=256,
-        episode_length=MAX_STEPS,
+        episode_length=max_steps,
     )
-    env = make_env(env_cfg, n_envs=1)[TASK_SUITE][TASK_ID]
+    env = make_env(env_cfg, n_envs=1)[task_suite][task_id]
     print(f"task: {env.envs[0].task} | instruction: {env.envs[0].task_description}")
+
+    # 环境侧也有一对 processor：把 LIBERO 的观测/动作格式与策略的接口对齐。
     env_preprocessor, env_postprocessor = make_env_pre_post_processors(env_cfg, policy_cfg)
 
     frames = []
@@ -77,48 +93,55 @@ def main() -> None:
     try:
         policy.reset()
 
-        # 切换到底层 LIBERO 子环境里已经验证可成功的 init state。
-        set_episode_index(env, EPISODE_INDEX)
-        observation, _ = env.reset(seed=[SEED + EPISODE_INDEX])
+        # 这个初始状态已经验证过能成功，换一个初始状态成功率就不一定了——
+        # 3.2 节说的分布漂移，从起始位姿就开始起作用。
+        episode_index = 2
+        set_episode_index(env, episode_index)
+        observation, _ = env.reset(seed=[seed + episode_index])
 
-        for _ in range(MAX_STEPS):
+        for _ in range(max_steps):
             # 环境原始 observation 先转成 LeRobot 约定的扁平 key 格式，
-            # 再补上 task 文本，随后送进 env processor 和 policy processor。
+            # 再补上任务的语言指令，随后依次过环境侧和策略侧的预处理。
             observation_batch = preprocess_observation(observation)
             observation_batch = add_envs_task(env, observation_batch)
             observation_batch = env_preprocessor(observation_batch)
             observation_batch = preprocessor(observation_batch)
 
-            # pi0 每次根据当前观测输出一个动作。
+            # 整个闭环里，策略只做这一件事：看一眼观测，给出一个动作。
             with torch.inference_mode():
                 action = policy.select_action(observation_batch)
 
-            # postprocessor 负责把 policy 输出还原回环境动作空间。
+            # 反归一化 + 还原成环境的动作口径，正是 3 节那条"来回路"的回程。
             action = postprocessor(action)
             action = env_postprocessor({"action": action})["action"].cpu().numpy()
 
-            # 执行动作，并把渲染帧缓存下来，最后统一写 mp4。
+            # 动作作用回环境，环境给出新的观测——闭环的下一圈从这里开始。
             observation, _, terminated, truncated, info = env.step(action)
             frames.append(env.envs[0].render())
 
-            # LIBERO 的 success 信号放在 final_info 里。
+            # LIBERO 把成功信号放在 final_info 里，只在回合结束那一步出现。
             if "final_info" in info and isinstance(info["final_info"], dict):
                 success = bool(info["final_info"]["is_success"][0])
 
             if bool(terminated[0]) or bool(truncated[0]):
                 break
 
-        # 这两个检查保证 demo 不是“看起来运行了”，而是真的有结果、而且真的成功。
+        # 跑完不等于跑对。这两个检查把"跑完了但什么都没发生"和
+        # "跑完了但任务没成"这两种情况直接变成报错，不让它们混成一次成功。
         if not frames:
             raise RuntimeError("no frames")
         if not success:
             raise RuntimeError("no success")
 
-        # 把整段 rollout 直接导出成 mp4。
-        write_video(str(OUT_PATH), frames, fps=FPS)
-        print(OUT_PATH)
+        # 路径相对 code/ 目录写，和 README 里的运行方式（cd code 之后再跑）一致，
+        # 脚本和 notebook 用同一个工作目录，产物就不会散到两处去。
+        fps = 10
+        out_path = Path("vla/1_policy_rollout/1_2_pi0_libero_rollout/output/pi0_libero_success.mp4")
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        write_video(str(out_path), frames, fps=fps)
+        print(out_path)
     finally:
-        # 关闭环境，避免 MuJoCo / EGL 资源泄漏。
+        # MuJoCo / EGL 的上下文不会自己释放，异常退出时也必须关掉。
         env.close()
 
 

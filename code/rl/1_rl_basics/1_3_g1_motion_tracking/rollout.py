@@ -1,35 +1,78 @@
+"""按统一口径评测动作跟随的策略，并录成对照视频。
+
+与行走线的同名脚本作用相同，只是任务换成了动作跟踪；讲义 6.6 节表格里的奖励与
+摔倒率由本文件产出，摘要写成 `result/1_3_g1_motion_tracking/<run>.json`。
+
+讲义对应：第14讲 6.6 节。
+"""
 from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 
 import mediapy as media
 import numpy as np
 import torch
 
-from .env import BeyondMimicEnv
-from .motion import MotionClip
-from .train_v3_ppo import ActorCritic
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from env import BeyondMimicEnv  # noqa: E402
+from motion import MotionClip  # noqa: E402
+from train_v3_ppo import ActorCritic  # noqa: E402
 
 
 def result_root() -> Path:
+    """给出本模块结果目录的路径。
+
+    Returns:
+        `result/1_3_g1_motion_tracking/` 的绝对路径。
+    """
     return Path(__file__).resolve().parents[1] / "result" / "1_3_g1_motion_tracking"
 
 
 def default_rollout_output(checkpoint: str | Path, motion_file: str | Path) -> Path:
+    """按 checkpoint 与动作文件名拼出默认的摘要文件路径。
+
+    Args:
+        checkpoint: 被评测的权重文件。
+        motion_file: 参考动作文件。
+
+    Returns:
+        `.json` 摘要的落盘路径。
+    """
     checkpoint = Path(checkpoint)
     motion_file = Path(motion_file)
     return result_root() / f"{motion_file.stem}-{checkpoint.stem}.json"
 
 
 def default_rollout_video_output(checkpoint: str | Path, motion_file: str | Path) -> Path:
+    """同上，但给出的是视频落盘路径。
+
+    Args:
+        checkpoint: 被评测的权重文件。
+        motion_file: 参考动作文件。
+
+    Returns:
+        `.mp4` 视频的落盘路径。
+    """
     checkpoint = Path(checkpoint)
     motion_file = Path(motion_file)
     return result_root() / f"{motion_file.stem}-{checkpoint.stem}.mp4"
 
 
 def load_policy(checkpoint: str | Path, device: str | torch.device) -> tuple[ActorCritic, int]:
+    """从 checkpoint 恢复一个可推理的策略。
+
+    网络维度从 checkpoint 存的训练设置里读，不写死在这里。
+
+    Args:
+        checkpoint: checkpoint 文件路径。
+        device: 模型放到哪个设备上。
+
+    Returns:
+        (模型, 该 checkpoint 对应的训练迭代数)。
+    """
     checkpoint_data = torch.load(checkpoint, map_location="cpu", weights_only=False)
     model = ActorCritic(obs_dim=160, critic_obs_dim=286, action_dim=29)
     model.load_state_dict(checkpoint_data["actor_critic"])
@@ -58,6 +101,24 @@ def run_rollout(
     episode_length_s: float = 10.0,
     show_reference_ghost: bool = False,
 ) -> dict[str, int | float | str]:
+    """跑一段确定性 rollout，落盘评测摘要与视频。
+
+    Args:
+        motion_file: 要跟随的参考动作。
+        checkpoint: 要评测的权重。
+        output: 摘要落盘路径。
+        video_output: 视频落盘路径。
+        num_envs: 并行环境数。
+        num_steps: 每个环境跑多少步。
+        device: 仿真与推理所在设备。
+        seed: 随机种子。
+        episode_length_s: 回合上限，按秒计。
+        show_reference_ghost: 是否把参考姿态的虚影一起画进视频。默认关掉，画面里
+            只留机器人本身；要看「跟得准不准」就把它打开。
+
+    Returns:
+        评测摘要字典。
+    """
     torch.manual_seed(seed)
     motion = MotionClip.load(motion_file, device="cpu")
     output = output or default_rollout_output(checkpoint, motion_file)
@@ -136,6 +197,7 @@ def run_rollout(
 
 
 def main() -> None:
+    """对本模块的几个 checkpoint 依次录制跟随效果。"""
     group_root = Path(__file__).resolve().parents[1]
     datasets_root = Path(os.environ["DATASETS_ROOT"])
 

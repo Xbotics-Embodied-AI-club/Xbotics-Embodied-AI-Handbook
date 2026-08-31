@@ -13,8 +13,8 @@
 | `train_smolvla.sh` | 微调入口：`lerobot-train --policy.path=lerobot/smolvla_base` 全量微调 |
 | `smolvla_eval.sh` | 评测入口：`lerobot-eval --env.type=so101_sim` 跑 20 episode，报 pc_success + 录像 |
 | `plot_loss.py` | 从训练日志抓 loss 画收敛曲线到 `result/loss_curve.png` |
-| `smolvla_finetune.ipynb` | 课堂走读版：命令 + 机制讲解 + 结果展示 |
-| `result/` | loss 曲线、成功率、rollout 抽帧 |
+| `smolvla_finetune.ipynb` | 逐行走读：命令 + 机制讲解 + 结果展示 |
+| `result/` | 训练与评测的产物落点（loss 曲线、成功率、rollout 抽帧）；跑完上面两个脚本才会生成 |
 
 ## 数据准备
 
@@ -63,18 +63,17 @@ bash vla/5_vla_finetune/5_2_smolvla_full_sft/smolvla_eval.sh
 
 ## 结果
 
-ReachCube（“reach the red cube”），16 集 / 800 帧，batch 64，20000 步全量微调
+ReachCube（"reach the red cube"），16 集 / 800 帧，batch 64，20000 步全量微调
 （该任务已下线，见上方数据准备一节；下方结果是训练当时留下的历史记录）。
 
 | 指标 | 数值 |
 |---|---|
-| 最终 flow-matching loss | 见 `result/loss_curve.png`（约 0.0x） |
+| 最终 flow-matching loss | 跑完 `plot_loss.py` 后见 `result/loss_curve.png` |
 | 评测 episode 数 | 20 |
-| pc_success | 见 `result/eval_smolvla/eval_info.json` |
+| pc_success | 跑完 `smolvla_eval.sh` 后见 `result/eval_smolvla/eval_info.json` |
 
-- 收敛曲线：`result/loss_curve.png`
-- rollout 视频与逐 episode 结果：`result/eval_smolvla/`
-- 成功案例抽帧：`result/`
+> `result/` 下的产物**不随仓库分发**（大文件不进 git）：收敛曲线来自 `plot_loss.py`，
+> rollout 视频与逐 episode 结果来自 `smolvla_eval.sh`，都要自己跑一遍才有。
 
-> 环境说明：本仓库统一走 `code/pyproject.toml` 的 uv 环境；在共享训练机上把
-> `UV_PROJECT_ENVIRONMENT` 指向已验证的 venv 后，上面的 `uv run` 命令即可复用。
+> 环境说明：本仓库统一走 `code/pyproject.toml` 的 uv 环境。若你的 venv 不在默认位置，
+> 把 `UV_PROJECT_ENVIRONMENT` 指过去，上面的 `uv run` 命令即可原样复用。

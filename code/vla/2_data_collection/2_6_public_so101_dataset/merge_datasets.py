@@ -1,11 +1,13 @@
 """把 9 个单任务数据集合并成一个多任务训练集。
 
+对应第9讲《操作数据闭环》4.6 节末尾的公开数据集路线，接在 download_dataset.py 之后。
+
 用 lerobot 官方的 aggregate_datasets：它会先 validate_all_metadata 强校验 9 份的 fps /
 robot_type / features 完全一致（不一致直接抛错，而不是静默错位），然后重映射每份的
 task_index 到合并后的统一任务表、重建全局 index 与 episode_index、重算 stats。
 
 不做任何上采样。9 个任务各 200-300 集本来就均匀，合并即平衡；反过来向某个任务偏斜
-上采样会伤害泛化——这是 piper 项目上用真机验出来的（偏斜版比平衡版明显更差）。
+上采样会伤害泛化——真机上对比过，偏斜版明显不如平衡版。
 """
 
 import json
