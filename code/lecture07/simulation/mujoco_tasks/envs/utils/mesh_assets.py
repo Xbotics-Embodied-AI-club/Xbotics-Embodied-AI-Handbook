@@ -8,13 +8,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 import mujoco
+import so101_sim
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-_LECTURE07_ROOT = Path(__file__).resolve().parents[4]
-_CODE_ROOT = _LECTURE07_ROOT.parent
-URDF_PATH = _CODE_ROOT / "platform" / "so101_sim" / "so101_sim" / "robots" / "so101_base" / "so101.urdf"
+# SO-101 的 URDF 与网格来自 so101_sim 包（独立仓 Xbotics-SO101-Sim，由 uv sync 装）。
+# 从包的安装位置取，而不是拼相对路径 —— 本仓不再放它的副本。
+URDF_PATH = Path(so101_sim.__file__).resolve().parent / "robots" / "so101_base" / "so101.urdf"
 
 MESH_DIR = URDF_PATH.parent
 

@@ -531,7 +531,7 @@ $$
 
 ### 3.2.7 Action Expert 的具体配置
 
-PaliGemma 基于 Gemma 2B 语言模型。下表两列分别是 VLM 骨干（`gemma_2b`）与 Action Expert（`gemma_300m`）的 Transformer 配置，数值取自官方实现的模型配置（LeRobot 包内 `lerobot/policies/pi0/modeling_pi0.py` 里的 `get_gemma_config`，与 openpi 包内 `src/openpi/models/gemma.py` 一致；LeRobot 由 `code/platform/lerobot/fetch_lerobot.sh` 拉取，仓库内不存源码树）：
+PaliGemma 基于 Gemma 2B 语言模型。下表两列分别是 VLM 骨干（`gemma_2b`）与 Action Expert（`gemma_300m`）的 Transformer 配置，数值取自官方实现的模型配置（LeRobot 包内 `lerobot/policies/pi0/modeling_pi0.py` 里的 `get_gemma_config`，与 openpi 包内 `src/openpi/models/gemma.py` 一致；LeRobot 由 `uv sync` 从我们维护的 fork 装入，仓库内不存源码树）：
 
 | 参数 | VLM 骨干（`gemma_2b`） | Action Expert（`gemma_300m`） |
 |------|----------------------|---------------|

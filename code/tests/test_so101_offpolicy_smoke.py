@@ -13,7 +13,7 @@
 v6 额外核验：`C51TwinQ` 的 logits/expected_q shape（分布式 Critic，不是
 标量），视觉 `Actor.get_action` 三元组 shape；v6 的 `Projection` 自带 LayerNorm，
 不需要 `RunningNorm`。这两项只测独立的网络前向，不依赖仿真环境——`CNNEncoder`/
-`ReplayBuffer` 仍按单相机 3 通道写的，在 `platform/so101_sim` 现有的 KIT 双相机
+`ReplayBuffer` 仍按单相机 3 通道写的，在 `so101_sim` 现有的 KIT 双相机
 （6 通道）场景上跑不动，这是留给 RL 模块重新整训时一并解决的架构缺口，见同目录
 README「待重新整训」一节。
 需要 CUDA（ManiSkill GPU 后端）。
@@ -332,7 +332,7 @@ def test_visual_actor_get_action_shapes():
 
 
 @pytest.mark.xfail(
-    reason="CNNEncoder/ReplayBuffer 按单相机 3 通道写的；platform/so101_sim 现有的 KIT "
+    reason="CNNEncoder/ReplayBuffer 按单相机 3 通道写的；so101_sim 现有的 KIT "
     "分发场景是双相机 6 通道输出，这是留给 RL 模块重新整训时一并解决的架构缺口，不是本次"
     "接口收敛能机械修的（见 3_2_so101_offpolicy/README.md「待重新整训」一节）。",
     strict=True,

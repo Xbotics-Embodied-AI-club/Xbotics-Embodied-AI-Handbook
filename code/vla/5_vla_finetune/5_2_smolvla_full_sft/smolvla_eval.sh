@@ -4,7 +4,7 @@
 # 在 code/ 目录运行：bash vla/5_vla_finetune/5_2_smolvla_full_sft/smolvla_eval.sh
 set -euo pipefail
 
-# 评测同一个仿真任务（so101_sim 环境由 platform/lerobot 的 0004 补丁注册）。
+# 评测同一个仿真任务（so101_sim 环境由我们维护的 lerobot fork（xbotics 分支）注册）。
 CKPT="$DATASETS_ROOT/models/trained/so101_sim_smolvla/SO101ReachCube-v1/checkpoints/last/pretrained_model"
 
 # episode 越多成功率越可信；每个 episode 换一次随机初始状态。

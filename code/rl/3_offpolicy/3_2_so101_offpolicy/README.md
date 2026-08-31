@@ -14,7 +14,7 @@
 四个文件**各自自包含**（本级的网络 `nn.Module` + `LightningModule` 更新 + 回放池 +
 `trainer.fit` 都在同一个文件里，无共享 `model.py`），阶梯对照的重点就在每一级"改了
 什么"，diff 直接体现在文件里，不用来回跳文件找。SO101 环境不在本模块定义，统一从
-`platform/so101_sim` 消费（`state_rl_env`/`visual_rl_env`）——只写/走算法侧。
+`so101_sim` 包消费（`state_rl_env`/`visual_rl_env`）——只写/走算法侧。
 
 ```bash
 cd code
@@ -24,7 +24,7 @@ python rl/3_offpolicy/3_2_so101_offpolicy/train_v6_squint.py  # ⚠️ 现在跑
 
 > ⚠️ **v6 现在直接跑会报错。** `train_v6_squint.py` 的 `CNNEncoder`
 > （`nn.Conv2d(3, 32, ...)`）与 `ReplayBuffer`（`rgb`/`next_rgb` 按 `(容量, H, W, 3)` 开）
-> 按单相机 **3 通道**写死，而 `platform/so101_sim` 现存的三个分发场景都是双相机
+> 按单相机 **3 通道**写死，而 `so101_sim` 现存的三个分发场景都是双相机
 > （`top` + `wrist`）**6 通道**输出，通道数对不上。**报错点在热身采样**：策略还没开始跑，
 > `_collect(use_policy=False)` 用随机动作采的第一批帧写进 `buffer.add()` 时就挂了
 > （池子 3 通道、帧 6 通道），跟 `torch.load` / `state_dict` 无关——这个文件里根本没有
@@ -38,7 +38,7 @@ SAC 换随机策略 + 最大熵后 success_once 从 iter~480 起稳定落在 0.9
 C51 分布式 Critic，success≈0.99，且能顺手产 VLA 课要的数据。
 
 > 上面这组对照数据是在已下线的单相机 `SO101ReachCube-v1` 任务上跑出来的，四个文件现在
-> 的 `TASK` 已改指向 `platform/so101_sim` 现存的 KIT 分发场景（`SO101PickPlaceCube40-v1`
+> 的 `TASK` 已改指向 `so101_sim` 现存的 KIT 分发场景（`SO101PickPlaceCube40-v1`
 > 等）；重跑不会复现这组数值，本模块的算法阶梯待重新整训（见文末说明）。
 >
 > 另外，**那次实验的原始训练记录没有留在仓库里**：`../result/` 下只有 CartPole 两级的

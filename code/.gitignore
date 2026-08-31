@@ -6,9 +6,6 @@
 .venv/
 .venv_*/
 
-# lerobot 上游源码（由 platform/lerobot/fetch_lerobot.sh 拉取并打补丁，不入库）
-platform/lerobot/lerobot/
-
 # 官方 RDK 工具（由 platform/rdk/fetch_rdk_tools.sh 拉取，不入库）
 platform/rdk/rdk_LeRobot_tools/
 

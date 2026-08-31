@@ -59,7 +59,7 @@ python -m unittest discover -s tests -v
 ## MuJoCo 资产场景（可选）
 
 场景定义在 `simulation/mujoco_tasks/envs/scene.py`，加载
-`code/platform/so101_sim/.../so101.urdf`，并在白色桌面上绘制 8 cm × 8 cm 的红色 A 区与蓝色 B 区方框。
+`so101_sim` 包里的 `robots/so101_base/so101.urdf`，并在白色桌面上绘制 8 cm × 8 cm 的红色 A 区与蓝色 B 区方框。
 
 ```bash
 # 完整 pick-place 状态机：cube（90° 翻转双指夹取）/ bottle（水平径向抓取入盒）

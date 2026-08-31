@@ -54,7 +54,7 @@ bash vla/5_vla_finetune/5_2_smolvla_full_sft/train_smolvla.sh
 bash vla/5_vla_finetune/5_2_smolvla_full_sft/smolvla_eval.sh
 ```
 
-`so101_sim` 评测环境由 `code/platform/lerobot` 的 0004 补丁注册；评测端同样用 `rename_map`
+`so101_sim` 评测环境由我们维护的 lerobot fork（`xbotics` 分支）注册；评测端同样用 `rename_map`
 把环境输出的 `base_camera` 映射到 checkpoint 的 `camera1`。
 
 > `--env.task` 现在填的是 `so101_sim` 现存的 `SO101PickPlaceCube40-v1`（ReachCube 已下线，

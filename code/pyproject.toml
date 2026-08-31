@@ -8,9 +8,10 @@
 #   rdk_s100  —— 地瓜 RDK S100/S600 板端（aarch64）：SO101 数据采集。
 #                uv sync --extra rdk_s100 --no-editable
 #
-# lerobot 先由 ./platform/lerobot/fetch_lerobot.sh 把 v0.5.1 源 clone 到 ./platform/lerobot/lerobot/
-# 并打上本地补丁（groot 修复 / vla0_smol / openvla），再以 editable 方式安装
-# （path source 见 [tool.uv.sources]）。
+# lerobot 直接装我们维护的 fork（见 [tool.uv.sources]），不再 clone 源码打补丁：
+#   github.com/Xbotics-Embodied-AI-club/lerobot 分支 xbotics（基线 v0.5.1）
+# 那四个改动（groot 修复 / vla0_smol / openvla / so101_sim 评测口）现在是 fork 里的
+# 四个 commit。SO-101 仿真器也独立成仓 Xbotics-SO101-Sim，由 fork 作核心依赖带入。
 # 资产（数据集/模型）：本地部署随用随下；Docker 构建时由 docker_cfg/scripts/ 烘进镜像。
 
 [project]
@@ -32,13 +33,14 @@ gpu_x86 = [
     "torchaudio==2.8.0",
     "torchcodec==0.7.0",
     # lerobot 全量（含 pi0 / libero / smolvla / aloha …；all 因 flash-attn 故意不含 groot）
+    # 走我们的 fork，so101_sim 由它作核心依赖一并带入。
     "lerobot[all]",
     "transformers==5.3.0",
-    # vla0_smol policy（0002 补丁）在 factory.py 顶层被 eager import，其 modeling
-    # 顶层 `import xgrammar`（整数串动作约束解码）。缺它则任何 get_policy_class（含 pi0）都会
+    # vla0_smol policy 在 factory.py 顶层被 eager import，其 modeling 顶层
+    # `import xgrammar`（整数串动作约束解码）。缺它则任何 get_policy_class（含 pi0）都会
     # ImportError，故必须带 xgrammar。
     "xgrammar",
-    # openvla policy（0003 补丁）：prismatic remote code 依赖 timm<1.0 的视觉骨干 + tokenizer
+    # openvla policy：prismatic remote code 依赖 timm<1.0 的视觉骨干 + tokenizer
     "timm==0.9.12",
     "sentencepiece",
     "accelerate",
@@ -57,17 +59,20 @@ gpu_x86 = [
     "nbconvert",
     "nbclient",
     # G1 并行仿真 + BeyondMimic 训练（rl/1_rl_basics）
-    "mjlab",
+    # 必须钉版：不写下界时 uv 会一路回溯到 mjlab 0.1.0——它没有 mjlab.tasks.tracking.*
+    # 与 mjlab.envs，而 1_1/1_2/1_3 三个模块正是从那里 import，装完要到运行才报错。
+    # 上界锁在 1.4：1.5+ 要 mujoco 3.11，与本课其余部分验证过的 3.8.1 不是同一套。
+    "mjlab>=1.4,<1.5",
     "mujoco",
     "mujoco-warp",
     "warp-lang",
     "tyro",
     "mediapy",
-    # SO101 仿真闭环：mani_skill（GPU 并行仿真+无头 RGB，带入 sapien/mplib/pytorch-kinematics）
-    # + so101_sim（我们的环境包，editable，见 [tool.uv.sources]；三个 KIT 分发场景）。
+    # SO101 仿真闭环：mani_skill（GPU 并行仿真+无头 RGB，带入 sapien/mplib/pytorch-kinematics）。
+    # so101_sim 本身由 lerobot fork 作核心依赖带入，这里不重复声明 —— 声明两次会让
+    # 两个 git source 争同一个包名。仿真器仓：Xbotics-SO101-Sim。
     # 供 lerobot-eval --env.type=so101_sim 与 rl/3_offpolicy 数据生成。
     "mani-skill==3.0.1",
-    "so101_sim",
     # SAC 训练器（rl/3_offpolicy 数据生产线薄包它出专家）依赖；
     # 实测与 torch2.8+cu128 共存，钉版防 uv 拉新版崩（tensordict CudaGraphModule / torchrl ReplayBuffer）。
     "torchrl==0.13.2",
@@ -154,10 +159,13 @@ package = false
 conflicts = [[{ extra = "gpu_x86" }, { extra = "nogpu_x86" }, { extra = "rdk_s100" }]]
 
 [tool.uv.sources]
-# 本地 clone + 打补丁后的 lerobot 源（由 lerobot/fetch_lerobot.sh 生成，gitignore）
-lerobot = { path = "./platform/lerobot/lerobot", editable = true }
-# so101_sim：我们的 SO101 仿真环境包（editable；package_name=so101_sim，0004 补丁运行时 import 它）
-so101_sim = { path = "./platform/so101_sim", editable = true }
+# 我们维护的 lerobot fork。基线 v0.5.1 + 四个 commit：groot 修复 / vla0_smol /
+# openvla / so101_sim 评测口。原先是 clone 上游源 + git apply 四个 .patch + editable，
+# 现在装 fork 本身 —— 补丁形态要每台机器先跑一遍拉取脚本，漏跑就静默少功能。
+lerobot = { git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git", branch = "xbotics" }
+# so101_sim 不在这里列 —— 它是 lerobot fork 的核心依赖，由 fork 的 pyproject 指向
+# Xbotics-SO101-Sim。在这里再声明一次会变成两个 source 争同一个包名。
+# 要改仿真器本体就去那个仓；本仓不再放它的副本。
 # torch 系按所选 extra 命中不同 index：gpu_x86→cu128，nogpu_x86→cpu，rdk_s100→PyPI(aarch64)
 gvhmr = { git = "https://github.com/zju3dv/GVHMR.git" }
 general-motion-retargeting = { git = "https://github.com/YanjieZe/GMR.git" }

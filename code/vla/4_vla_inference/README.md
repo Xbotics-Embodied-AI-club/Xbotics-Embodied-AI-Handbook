@@ -20,6 +20,5 @@
 每个模块都是三件套：demo `.py`（逐行走读，固定成功局）+ 同名 `.ipynb`（分节讲解）
 + `*_eval.sh`（官方 `lerobot-eval` 标准评测：多 episode pc_success 统计 + 自动录像）。
 
-环境：`cd code && uv sync --extra gpu_x86`；4_1 依赖
-`bash platform/lerobot/fetch_lerobot.sh` 打入的 openvla policy 补丁；权重自动
-下载落 `$HF_HOME`。
+环境：`cd code && uv sync --extra gpu_x86`。4_1 用的 openvla policy 在我们维护的
+lerobot fork 里（`xbotics` 分支），`uv sync` 一并装好；权重自动下载落 `$HF_HOME`。

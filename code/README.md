@@ -19,10 +19,9 @@ code/
 │   ├── 1_rl_basics/              # G1 行走 + 动作跟随，REINFORCE→A2C→PPO 三算法对照
 │   ├── 2_grpo_posttraining/      # GRPO 后训练：VLM 数数 + VLA-0 自我提升
 │   └── 3_offpolicy/              # Off-policy：SO101 视觉 RL + HIL-SERL 真机（讲16）
-└── platform/                     # 上游框架 + 硬件 + 部署（非课程 demo，被 import/fetch）
-    ├── lerobot/                  #   lerobot 本地补丁 + fetch + 上游源（见 platform/lerobot/…）
+└── platform/                     # 硬件与板端部署（非课程 demo）
     ├── rdk/                      #   地瓜 RDK 板端部署（ACT 上板，见 platform/rdk/README.md）
-    └── so101_sim/                #   SO101 仿真环境包（editable；ManiSkill3，入 lerobot-eval + RL 数据生成）
+    └── so101_real/               #   SO101 真机设备绑定与标定脚本
 ```
 
 > 演示代码面向课堂：常量就近内联、自上而下按讲解顺序读，不用命令行参数层。
@@ -39,13 +38,25 @@ code/
 
 ```bash
 cd code
-bash platform/lerobot/fetch_lerobot.sh   # 拉取 lerobot 0.5.1 源并打补丁（不入库）
 uv sync --extra gpu_x86
 ```
 
-### platform/lerobot（本地补丁，不分发源树）
+### lerobot 走我们自己维护的 fork
 
-lerobot 不提交源码：`platform/lerobot/fetch_lerobot.sh` 从 git 拉取 v0.5.1 到 `platform/lerobot/lerobot/`（gitignore）并打 `0001`/`0002`/`0003`/`0004` 补丁，再以 editable 安装。补丁内容见 `platform/lerobot/*.patch`（`0004` 注册 `so101_sim` 仿真 env）。`so101_sim` 本身是 `platform/so101_sim/` 的 editable 包（`import so101_sim` 直接可用，无需 PYTHONPATH）。
+<https://github.com/Xbotics-Embodied-AI-club/lerobot>，分支 `xbotics`，基线 v0.5.1。
+`uv sync` 直接把它装上，没有额外步骤。
+
+相对上游多四样，都是 fork 里的独立 commit：
+
+| | 内容 |
+| --- | --- |
+| `fix(groot)` | `GR00TN15Config` 去 `@dataclass`（HF `PretrainedConfig` 子类套它必崩，上游未修） |
+| `feat` VLA-0 | `--policy.type=vla0_smol` |
+| `feat` OpenVLA | `--policy.type=openvla` |
+| `feat` 仿真评测口 | `--env.type=so101_sim` |
+
+SO-101 仿真器本体也独立成仓：<https://github.com/Xbotics-Embodied-AI-club/Xbotics-SO101-Sim>，
+由 fork 作核心依赖带入，`import so101_sim` 直接可用。要改仿真器就去那个仓，本仓不放副本。
 
 ## 二、环境变量
 

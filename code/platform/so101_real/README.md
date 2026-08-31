@@ -18,7 +18,7 @@
 
 | 目录 | 干什么 |
 |---|---|
-| `platform/so101_sim/` | 仿真（ManiSkill3） |
+| `so101_sim` 包 | 仿真（ManiSkill3），独立仓 Xbotics-SO101-Sim |
 | `platform/so101_real/` | **本目录**：真机设备绑定 |
 | `platform/rdk/` | 地瓜 RDK 开发板上的 BPU 上板部署（量化编译 → 板端推理） |
 
