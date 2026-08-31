@@ -46,5 +46,5 @@ cd code
 uv sync --extra gpu_x86
 ```
 
-lerobot 走我们维护的 fork（`xbotics` 分支，基线 v0.5.1），`uv sync` 一步装好；
+lerobot 走我们维护的 fork（`main` 分支，基线 v0.5.1），`uv sync` 一步装好；
 组 2/3 用到的 openvla / vla0_smol policy 已在里面，不需要额外打补丁。

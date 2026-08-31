@@ -43,7 +43,7 @@ uv sync --extra gpu_x86
 
 ### lerobot 走我们自己维护的 fork
 
-<https://github.com/Xbotics-Embodied-AI-club/lerobot>，分支 `xbotics`，基线 v0.5.1。
+<https://github.com/Xbotics-Embodied-AI-club/lerobot>，分支 `main`，基线 v0.5.1。
 `uv sync` 直接把它装上，没有额外步骤。
 
 相对上游多四样，都是 fork 里的独立 commit：

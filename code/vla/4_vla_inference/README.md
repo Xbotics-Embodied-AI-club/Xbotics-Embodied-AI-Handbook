@@ -21,4 +21,4 @@
 + `*_eval.sh`（官方 `lerobot-eval` 标准评测：多 episode pc_success 统计 + 自动录像）。
 
 环境：`cd code && uv sync --extra gpu_x86`。4_1 用的 openvla policy 在我们维护的
-lerobot fork 里（`xbotics` 分支），`uv sync` 一并装好；权重自动下载落 `$HF_HOME`。
+lerobot fork 里（`main` 分支），`uv sync` 一并装好；权重自动下载落 `$HF_HOME`。

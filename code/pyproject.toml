@@ -9,7 +9,7 @@
 #                uv sync --extra rdk_s100 --no-editable
 #
 # lerobot 直接装我们维护的 fork（见 [tool.uv.sources]），不再 clone 源码打补丁：
-#   github.com/Xbotics-Embodied-AI-club/lerobot 分支 xbotics（基线 v0.5.1）
+#   github.com/Xbotics-Embodied-AI-club/lerobot 分支 main（基线 v0.5.1）
 # 那四个改动（groot 修复 / vla0_smol / openvla / so101_sim 评测口）现在是 fork 里的
 # 四个 commit。SO-101 仿真器也独立成仓 Xbotics-SO101-Sim，由 fork 作核心依赖带入。
 # 资产（数据集/模型）：本地部署随用随下；Docker 构建时由 docker_cfg/scripts/ 烘进镜像。
@@ -162,7 +162,7 @@ conflicts = [[{ extra = "gpu_x86" }, { extra = "nogpu_x86" }, { extra = "rdk_s10
 # 我们维护的 lerobot fork。基线 v0.5.1 + 四个 commit：groot 修复 / vla0_smol /
 # openvla / so101_sim 评测口。原先是 clone 上游源 + git apply 四个 .patch + editable，
 # 现在装 fork 本身 —— 补丁形态要每台机器先跑一遍拉取脚本，漏跑就静默少功能。
-lerobot = { git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git", branch = "xbotics" }
+lerobot = { git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git", branch = "main" }
 # so101_sim 不在这里列 —— 它是 lerobot fork 的核心依赖，由 fork 的 pyproject 指向
 # Xbotics-SO101-Sim。在这里再声明一次会变成两个 source 争同一个包名。
 # 要改仿真器本体就去那个仓；本仓不再放它的副本。

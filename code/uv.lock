@@ -2695,7 +2695,7 @@ wheels = [
 [[package]]
 name = "lerobot"
 version = "0.5.1"
-source = { git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=xbotics#175faf9375c8c16f2196e857df7316560612b76e" }
+source = { git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=main#175faf9375c8c16f2196e857df7316560612b76e" }
 dependencies = [
     { name = "accelerate" },
     { name = "av" },
@@ -7275,9 +7275,9 @@ requires-dist = [
     { name = "ipython", marker = "extra == 'gpu-x86'" },
     { name = "joblib", marker = "extra == 'gpu-x86'" },
     { name = "lapx", marker = "extra == 'gpu-x86'" },
-    { name = "lerobot", extras = ["all"], marker = "extra == 'gpu-x86'", git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=xbotics" },
-    { name = "lerobot", extras = ["feetech"], marker = "extra == 'nogpu-x86'", git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=xbotics" },
-    { name = "lerobot", extras = ["feetech"], marker = "extra == 'rdk-s100'", git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=xbotics" },
+    { name = "lerobot", extras = ["all"], marker = "extra == 'gpu-x86'", git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=main" },
+    { name = "lerobot", extras = ["feetech"], marker = "extra == 'nogpu-x86'", git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=main" },
+    { name = "lerobot", extras = ["feetech"], marker = "extra == 'rdk-s100'", git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=main" },
     { name = "lightning", marker = "extra == 'gpu-x86'" },
     { name = "mani-skill", marker = "extra == 'gpu-x86'", specifier = "==3.0.1" },
     { name = "matplotlib", marker = "extra == 'gpu-x86'" },
