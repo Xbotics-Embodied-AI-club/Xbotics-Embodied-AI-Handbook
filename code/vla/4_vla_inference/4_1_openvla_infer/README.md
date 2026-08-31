@@ -8,7 +8,7 @@ checkpoint，在 LIBERO 里闭环推理一次并录像。
 - `openvla_demo.py` — 脚本版，跑通即产出 `output/openvla_libero_success.mp4`
 - `openvla_eval.sh` — 官方 `lerobot-eval` 标准评测入口（多 episode pc_success + 自动录像）
 
-运行：`cd experiments && uv sync --extra gpu_x86 && bash lerobot/fetch_lerobot.sh`
+运行：`cd code && uv sync --extra gpu_x86 && bash platform/lerobot/fetch_lerobot.sh`
 （openvla policy 由 `lerobot/0003-openvla-policy.patch` 提供），然后
 `uv run python vla/4_vla_inference/4_1_openvla_infer/openvla_demo.py`。
 

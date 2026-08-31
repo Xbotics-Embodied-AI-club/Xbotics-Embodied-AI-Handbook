@@ -18,6 +18,7 @@ DDPG 引入确定性策略网络要解决的问题。
 """
 from __future__ import annotations
 
+import json
 import os
 from collections import deque
 from pathlib import Path
@@ -87,12 +88,14 @@ PRINT_EVERY = 20  # 每 N 回合打印一次「最近 N 回合回报的滑动均
 class CollectorState:
     """在线采集要跨越多个 Lightning epoch 持续存在的状态：当前观测、回合计数、ε 衰减进度。"""
 
-    def __init__(self, env):
-        self.obs, _ = env.reset()
+    def __init__(self, env, seed):
+        self.obs, _ = env.reset(seed=seed)
         self.episode_return = 0.0
         self.episode_count = 0
         self.global_env_step = 0
         self.recent_returns = deque(maxlen=PRINT_EVERY)
+        # 每个回合结束时把回报追加进来，训练完整条曲线存成 json，用来画对照图。
+        self.all_returns = []
 
 
 def warmup_buffer(env, buffer, stats, warmup_steps):
@@ -107,6 +110,7 @@ def warmup_buffer(env, buffer, stats, warmup_steps):
         if done:
             stats.episode_count += 1
             stats.recent_returns.append(stats.episode_return)
+            stats.all_returns.append(stats.episode_return)
             stats.obs, _ = env.reset()
             stats.episode_return = 0.0
 
@@ -146,6 +150,7 @@ class CartPoleReplayDataset(IterableDataset):
             if done:
                 stats.episode_count += 1
                 stats.recent_returns.append(stats.episode_return)
+                stats.all_returns.append(stats.episode_return)
                 if stats.episode_count % PRINT_EVERY == 0:
                     print(
                         f"episode {stats.episode_count:5d} | epsilon {epsilon:.3f} | "
@@ -155,7 +160,7 @@ class CartPoleReplayDataset(IterableDataset):
                 stats.episode_return = 0.0
 
     def __iter__(self):
-        self.collect()
+        # 采样放在 DataModule 里做，这里只负责吐训练用的小批量。
         for _ in range(self.batches_per_epoch):
             states, actions, rewards, next_states, dones = self.buffer.sample(self.batch_size)
             yield (
@@ -188,6 +193,8 @@ class CartPoleDQNData(L.LightningDataModule):
             self.steps_per_epoch, self.batches_per_epoch, self.batch_size,
             self.epsilon_start, self.epsilon_end, self.epsilon_decay_steps,
         )
+        # 每个 epoch 先用当前策略采一段新经验进池，再交给 DataLoader 抽小批量训练。
+        dataset.collect()
         return DataLoader(dataset, batch_size=None)
 
 
@@ -195,7 +202,7 @@ class DQN(L.LightningModule):
     """DQN：Q(s,a) 回归 r + γ·max_a' Q_target(s',a')，`automatic_optimization=False` 手动优化。"""
 
     def __init__(self, state_dim, n_actions, hidden_dim, learning_rate, gamma,
-                 target_sync_every, checkpoint_path, save_interval, max_epochs):
+                 target_sync_every, checkpoint_path, save_interval, max_epochs, stats, result_path):
         super().__init__()
         self.online = QNetwork(state_dim, hidden_dim, n_actions)
         self.target = QNetwork(state_dim, hidden_dim, n_actions)
@@ -206,6 +213,8 @@ class DQN(L.LightningModule):
         self.target_sync_every = target_sync_every
         self.checkpoint_path = checkpoint_path
         self.save_interval = save_interval
+        self.stats = stats
+        self.result_path = result_path
         self.max_epochs = max_epochs
         self.automatic_optimization = False
         self.grad_steps = 0
@@ -226,8 +235,8 @@ class DQN(L.LightningModule):
 
         q_values = self.online(states).gather(1, actions.unsqueeze(1)).squeeze(1)
         with torch.no_grad():
-            # 终止（杆倒/出界）不 bootstrap；到时间上限的 done 已经在采集时用 terminated
-            # （而非 terminated or truncated）写入了 dones，所以这里直接乘 (1 - dones) 即可。
+            # 采集时 dones 写的是 terminated（不含 truncated），
+            # 所以真正失败才不 bootstrap，这里直接乘 (1 - dones)。
             next_q = self.target(next_states).max(dim=1).values
             td_target = rewards + self.gamma * next_q * (1.0 - dones)
         loss = nn.functional.mse_loss(q_values, td_target)
@@ -249,9 +258,25 @@ class DQN(L.LightningModule):
             torch.save(self.online.state_dict(), self.checkpoint_path)
         return loss
 
+    def on_train_end(self):
+        self.result_path.parent.mkdir(parents=True, exist_ok=True)
+        self.result_path.write_text(json.dumps({
+            "algo": "dqn",
+            "env_steps": self.stats.global_env_step,
+            "episodes": self.stats.episode_count,
+            "returns": self.stats.all_returns,
+        }))
+        print(f"回报曲线已保存到 {self.result_path}")
+
 
 def main():
+    # 固定随机种子：同一台机器上重跑能得到完全一样的曲线，书里报的数字才可复现。
+    seed = 1
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
     env = gym.make("CartPole-v1")
+    env.action_space.seed(seed)
     state_dim = env.observation_space.shape[0]
     n_actions = env.action_space.n
 
@@ -268,17 +293,19 @@ def main():
 
     steps_per_epoch = 20  # 每个 epoch 先采这么多环境步
     batches_per_epoch = 20  # 再用这么多个小批量做梯度更新（采样:更新 = 1:1）
-    total_env_steps = 60000
+    # 5 万步时策略已经练到位（末段平均回报 400 上下）；再往后是收益递减，训练就停在这里。
+    total_env_steps = 50000
     max_epochs = total_env_steps // steps_per_epoch
     save_interval = 500
 
     buffer = ReplayBuffer(buffer_capacity, state_dim)
-    stats = CollectorState(env)
+    stats = CollectorState(env, seed)
     warmup_buffer(env, buffer, stats, warmup_steps)
 
     checkpoint_path = Path(os.environ["DATASETS_ROOT"]) / "models" / "trained" / "cartpole" / "dqn.pt"
+    result_path = Path(__file__).resolve().parents[1] / "result" / "cartpole-dqn.json"
     model = DQN(state_dim, n_actions, hidden_dim, learning_rate, gamma,
-                target_sync_every, checkpoint_path, save_interval, max_epochs)
+                target_sync_every, checkpoint_path, save_interval, max_epochs, stats, result_path)
     data = CartPoleDQNData(env, model, buffer, stats, steps_per_epoch, batches_per_epoch, batch_size,
                            epsilon_start, epsilon_end, epsilon_decay_steps)
 

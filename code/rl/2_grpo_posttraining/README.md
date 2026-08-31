@@ -16,8 +16,8 @@ GRPO 的题眼是「**强化学习与策略解耦**」：同一套外壳——�
 ## 运行
 
 ```bash
-cd experiments
-bash lerobot/fetch_lerobot.sh   # 2_2 需要 lerobot 源（打补丁后 editable 安装）
+cd code
+bash platform/lerobot/fetch_lerobot.sh   # 2_2 需要 lerobot 源（打补丁后 editable 安装）
 uv sync --extra gpu_x86         # 2_1 / 2_2 同一套环境
 ```
 

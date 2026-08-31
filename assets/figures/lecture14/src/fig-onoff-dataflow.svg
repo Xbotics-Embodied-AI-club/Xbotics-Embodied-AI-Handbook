@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="440" viewBox="0 0 1120 440" font-family="Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei, sans-serif">
+  <defs>
+    <marker id="ob" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1F6FB2"/>
+    </marker>
+    <marker id="og" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2E8B57"/>
+    </marker>
+    <marker id="oy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#D68910"/>
+    </marker>
+    <marker id="orr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#C0392B"/>
+    </marker>
+    <marker id="ogy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#888"/>
+    </marker>
+  </defs>
+
+  <!-- ===== 左：on-policy ===== -->
+  <text x="250" y="40" font-size="25" font-weight="bold" fill="#1F6FB2" text-anchor="middle">on-policy（第14讲、第15讲）</text>
+
+  <rect x="140" y="80" width="220" height="70" rx="10" fill="#DCE9F6" stroke="#1F6FB2" stroke-width="2.5"/>
+  <text x="250" y="122" font-size="21" font-weight="bold" fill="#12456F" text-anchor="middle">当前策略</text>
+
+  <rect x="130" y="242" width="240" height="86" rx="10" fill="#EAF2FB" stroke="#1F6FB2" stroke-width="2.5"/>
+  <text x="250" y="278" font-size="19" fill="#12456F" text-anchor="middle">新鲜数据</text>
+  <text x="250" y="306" font-size="16" fill="#4A6A85" text-anchor="middle">（只来自当前策略）</text>
+
+  <line x1="205" y1="154" x2="205" y2="236" stroke="#1F6FB2" stroke-width="2.5" marker-end="url(#ob)"/>
+  <text x="176" y="200" font-size="16" fill="#1F6FB2" text-anchor="end">采样</text>
+
+  <line x1="300" y1="238" x2="300" y2="156" stroke="#1F6FB2" stroke-width="2.5" marker-end="url(#ob)"/>
+  <text x="326" y="200" font-size="16" fill="#1F6FB2">更新一次</text>
+
+  <line x1="250" y1="332" x2="250" y2="374" stroke="#888" stroke-width="2.5" stroke-dasharray="7,5" marker-end="url(#ogy)"/>
+  <text x="250" y="398" font-size="17" fill="#666" text-anchor="middle">更新完立即作废</text>
+  <text x="250" y="426" font-size="16" fill="#888" text-anchor="middle">策略一变，全部重采</text>
+
+  <line x1="560" y1="60" x2="560" y2="420" stroke="#DDD" stroke-width="2" stroke-dasharray="8,6"/>
+
+  <!-- ===== 右：off-policy ===== -->
+  <text x="840" y="40" font-size="25" font-weight="bold" fill="#C0392B" text-anchor="middle">off-policy（第16讲）</text>
+
+  <rect x="620" y="72" width="140" height="60" rx="10" fill="#FFF" stroke="#1F6FB2" stroke-width="2.5"/>
+  <text x="690" y="109" font-size="17" fill="#12456F" text-anchor="middle">旧策略经验</text>
+
+  <rect x="778" y="72" width="128" height="60" rx="10" fill="#FFF" stroke="#2E8B57" stroke-width="2.5"/>
+  <text x="842" y="109" font-size="17" fill="#1D5E3A" text-anchor="middle">人类示范</text>
+
+  <rect x="924" y="72" width="128" height="60" rx="10" fill="#FFF" stroke="#D68910" stroke-width="2.5"/>
+  <text x="988" y="109" font-size="17" fill="#8A5A08" text-anchor="middle">人工干预</text>
+
+  <line x1="700" y1="136" x2="770" y2="196" stroke="#1F6FB2" stroke-width="2.5" marker-end="url(#ob)"/>
+  <line x1="842" y1="136" x2="842" y2="196" stroke="#2E8B57" stroke-width="2.5" marker-end="url(#og)"/>
+  <line x1="978" y1="136" x2="912" y2="196" stroke="#D68910" stroke-width="2.5" marker-end="url(#oy)"/>
+
+  <rect x="646" y="200" width="392" height="86" rx="10" fill="#FBEDDC" stroke="#C0392B" stroke-width="2.5"/>
+  <text x="842" y="236" font-size="21" font-weight="bold" fill="#8E2A1E" text-anchor="middle">replay buffer（经验池）</text>
+  <text x="842" y="266" font-size="18" font-weight="bold" fill="#8E2A1E" text-anchor="middle">长期保存，反复使用</text>
+
+  <line x1="746" y1="290" x2="746" y2="352" stroke="#C0392B" stroke-width="2.5" marker-end="url(#orr)"/>
+  <text x="716" y="324" font-size="16" fill="#C0392B" text-anchor="end">随机抽 batch</text>
+
+  <path d="M964 352 C 990 320, 990 300, 964 290" fill="none" stroke="#888" stroke-width="2.5" stroke-dasharray="7,5" marker-end="url(#ogy)"/>
+  <text x="1006" y="324" font-size="16" fill="#666">新经验入池</text>
+
+  <rect x="664" y="356" width="300" height="62" rx="10" fill="#FBEAE8" stroke="#C0392B" stroke-width="2.5"/>
+  <text x="814" y="394" font-size="21" font-weight="bold" fill="#8E2A1E" text-anchor="middle">目标策略</text>
+
+  <text x="842" y="436" font-size="16" fill="#666" text-anchor="middle">采数据的手 与 被训练的脑 解耦</text>
+</svg>

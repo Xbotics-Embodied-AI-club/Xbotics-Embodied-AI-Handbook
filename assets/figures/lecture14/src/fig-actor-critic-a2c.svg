@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" font-family="Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei, sans-serif">
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+    </marker>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#C0392B"/>
+    </marker>
+  </defs>
+
+  <text x="480" y="34" font-size="24" font-weight="bold" fill="#333" text-anchor="middle">A2C 的 Actor-Critic：critic 只是给策略梯度当参照物</text>
+
+  <!-- Actor -->
+  <rect x="40" y="76" width="230" height="98" rx="12" fill="#E8F1FA" stroke="#1F6FB2" stroke-width="2.5"/>
+  <text x="155" y="112" font-size="21" font-weight="bold" fill="#12456F" text-anchor="middle">Actor（策略网络）</text>
+  <text x="155" y="142" font-size="17" fill="#12456F" text-anchor="middle">π(a | s)　出动作</text>
+  <text x="155" y="164" font-size="14" fill="#4A6A85" text-anchor="middle">优化主体</text>
+
+  <!-- Critic -->
+  <rect x="40" y="244" width="230" height="98" rx="12" fill="#E7F4EC" stroke="#2E8B57" stroke-width="2.5"/>
+  <text x="155" y="280" font-size="21" font-weight="bold" fill="#1D5E3A" text-anchor="middle">Critic（价值网络）</text>
+  <text x="155" y="310" font-size="17" fill="#1D5E3A" text-anchor="middle">V(s)　估状态价值</text>
+  <text x="155" y="332" font-size="14" fill="#4A6A85" text-anchor="middle">只当参照物，不选动作</text>
+
+  <!-- 环境 -->
+  <rect x="356" y="76" width="180" height="98" rx="12" fill="#F4F4F4" stroke="#777" stroke-width="2.5"/>
+  <text x="446" y="118" font-size="20" font-weight="bold" fill="#444" text-anchor="middle">环境</text>
+  <text x="446" y="148" font-size="15" fill="#555" text-anchor="middle">给出 r 与 s′</text>
+
+  <!-- 优势 -->
+  <rect x="620" y="150" width="300" height="120" rx="12" fill="#FDF2E0" stroke="#D68910" stroke-width="2.5"/>
+  <text x="770" y="186" font-size="20" font-weight="bold" fill="#8A5A08" text-anchor="middle">优势 A</text>
+  <text x="770" y="220" font-size="18" fill="#8A5A08" text-anchor="middle">A = r + γV(s′) − V(s)</text>
+  <text x="770" y="250" font-size="14" fill="#8A5A08" text-anchor="middle">「比平均水平好多少」（GAE 是它的多步版）</text>
+
+  <line x1="272" y1="124" x2="350" y2="124" stroke="#555" stroke-width="2.5" marker-end="url(#a1)"/>
+  <text x="311" y="112" font-size="14" fill="#555" text-anchor="middle">a</text>
+
+  <path d="M536 140 C 590 140, 590 190, 614 190" fill="none" stroke="#555" stroke-width="2.5" marker-end="url(#a1)"/>
+  <text x="572" y="176" font-size="14" fill="#555" text-anchor="middle">r, s′</text>
+
+  <path d="M272 292 C 440 292, 520 232, 614 224" fill="none" stroke="#2E8B57" stroke-width="2.5" marker-end="url(#a1)"/>
+  <text x="430" y="284" font-size="14" fill="#1D5E3A" text-anchor="middle">V(s), V(s′)</text>
+
+  <!-- A 回传给 actor -->
+  <path d="M770 146 C 770 60, 400 44, 155 68" fill="none" stroke="#C0392B" stroke-width="2.5" marker-end="url(#a2)"/>
+  <text x="470" y="52" font-size="15" font-weight="bold" fill="#C0392B" text-anchor="middle">用 A 加权策略梯度，更新 actor</text>
+
+  <!-- critic 回归 -->
+  <path d="M660 274 C 620 366, 320 380, 175 348" fill="none" stroke="#2E8B57" stroke-width="2.5" marker-end="url(#a1)"/>
+  <text x="430" y="392" font-size="15" font-weight="bold" fill="#1D5E3A" text-anchor="middle">critic 回归 returns，把 V 估得更准</text>
+</svg>

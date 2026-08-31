@@ -35,21 +35,35 @@ def test_discretize_returns_correct_bucket_tuple():
     assert all(0 <= index < qlearning.NUM_BINS for index in bucket)
 
 
-def test_qlearning_one_td_update_runs():
+def test_tabular_q_has_no_trainable_parameters():
+    """第一级的教学点：Q 表放在 nn.Module 里，但一个可训练参数都没有。"""
+    model = qlearning.TabularQ(n_actions=2)
+    assert list(model.parameters()) == []
+    assert model.table.shape == (qlearning.NUM_BINS,) * 4 + (2,)
+
+
+def test_tabular_qlearning_training_step_runs(tmp_path):
     env = gym.make("CartPole-v1")
     n_actions = env.action_space.n
-    Q = np.zeros((qlearning.NUM_BINS,) * 4 + (n_actions,))
 
-    obs, _ = env.reset(seed=0)
-    state = qlearning.discretize(obs)
-    action = env.action_space.sample()
-    next_obs, reward, terminated, _truncated, _info = env.step(action)
-    next_state = qlearning.discretize(next_obs)
+    stats = qlearning.CollectorState(env, seed=0)
+    model = qlearning.TabularQLearning(
+        n_actions=n_actions, alpha=0.2, gamma=0.99, stats=stats,
+        qtable_path=tmp_path / "qtable.npy", result_path=tmp_path / "r.json", print_every=1000,
+    )
+    data = qlearning.CartPoleTabularData(
+        env, model.model, stats, steps_per_epoch=4,
+        epsilon_start=1.0, epsilon_end=1.0, epsilon_decay_steps=100,
+    )
+    trainer = L.Trainer(
+        accelerator="cpu", devices=1, max_epochs=1, logger=False, enable_checkpointing=False,
+        enable_progress_bar=False, enable_model_summary=False,
+    )
+    trainer.fit(model, data)
 
-    target = reward if terminated else reward + qlearning.GAMMA * np.max(Q[next_state])
-    Q[state][action] += qlearning.ALPHA * (target - Q[state][action])
-
-    assert np.isfinite(Q[state][action])
+    # 表格更新确实发生了：至少有一格被改动过，且全表有限。
+    assert torch.isfinite(model.model.table).all()
+    assert (model.model.table != 0).any()
     env.close()
 
 
@@ -66,12 +80,13 @@ def test_dqn_training_step_runs(tmp_path):
     n_actions = env.action_space.n
 
     buffer = dqn.ReplayBuffer(capacity=200, state_dim=state_dim)
-    stats = dqn.CollectorState(env)
+    stats = dqn.CollectorState(env, seed=0)
     dqn.warmup_buffer(env, buffer, stats, warmup_steps=50)
 
     model = dqn.DQN(
         state_dim=state_dim, n_actions=n_actions, hidden_dim=8, learning_rate=1.0e-3, gamma=0.99,
         target_sync_every=10, checkpoint_path=tmp_path / "dqn.pt", save_interval=1000, max_epochs=1,
+        stats=stats, result_path=tmp_path / "r.json",
     )
     data = dqn.CartPoleDQNData(
         env, model, buffer, stats, steps_per_epoch=2, batches_per_epoch=1, batch_size=8,

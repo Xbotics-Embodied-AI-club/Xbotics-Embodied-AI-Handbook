@@ -1,3 +1,12 @@
+# 自用面：实验留痕 / 工具代码 / 工作缓存，一律不入库。
+# 本仓是要推 GitHub 的公开仓（Xbotics-Embodied-AI-Handbook），交付面与自用面在顶层一刀切开：
+#   code/ docs/ assets/ hardware/   交付：推上游、发学员
+#   experiments/                    自用：results/（产物）· scripts/<task-id>/（工具代码）· scratch/（缓存）
+# 只需这一行；以后新增任何一种自用产物都落在 experiments/ 下，不必再逐个补 ignore。
+experiments/
+
+# 取代旧的 _tmp_result/（内容已按 task-id 迁入 experiments/results/ 与 scratch/）
+
 # Python
 __pycache__/
 *.py[cod]

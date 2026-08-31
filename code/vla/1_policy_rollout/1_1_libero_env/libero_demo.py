@@ -8,7 +8,6 @@ os.environ["MUJOCO_GL"] = "egl"   # 无桌面环境用 EGL 离屏渲染
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 OUT_DIR = "output"
 os.makedirs(OUT_DIR, exist_ok=True)

@@ -16,7 +16,7 @@ DQN 依然只能对离散动作取 argmax；下一包 `rl/3_offpolicy/3_2_so101_
 ## 怎么跑
 
 ```bash
-cd experiments
+cd code
 python rl/3_offpolicy/3_1_cartpole_value_rl/train_v1_qlearning.py
 python rl/3_offpolicy/3_1_cartpole_value_rl/train_v2_dqn.py
 ```

@@ -27,7 +27,7 @@
 ## 运行
 
 ```bash
-cd experiments
+cd code
 uv sync --extra gpu_x86
 uv run python rl/2_grpo_posttraining/2_1_grpo_vlm_counting/train_grpo_qwen2_vl.py
 ```

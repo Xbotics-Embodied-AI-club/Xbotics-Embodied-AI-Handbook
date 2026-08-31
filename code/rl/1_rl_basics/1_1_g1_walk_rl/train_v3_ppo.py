@@ -267,7 +267,8 @@ class G1WalkLightningPPO(L.LightningModule):
 
         ratio = torch.exp(log_probs - batch["log_probs"])
         unclipped = ratio * batch["advantages"]
-        clipped = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * batch["advantages"]
+        clipped = (torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
+                   * batch["advantages"])
         policy_loss = -torch.min(unclipped, clipped).mean()
         value_loss = self.value_loss(values, batch["values"], batch["returns"])
         entropy_loss = entropy.mean()

@@ -19,6 +19,6 @@
 每个模块都是三件套：demo `.py`（课堂逐行走读，固定成功局）+ 同名 `.ipynb`（分节讲解）
 + `*_eval.sh`（官方 `lerobot-eval` 标准评测：多 episode pc_success 统计 + 自动录像）。
 
-环境：`cd experiments && uv sync --extra gpu_x86`；4_1/4_3 依赖
-`bash lerobot/fetch_lerobot.sh` 打入的 openvla / vla0_smol policy 补丁；权重自动
+环境：`cd code && uv sync --extra gpu_x86`；4_1/4_3 依赖
+`bash platform/lerobot/fetch_lerobot.sh` 打入的 openvla / vla0_smol policy 补丁；权重自动
 下载落 `$HF_HOME`（4_3 用本地训练产物）。

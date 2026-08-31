@@ -12,7 +12,7 @@ checkpoint 来自讲 15 的 GRPO 后训练实验（`rl/2_grpo_posttraining/2_2_g
 数字串解码也改装自那里的 `model.py`），放在
 `$DATASETS_ROOT/models/trained/xbotics_rl_grpo_vla0/grpo_runs/iter002/`。
 
-运行：`cd experiments && uv sync --extra gpu_x86 && bash lerobot/fetch_lerobot.sh`
+运行：`cd code && uv sync --extra gpu_x86 && bash platform/lerobot/fetch_lerobot.sh`
 （vla0_smol policy 由 `lerobot/0002-vla0-smol-policy.patch` 提供），然后
 `uv run python vla/4_vla_inference/4_3_vla0_infer/vla0_demo.py`。
 

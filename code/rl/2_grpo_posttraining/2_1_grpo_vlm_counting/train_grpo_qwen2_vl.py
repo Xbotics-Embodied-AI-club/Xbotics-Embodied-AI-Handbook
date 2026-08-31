@@ -306,7 +306,7 @@ class QwenVLGRPOModel(nn.Module):
 
         # 正确性奖励：只比较最终计数答案，弱化自然语言解释。
         def correctness_reward_func(completions, answer, **unused):
-            return [correctness_reward(completion, target) for completion, target in zip(completions, answer)]
+            return [correctness_reward(c, t) for c, t in zip(completions, answer)]
 
         # GRPO 每个问题采样 4 个回答，同组回答互相比较后更新 LoRA。
         grpo_config = GRPOConfig(

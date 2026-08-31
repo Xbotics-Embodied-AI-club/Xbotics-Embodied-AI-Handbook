@@ -14,7 +14,7 @@
 - `pi0fast_eval.sh` / `pi05_eval.sh` — 官方 `lerobot-eval` 标准评测入口
   （多 episode pc_success 统计 + 自动录像进 `output/eval_*/`）
 
-运行：`cd experiments && uv sync --extra gpu_x86`，然后
+运行：`cd code && uv sync --extra gpu_x86`，然后
 `uv run python vla/4_vla_inference/4_2_pi0fast_pi05_infer/pi0fast_demo.py`（或 pi05）。
 
 结果：libero_goal task5「push the plate to the front of the stove」，初始状态 2，

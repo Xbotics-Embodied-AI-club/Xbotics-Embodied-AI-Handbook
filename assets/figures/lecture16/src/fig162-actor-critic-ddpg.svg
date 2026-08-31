@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="430" viewBox="0 0 980 430" font-family="Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei, sans-serif">
+  <defs>
+    <marker id="d1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+    </marker>
+    <marker id="d2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#C0392B"/>
+    </marker>
+  </defs>
+
+  <text x="490" y="34" font-size="24" font-weight="bold" fill="#333" text-anchor="middle">DDPG 的 Actor-Critic：Actor 直接吐连续动作，Critic 给它打分</text>
+
+  <!-- Actor -->
+  <rect x="40" y="80" width="242" height="104" rx="12" fill="#E8F1FA" stroke="#1F6FB2" stroke-width="2.5"/>
+  <text x="161" y="116" font-size="21" font-weight="bold" fill="#12456F" text-anchor="middle">Actor（确定性策略）</text>
+  <text x="161" y="146" font-size="17" fill="#12456F" text-anchor="middle">a = μ(s)</text>
+  <text x="161" y="172" font-size="14" fill="#4A6A85" text-anchor="middle">不做 argmax，一步吐出连续动作</text>
+
+  <!-- Critic -->
+  <rect x="40" y="252" width="242" height="104" rx="12" fill="#E7F4EC" stroke="#2E8B57" stroke-width="2.5"/>
+  <text x="161" y="288" font-size="21" font-weight="bold" fill="#1D5E3A" text-anchor="middle">Critic（动作价值）</text>
+  <text x="161" y="318" font-size="17" fill="#1D5E3A" text-anchor="middle">Q(s, a)</text>
+  <text x="161" y="344" font-size="14" fill="#4A6A85" text-anchor="middle">学习主体，评价「在 s 做了 a」</text>
+
+  <!-- replay buffer -->
+  <rect x="368" y="80" width="216" height="104" rx="12" fill="#FDF2E0" stroke="#D68910" stroke-width="2.5"/>
+  <text x="476" y="118" font-size="20" font-weight="bold" fill="#8A5A08" text-anchor="middle">replay buffer</text>
+  <text x="476" y="148" font-size="15" fill="#8A5A08" text-anchor="middle">(s, a, r, s′) 长期保存</text>
+  <text x="476" y="170" font-size="14" fill="#8A5A08" text-anchor="middle">随机抽 batch，反复使用</text>
+
+  <!-- 贝尔曼目标 -->
+  <rect x="642" y="238" width="300" height="118" rx="12" fill="#FBEAE8" stroke="#C0392B" stroke-width="2.5"/>
+  <text x="792" y="274" font-size="20" font-weight="bold" fill="#8E2A1E" text-anchor="middle">贝尔曼回归目标</text>
+  <text x="792" y="306" font-size="17" fill="#8E2A1E" text-anchor="middle">y = r + γ Q′(s′, μ′(s′))</text>
+  <text x="792" y="336" font-size="14" fill="#8E2A1E" text-anchor="middle">目标网络 Q′、μ′ 软更新，稳住目标</text>
+
+  <line x1="284" y1="132" x2="362" y2="132" stroke="#555" stroke-width="2.5" marker-end="url(#d1)"/>
+  <text x="323" y="120" font-size="14" fill="#555" text-anchor="middle">新经验入池</text>
+
+  <path d="M476 188 C 476 232, 340 246, 286 292" fill="none" stroke="#D68910" stroke-width="2.5" marker-end="url(#d1)"/>
+  <text x="418" y="248" font-size="14" fill="#8A5A08" text-anchor="middle">抽 batch</text>
+
+  <path d="M286 320 C 460 320, 560 298, 636 298" fill="none" stroke="#2E8B57" stroke-width="2.5" marker-end="url(#d1)"/>
+  <text x="462" y="310" font-size="14" fill="#1D5E3A" text-anchor="middle">Q(s,a) 向 y 回归</text>
+
+  <!-- critic 指导 actor -->
+  <path d="M700 234 C 700 60, 380 44, 161 72" fill="none" stroke="#C0392B" stroke-width="2.5" marker-end="url(#d2)"/>
+  <text x="452" y="52" font-size="15" font-weight="bold" fill="#C0392B" text-anchor="middle">Actor 沿 ∇a Q(s, a) 的方向更新——把 Q 推高</text>
+
+  <text x="490" y="404" font-size="16" fill="#555" text-anchor="middle">与 A2C 的分工正好相反：这里 critic 是学习主体，actor 更像「帮连续动作找 Q 最大值」的执行器。</text>
+</svg>

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="380" viewBox="0 0 880 380" font-family="Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei, sans-serif">
+  <defs>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1F6FB2"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#C0392B"/>
+    </marker>
+  </defs>
+
+  <rect x="330" y="30" width="220" height="76" rx="12" fill="#E8F1FA" stroke="#1F6FB2" stroke-width="2.5"/>
+  <text x="440" y="70" font-size="26" font-weight="bold" fill="#12456F" text-anchor="middle">智能体</text>
+  <text x="440" y="94" font-size="15" fill="#4A6A85" text-anchor="middle">策略 π：看到什么 → 做什么</text>
+
+  <rect x="330" y="274" width="220" height="76" rx="12" fill="#E7F4EC" stroke="#2E8B57" stroke-width="2.5"/>
+  <text x="440" y="314" font-size="26" font-weight="bold" fill="#1D5E3A" text-anchor="middle">环境</text>
+  <text x="440" y="338" font-size="15" fill="#4A6A85" text-anchor="middle">按物理规律推进一步</text>
+
+  <!-- 右：智能体 -> 环境 -->
+  <path d="M550 68 C 700 68, 700 312, 550 312" fill="none" stroke="#C0392B" stroke-width="2.5" marker-end="url(#ar)"/>
+  <text x="712" y="182" font-size="19" font-weight="bold" fill="#C0392B">动作</text>
+  <text x="712" y="208" font-size="19" fill="#C0392B">a</text>
+  <text x="726" y="214" font-size="13" fill="#C0392B">t</text>
+
+  <!-- 左：环境 -> 智能体 -->
+  <path d="M330 312 C 180 312, 180 68, 330 68" fill="none" stroke="#1F6FB2" stroke-width="2.5" marker-end="url(#ab)"/>
+  <text x="52" y="176" font-size="19" font-weight="bold" fill="#1F6FB2">新状态</text>
+  <text x="52" y="202" font-size="19" fill="#1F6FB2">s</text>
+  <text x="64" y="208" font-size="13" fill="#1F6FB2">t+1</text>
+  <text x="52" y="234" font-size="19" font-weight="bold" fill="#1F6FB2">奖励</text>
+  <text x="128" y="234" font-size="19" fill="#1F6FB2">r</text>
+  <text x="139" y="240" font-size="13" fill="#1F6FB2">t</text>
+
+  <text x="440" y="192" font-size="17" fill="#777" text-anchor="middle">如此循环，直到回合结束</text>
+</svg>

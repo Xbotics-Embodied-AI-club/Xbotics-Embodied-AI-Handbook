@@ -115,7 +115,7 @@ class VLA0LightningGRPO(L.LightningModule):
                 denom = valid.sum().clamp(min=1)
                 lp = (lp_tok * valid).sum() / denom
                 loss = -(adv * lp)
-                # KL-to-ref（DeepSeek GRPO 的 k3 估计器，逐 token ≥ 0）：把策略锚在冻结基座附近。
+                # KL-to-ref（k3 估计器，逐 token ≥ 0）：把策略锚在冻结基座附近。
                 lp_ref, _ = sequence_logprob_tok(self.ref_model, rec, requires_grad=False)
                 delta = lp_ref - lp_tok
                 kl_tok = torch.exp(delta) - delta - 1.0

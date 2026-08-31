@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="430" viewBox="0 0 1000 430" font-family="Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei, sans-serif">
+  <defs>
+    <marker id="tick" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#D68910"/>
+    </marker>
+  </defs>
+
+  <text x="500" y="36" font-size="25" font-weight="bold" fill="#333" text-anchor="middle">动作空间分两类</text>
+  <line x1="500" y1="62" x2="500" y2="400" stroke="#CCC" stroke-width="2" stroke-dasharray="7,6"/>
+
+  <!-- 左：离散 -->
+  <text x="250" y="98" font-size="22" font-weight="bold" fill="#1F6FB2" text-anchor="middle">离散动作空间</text>
+  <text x="250" y="126" font-size="16" fill="#4A6A85" text-anchor="middle">从有限个选项里挑一个</text>
+
+  <g fill="#E8F1FA" stroke="#1F6FB2" stroke-width="2.5">
+    <rect x="88" y="158" width="140" height="52" rx="10"/>
+    <rect x="272" y="158" width="140" height="52" rx="10"/>
+    <rect x="88" y="228" width="140" height="52" rx="10"/>
+    <rect x="272" y="228" width="140" height="52" rx="10"/>
+  </g>
+  <g font-size="19" fill="#12456F" text-anchor="middle">
+    <text x="158" y="191">向左推</text>
+    <text x="342" y="191">向右推</text>
+    <text x="158" y="261">不动</text>
+    <text x="342" y="261">跳</text>
+  </g>
+
+  <text x="250" y="330" font-size="16" fill="#555" text-anchor="middle">动作个数是有限的，可以逐个比较好坏</text>
+  <text x="250" y="362" font-size="16" fill="#777" text-anchor="middle">例：游戏手柄按键、</text>
+  <text x="250" y="388" font-size="16" fill="#777" text-anchor="middle">语言模型从词表里选下一个 token</text>
+
+  <!-- 右：连续 -->
+  <text x="750" y="98" font-size="22" font-weight="bold" fill="#C0392B" text-anchor="middle">连续动作空间</text>
+  <text x="750" y="126" font-size="16" fill="#4A6A85" text-anchor="middle">动作是一个实数区间里的取值</text>
+
+  <line x1="586" y1="222" x2="912" y2="222" stroke="#D68910" stroke-width="3" marker-end="url(#tick)"/>
+  <g stroke="#D68910" stroke-width="2.5">
+    <line x1="600" y1="212" x2="600" y2="232"/>
+    <line x1="898" y1="212" x2="898" y2="232"/>
+  </g>
+  <circle cx="712" cy="222" r="9" fill="#C0392B"/>
+  <text x="600" y="258" font-size="17" fill="#8A5A08" text-anchor="middle">−1.0</text>
+  <text x="898" y="258" font-size="17" fill="#8A5A08" text-anchor="middle">+1.0</text>
+  <text x="712" y="196" font-size="17" fill="#C0392B" text-anchor="middle">任一实数</text>
+
+  <text x="750" y="330" font-size="16" fill="#555" text-anchor="middle">取值有无穷多个，没法逐个枚举</text>
+  <text x="750" y="362" font-size="16" fill="#777" text-anchor="middle">例：方向盘转角、</text>
+  <text x="750" y="388" font-size="16" fill="#777" text-anchor="middle">G1 的 29 个关节目标量</text>
+</svg>

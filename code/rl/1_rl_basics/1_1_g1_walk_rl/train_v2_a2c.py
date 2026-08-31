@@ -90,7 +90,8 @@ class G1WalkRolloutDataset(IterableDataset):
 
         with torch.no_grad():
             next_value = self.model.value(critic_obs)
-        advantages, returns = compute_gae(reward_steps, done_steps, value_steps, next_value, self.gamma, self.lam)
+        advantages, returns = compute_gae(
+            reward_steps, done_steps, value_steps, next_value, self.gamma, self.lam)
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1.0e-8)
 
         batch_size = self.num_steps_per_env * num_envs

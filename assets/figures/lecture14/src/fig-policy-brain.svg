@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="300" viewBox="0 0 1000 300" font-family="Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei, sans-serif">
+  <defs>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#666"/>
+    </marker>
+  </defs>
+
+  <text x="500" y="34" font-size="24" font-weight="bold" fill="#333" text-anchor="middle">策略：把观测映射成动作</text>
+
+  <!-- 观测 -->
+  <rect x="40" y="86" width="212" height="120" rx="12" fill="#E8F1FA" stroke="#1F6FB2" stroke-width="2.5"/>
+  <text x="146" y="126" font-size="21" font-weight="bold" fill="#12456F" text-anchor="middle">观测 s</text>
+  <text x="146" y="156" font-size="15" fill="#4A6A85" text-anchor="middle">关节角度、躯干姿态</text>
+  <text x="146" y="180" font-size="15" fill="#4A6A85" text-anchor="middle">目标速度指令</text>
+
+  <line x1="258" y1="146" x2="332" y2="146" stroke="#666" stroke-width="2.5" marker-end="url(#ag)"/>
+
+  <!-- 策略网络 -->
+  <rect x="338" y="76" width="248" height="140" rx="12" fill="#FDF2E0" stroke="#D68910" stroke-width="2.5"/>
+  <text x="462" y="116" font-size="21" font-weight="bold" fill="#8A5A08" text-anchor="middle">策略网络 π</text>
+  <text x="462" y="146" font-size="15" fill="#8A5A08" text-anchor="middle">神经网络</text>
+  <text x="462" y="178" font-size="15" fill="#8A5A08" text-anchor="middle">输出一个动作分布，而不是</text>
+  <text x="462" y="200" font-size="15" fill="#8A5A08" text-anchor="middle">一个写死的动作</text>
+
+  <line x1="592" y1="146" x2="666" y2="146" stroke="#666" stroke-width="2.5" marker-end="url(#ag)"/>
+
+  <!-- 动作分布 -->
+  <rect x="672" y="86" width="288" height="120" rx="12" fill="#FBEAE8" stroke="#C0392B" stroke-width="2.5"/>
+  <text x="816" y="120" font-size="19" font-weight="bold" fill="#8E2A1E" text-anchor="middle">动作分布 π(a | s)</text>
+  <path d="M708 190 C 748 190, 762 138, 800 138 C 838 138, 852 190, 892 190" fill="none" stroke="#C0392B" stroke-width="2.5"/>
+  <line x1="700" y1="190" x2="924" y2="190" stroke="#8E2A1E" stroke-width="2"/>
+  <circle cx="800" cy="190" r="6" fill="#8E2A1E"/>
+  <text x="816" y="176" font-size="14" fill="#8E2A1E" text-anchor="middle">采样一个动作 a</text>
+
+  <text x="500" y="262" font-size="16" fill="#555" text-anchor="middle">同一个观测下合理的动作往往不止一个，所以策略输出的是分布；</text>
+  <text x="500" y="286" font-size="16" fill="#555" text-anchor="middle">随机性正是探索的来源。</text>
+</svg>

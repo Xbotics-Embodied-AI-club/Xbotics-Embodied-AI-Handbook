@@ -34,7 +34,6 @@ import time
 from pathlib import Path
 
 import lightning as L
-import numpy as np
 import torch
 import torch.nn.functional as F
 import wandb

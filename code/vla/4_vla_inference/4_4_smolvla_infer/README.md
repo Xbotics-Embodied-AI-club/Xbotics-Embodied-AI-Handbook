@@ -8,7 +8,7 @@
 - `smolvla_demo.py` — 脚本版，跑通即产出 `output/smolvla_libero_success.mp4`
 - `smolvla_eval.sh` — 官方 `lerobot-eval` 标准评测入口（rename_map 把 image/image2 映射到 checkpoint 的 camera1/2；实测 2 episode pc_success=50%）
 
-运行：`cd experiments && uv sync --extra gpu_x86`，然后
+运行：`cd code && uv sync --extra gpu_x86`，然后
 `uv run python vla/4_vla_inference/4_4_smolvla_infer/smolvla_demo.py`。
 
 结果：libero_goal task5「push the plate to the front of the stove」，初始状态 2，

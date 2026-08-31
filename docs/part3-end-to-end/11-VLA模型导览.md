@@ -1,5 +1,5 @@
 ---
-title: "第11讲　VLA 模型导览：从 OpenVLA 到 $\\pi_0$ 家族"
+title: "第11讲 VLA 模型导览：从 OpenVLA 到 $\\pi_0$ 家族"
 lang: zh-CN
 format:
   pdf:
@@ -329,11 +329,11 @@ OFT+ 的核心设计变化：
 LIBERO-10 上微调的 7B checkpoint，闭环推理一次并录像：
 
 ```bash
-cd experiments
+cd code
 uv run python vla/4_vla_inference/4_1_openvla_infer/openvla_demo.py
 ```
 
-代码里有两处与 $\pi_0$ 的 demo（第 8 讲跑过）不同，恰好对应本节讲过的两个机制：
+代码里有两处与 $\pi_0$ 的 demo（第8讲跑过）不同，恰好对应本节讲过的两个机制：
 
 - **加载方式**：这个 checkpoint 不是 LeRobot 格式——HF 仓库里放的是 transformers
   远程模型代码（Prismatic 架构），所以要显式构造 `OpenVLAConfig` 再加载；
@@ -639,7 +639,7 @@ $\pi_0$ 使用 10 步积分（$\delta = 0.1$），从 $\tau = 0$ 积分到 $\tau
 | 模型推理延迟（inference latency） | 跑一次完整前向要多久 | 板载约 73 ms、离板约 86 ms（RTX 4090，见上表） |
 | 重规划周期（replan interval） | 多久重新感知并推理一次 | 20 Hz 平台约 0.8 s、50 Hz 平台约 0.5 s |
 
-所以"$\pi_0$ 支持 50 Hz 控制"这句话的准确含义是：**动作以 50 Hz 出队执行**，而大模型每 0.5 秒才重新看一眼、重新规划一次。它不等于每 20 ms 重新推理一次。后面 3.6.1 的横向对比、以及讲 13 讨论实时推理时，都沿用这套区分。
+所以"$\pi_0$ 支持 50 Hz 控制"这句话的准确含义是：**动作以 50 Hz 出队执行**，而大模型每 0.5 秒才重新看一眼、重新规划一次。它不等于每 20 ms 重新推理一次。后面 3.6.1 的横向对比、以及第13讲讨论实时推理时，都沿用这套区分。
 
 ## 3.4 训练方案
 
@@ -737,12 +737,12 @@ $\pi_0$ 在 7 种不同的机器人构型上联合训练：
 
 ## 3.7 上手：跑一次 $\pi_0$ 推理
 
-$\pi_0$ 的闭环第 8 讲已经完整跑过（配套代码仓
+$\pi_0$ 的闭环第8讲已经完整跑过（配套代码仓
 `experiments/vla/1_policy_rollout/1_2_pi0_libero_rollout/`），当时把它当黑盒；
 学完本节可以带着结构重看一遍：
 
 ```bash
-cd experiments
+cd code
 uv run python vla/1_policy_rollout/1_2_pi0_libero_rollout/pi0_demo.py
 ```
 
@@ -782,7 +782,7 @@ PaliGemma 骨干把图像与指令编成前缀、算好 KV 缓存（3.2.5 节）
 3. **泛化边界**：模型是否能扩展到自动驾驶、导航、足式运动等更不同的领域，有待验证
 4. **数据需求预测**：对于给定任务，需要多少、什么类型的数据才能达到接近完美的性能，目前无法预测
 
-在第 3 节我们介绍了 $\pi_0$——基于 Flow Matching 的 VLA 模型，它用连续流替代自回归离散化，实现了高频精细控制。本节介绍它的一个重要后续工作 $\pi_0$-FAST：从动作 token 化的角度，优化自回归 VLA 的训练与推理效率（再下一节的 $\pi_{0.5}$ 会把 FAST 与 flow 结合、冲开放世界泛化）。
+在第 3 节我们介绍了 $\pi_0$——基于 Flow Matching 的 VLA 模型，它用连续流替代自回归离散化，实现了高频精细控制。下一节介绍它的一个重要后续工作 $\pi_0$-FAST：从动作 token 化的角度，优化自回归 VLA 的训练与推理效率（再下一节的 $\pi_{0.5}$ 会把 FAST 与 flow 结合、冲开放世界泛化）。
 
 # 4 $\pi_0$-FAST：高效动作 Token 化
 
@@ -933,7 +933,7 @@ FAST 在每个域中始终为每个机械臂生成约 30 个 token（双臂约 6
 的 LIBERO 微调 checkpoint 闭环一次：
 
 ```bash
-cd experiments
+cd code
 uv run python vla/4_vla_inference/4_2_pi0fast_pi05_infer/pi0fast_demo.py
 ```
 
@@ -1147,7 +1147,7 @@ $\pi_{0.5}$ 的推理分为两步：
 ## 5.5 上手：跑一次 $\pi_{0.5}$ 推理
 
 ```bash
-cd experiments
+cd code
 uv run python vla/4_vla_inference/4_2_pi0fast_pi05_infer/pi05_demo.py
 ```
 
@@ -1318,7 +1318,7 @@ checkpoint（强化学习部分 GRPO 后训练的产物，本地训练产物目�
 第一个动作块的原始文本打印出来：
 
 ```bash
-cd experiments
+cd code
 uv run python vla/4_vla_inference/4_3_vla0_infer/vla0_demo.py
 ```
 
@@ -1558,7 +1558,7 @@ SmolVLA 默认预测 $n = 50$ 步的动作 chunk。消融实验表明 chunk 大�
 | 总帧数 | ~10.6M 帧 |
 | 主要机器人 | SO-100 |
 
-这个数据规模比其他 VLA 的训练数据至少小一个数量级，但多样性显著更高——社区数据集天然包含了嘈杂的演示、异构的环境、多样的物体交互和不同的光照条件。
+这个数据规模比其他 VLA 的训练数据至少小一个数量级，但多样性显著更高——社区数据集天然包含了嘈杂的示教、异构的环境、多样的物体交互和不同的光照条件。
 
 ### 7.3.2 数据标准化
 
@@ -1655,7 +1655,7 @@ $$
 ## 7.5 上手：跑一次 SmolVLA 推理
 
 ```bash
-cd experiments
+cd code
 uv run python vla/4_vla_inference/4_4_smolvla_infer/smolvla_demo.py
 ```
 
@@ -1669,7 +1669,7 @@ uv run python vla/4_vla_inference/4_4_smolvla_infer/smolvla_demo.py
 标准评测入口 `smolvla_eval.sh` 里有个值得一提的细节：这个 checkpoint 训练时相机
 名叫 `camera1/2/3`，而 LIBERO 环境给出的两路观测叫 `image/image2`，评测命令用
 `--rename_map` 把观测键改名对齐——特征名对齐是部署 VLA 时最常见的一类"接线"工作
-（第 8 讲部署四关的口径问题，在这里又出现了一次）。
+（第8讲部署四关的口径问题，在这里又出现了一次）。
 
 刚讲完的异步推理没有出现在这段代码里：demo 是同步闭环，异步化是把同一个
 `select_action` 搬进 PolicyServer、与机器人端解耦的部署层改造，模型与本 demo 的

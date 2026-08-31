@@ -42,7 +42,7 @@ vla/
 统一 uv 环境见 `code/pyproject.toml`：
 
 ```bash
-cd experiments
-bash lerobot/fetch_lerobot.sh    # 拉 lerobot 源并打补丁（组2/3 需要）
+cd code
+bash platform/lerobot/fetch_lerobot.sh    # 拉 lerobot 源并打补丁（组2/3 需要）
 uv sync --extra gpu_x86
 ```

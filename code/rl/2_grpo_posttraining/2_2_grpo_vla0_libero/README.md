@@ -21,8 +21,8 @@
 统一环境见 `code/pyproject.toml` 的 `gpu_x86` extra：
 
 ```bash
-cd experiments
-bash lerobot/fetch_lerobot.sh          # 拉 lerobot 源并打补丁（含 vla0_smol policy）
+cd code
+bash platform/lerobot/fetch_lerobot.sh          # 拉 lerobot 源并打补丁（含 vla0_smol policy）
 uv sync --extra gpu_x86
 ```
 

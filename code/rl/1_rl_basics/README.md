@@ -24,7 +24,7 @@
 ## 运行
 
 ```bash
-cd experiments
+cd code
 uv sync --extra gpu_x86
 uv run python rl/1_rl_basics/1_1_g1_walk_rl/train_v1_reinforce.py   # 或打开同名 .ipynb
 ```
