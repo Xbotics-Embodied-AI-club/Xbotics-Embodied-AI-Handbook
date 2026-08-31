@@ -234,6 +234,8 @@
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
+\listoffigures
+\listoftables
 
 从第8讲开始，我们做的事情其实只有一件：训练一个\textbf{策略}，再把它部署到闭环里。第8讲立起了这个概念------策略就是从观测到动作的映射；第9到12讲围着它转了一整圈：采数据、用
 ACT 和 VLA
@@ -857,21 +859,21 @@ Retargeting）{[}9{]}{[}10{]}，负责把''人的动作''翻译成''G1
 版训练循环}\label{ux4ee3ux7801ux8d70ux8bfbv1-ux7248ux8badux7ec3ux5faaux73af}
 
 行走实验的代码都在 \texttt{code/rl/1\_rl\_basics/1\_1\_g1\_walk\_rl/}
-这一个目录里。本节走读前三个文件，其中前两个由三个版本共用；后三个不讲算法，但
+这一个目录里，下表只写目录内的文件名。本节走读前三个文件，其中前两个由三个版本共用；后三个不讲算法，但
 4.6 节起的评测数字、rollout 视频和 6.5
 节那两张训练曲线图，都由它们产出：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.4500\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5500\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2855\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.7145\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 文件 & 职责 \\
 \midrule\noalign{}
-\texttt{code/rl/1\_\allowbreak rl\_\allowbreak basics/1\_\allowbreak 1\_\allowbreak g1\_\allowbreak walk\_\allowbreak rl/env.py} & 包装 mjlab 的 G1 平地速度任务成 \texttt{G1WalkEnv}，返回观测 / 奖励 / 终止信号 \\
-\texttt{code/rl/1\_\allowbreak rl\_\allowbreak basics/1\_\allowbreak 1\_\allowbreak g1\_\allowbreak walk\_\allowbreak rl/model.py} & \texttt{ActorCritic} 网络（actor + critic 两个 MLP）与 GAE 工具函数 \\
-\texttt{code/rl/1\_\allowbreak rl\_\allowbreak basics/1\_\allowbreak 1\_\allowbreak g1\_\allowbreak walk\_\allowbreak rl/train\_\allowbreak v1\_\allowbreak reinforce.py} & 本节的 REINFORCE 训练脚本 \\
-\texttt{code/rl/1\_\allowbreak rl\_\allowbreak basics/1\_\allowbreak 1\_\allowbreak g1\_\allowbreak walk\_\allowbreak rl/rollout.py} & 载入训练好的权重，按 1.4 节的统一口径（16 个环境 × 400 步、确定性动作）评测并录像 \\
-\texttt{code/rl/1\_\allowbreak rl\_\allowbreak basics/1\_\allowbreak 1\_\allowbreak g1\_\allowbreak walk\_\allowbreak rl/plot\_\allowbreak reward\_\allowbreak curves.py} & 画 6.5 节那张三算法训练奖励对照曲线 \\
-\texttt{code/rl/1\_\allowbreak rl\_\allowbreak basics/1\_\allowbreak 1\_\allowbreak g1\_\allowbreak walk\_\allowbreak rl/plot\_\allowbreak training\_\allowbreak losses.py} & 画 6.5 节那张四面板训练损失对照图 \\
+\texttt{env.py} & 包装 mjlab 的 G1 平地速度任务成 \texttt{G1WalkEnv}，返回观测 / 奖励 / 终止信号 \\
+\texttt{model.py} & \texttt{ActorCritic} 网络（actor + critic 两个 MLP）与 GAE 工具函数 \\
+\texttt{train\_\allowbreak v1\_\allowbreak reinforce.py} & 本节的 REINFORCE 训练脚本 \\
+\texttt{rollout.py} & 载入训练好的权重，按 1.4 节的统一口径（16 个环境 × 400 步、确定性动作）评测并录像 \\
+\texttt{plot\_\allowbreak reward\_\allowbreak curves.py} & 画 6.5 节那张三算法训练奖励对照曲线 \\
+\texttt{plot\_\allowbreak training\_\allowbreak losses.py} & 画 6.5 节那张四面板训练损失对照图 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -902,11 +904,18 @@ Lightning 把训练拆成三块（第12讲 4.6 节见过 \texttt{LightningModule
 \begin{Shaded}
 \begin{Highlighting}[]
 \KeywordTok{def}\NormalTok{ reward\_to\_go(reward\_steps, done\_steps, gamma):}
-\NormalTok{    returns }\OperatorTok{=}\NormalTok{ torch.zeros\_like(reward\_steps)}
+    \CommentTok{\# reward\_steps / done\_steps 形状都是 (T, N)：T 个时间步 × N 个并行环境。}
+\NormalTok{    returns }\OperatorTok{=}\NormalTok{ torch.zeros\_like(reward\_steps)    }\CommentTok{\# 输出与输入同形，每步存一个 R\_t}
+    \CommentTok{\# running 存"当前步之后的累计回报"，形状 (N,)：N 个环境各算各的。}
+    \CommentTok{\# 它必须在循环外初始化——循环里每一步都要读上一次的结果，累加量不能每步重置。}
 \NormalTok{    running }\OperatorTok{=}\NormalTok{ torch.zeros(reward\_steps.shape[}\DecValTok{1}\NormalTok{], device}\OperatorTok{=}\NormalTok{reward\_steps.device)}
+    \CommentTok{\# 倒着遍历：R\_t = r\_t + gamma * R\_\{t+1\}，第 t 步要用到第 t+1 步的结果，}
+    \CommentTok{\# 所以从最后一步往前推，一趟就能算完；正着走得先把整段存下来再回头算。}
     \ControlFlowTok{for}\NormalTok{ step }\KeywordTok{in} \BuiltInTok{reversed}\NormalTok{(}\BuiltInTok{range}\NormalTok{(reward\_steps.shape[}\DecValTok{0}\NormalTok{])):}
+        \CommentTok{\# (1.0 {-} done\_steps[step]) 是"回合是否继续"的开关：该步回合结束时它是 0，}
+        \CommentTok{\# 把 running 乘没了——下一个回合的回报就不会漏进这一个回合。}
 \NormalTok{        running }\OperatorTok{=}\NormalTok{ reward\_steps[step] }\OperatorTok{+}\NormalTok{ gamma }\OperatorTok{*}\NormalTok{ running }\OperatorTok{*}\NormalTok{ (}\FloatTok{1.0} \OperatorTok{{-}}\NormalTok{ done\_steps[step])}
-\NormalTok{        returns[step] }\OperatorTok{=}\NormalTok{ running}
+\NormalTok{        returns[step] }\OperatorTok{=}\NormalTok{ running    }\CommentTok{\# 存下这一步的 reward{-}to{-}go}
     \ControlFlowTok{return}\NormalTok{ returns}
 \end{Highlighting}
 \end{Shaded}
@@ -917,8 +926,8 @@ Lightning 把训练拆成三块（第12讲 4.6 节见过 \texttt{LightningModule
 \begin{Highlighting}[]
 \NormalTok{        returns }\OperatorTok{=}\NormalTok{ reward\_to\_go(reward\_steps, done\_steps, }\VariableTok{self}\NormalTok{.gamma)}
         \CommentTok{\# 唯一的基线就是整批均值（常数），没有学习的 critic。}
-\NormalTok{        advantages }\OperatorTok{=}\NormalTok{ returns }\OperatorTok{{-}}\NormalTok{ returns.mean()}
-\NormalTok{        advantages }\OperatorTok{=}\NormalTok{ advantages }\OperatorTok{/}\NormalTok{ (advantages.std() }\OperatorTok{+} \FloatTok{1.0e{-}8}\NormalTok{)}
+\NormalTok{        advantages }\OperatorTok{=}\NormalTok{ returns }\OperatorTok{{-}}\NormalTok{ returns.mean()    }\CommentTok{\# 比这批平均好的得正权重，差的得负权重}
+\NormalTok{        advantages }\OperatorTok{=}\NormalTok{ advantages }\OperatorTok{/}\NormalTok{ (advantages.std() }\OperatorTok{+} \FloatTok{1.0e{-}8}\NormalTok{)    }\CommentTok{\# 再归一；+1e{-}8 防除零}
 \end{Highlighting}
 \end{Shaded}
 
@@ -931,12 +940,15 @@ Lightning 把训练拆成三块（第12讲 4.6 节见过 \texttt{LightningModule
 \begin{Shaded}
 \begin{Highlighting}[]
     \KeywordTok{def}\NormalTok{ training\_step(}\VariableTok{self}\NormalTok{, batch, batch\_idx):}
+        \CommentTok{\# 采样时那次前向裹在 no\_grad 里，梯度断了；这里重新算一遍才能反传。}
 \NormalTok{        distribution }\OperatorTok{=} \VariableTok{self}\NormalTok{.model.action\_distribution(batch[}\StringTok{"obs"}\NormalTok{])}
+        \CommentTok{\# 每个关节维度独立采样，各维 log 概率相加 = 整个动作向量的 log π(a|s)。}
 \NormalTok{        log\_probs }\OperatorTok{=}\NormalTok{ distribution.log\_prob(batch[}\StringTok{"actions"}\NormalTok{]).}\BuiltInTok{sum}\NormalTok{(dim}\OperatorTok{={-}}\DecValTok{1}\NormalTok{)}
-\NormalTok{        entropy }\OperatorTok{=}\NormalTok{ distribution.entropy().}\BuiltInTok{sum}\NormalTok{(dim}\OperatorTok{={-}}\DecValTok{1}\NormalTok{)}
+\NormalTok{        entropy }\OperatorTok{=}\NormalTok{ distribution.entropy().}\BuiltInTok{sum}\NormalTok{(dim}\OperatorTok{={-}}\DecValTok{1}\NormalTok{)    }\CommentTok{\# 同理各维熵相加，衡量分布摊开的程度}
+        \CommentTok{\# 4.2 节那行公式：负号是因为梯度下降只会"下降"，而我们想让好动作的概率上升。}
 \NormalTok{        policy\_loss }\OperatorTok{=} \OperatorTok{{-}}\NormalTok{(log\_probs }\OperatorTok{*}\NormalTok{ batch[}\StringTok{"advantages"}\NormalTok{]).mean()}
-\NormalTok{        entropy\_loss }\OperatorTok{=}\NormalTok{ entropy.mean()}
-\NormalTok{        loss }\OperatorTok{=}\NormalTok{ policy\_loss }\OperatorTok{{-}} \VariableTok{self}\NormalTok{.entropy\_coef }\OperatorTok{*}\NormalTok{ entropy\_loss}
+\NormalTok{        entropy\_loss }\OperatorTok{=}\NormalTok{ entropy.mean()    }\CommentTok{\# 一批里所有步的熵取平均}
+\NormalTok{        loss }\OperatorTok{=}\NormalTok{ policy\_loss }\OperatorTok{{-}} \VariableTok{self}\NormalTok{.entropy\_coef }\OperatorTok{*}\NormalTok{ entropy\_loss    }\CommentTok{\# 熵前是减号：熵越大 loss 越小}
 \end{Highlighting}
 \end{Shaded}
 
@@ -951,8 +963,8 @@ Lightning 把训练拆成三块（第12讲 4.6 节见过 \texttt{LightningModule
 \begin{Highlighting}[]
     \KeywordTok{def}\NormalTok{ configure\_optimizers(}\VariableTok{self}\NormalTok{):}
         \CommentTok{\# 只优化 actor 和动作标准差；critic 不参与训练。}
-\NormalTok{        params }\OperatorTok{=} \BuiltInTok{list}\NormalTok{(}\VariableTok{self}\NormalTok{.model.actor.parameters()) }\OperatorTok{+}\NormalTok{ [}\VariableTok{self}\NormalTok{.model.std]}
-        \VariableTok{self}\NormalTok{.optimizer }\OperatorTok{=}\NormalTok{ torch.optim.Adam(params, lr}\OperatorTok{=}\VariableTok{self}\NormalTok{.learning\_rate)}
+\NormalTok{        params }\OperatorTok{=} \BuiltInTok{list}\NormalTok{(}\VariableTok{self}\NormalTok{.model.actor.parameters()) }\OperatorTok{+}\NormalTok{ [}\VariableTok{self}\NormalTok{.model.std]    }\CommentTok{\# std 也是可学参数}
+        \VariableTok{self}\NormalTok{.optimizer }\OperatorTok{=}\NormalTok{ torch.optim.Adam(params, lr}\OperatorTok{=}\VariableTok{self}\NormalTok{.learning\_rate)    }\CommentTok{\# critic 的参数没进来}
         \ControlFlowTok{return} \VariableTok{self}\NormalTok{.optimizer}
 \end{Highlighting}
 \end{Shaded}
@@ -1105,6 +1117,29 @@ GAE}\label{ux4eceux57faux7ebfux5230-criticactor-critic-ux4e0e-gae}
 \textbf{critic（评分员）}，原来的策略网络对应地叫
 \textbf{actor（演员）}：演员出动作，评分员打分。
 
+四个方框、一个环，这套分工的骨架就说完了：
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=0.85\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig14-5-a2c-loop-PLACEHOLDER.png}
+
+}
+
+\caption{⚠️
+占位图（出处：\url{https://www.paddlepaddle.org.cn/documentation/practices/reinforcement_learning/advantage_actor_critic.html}，许可未确认），\textbf{待按此重画}。A2C
+的骨架是一个环：环境给出状态
+\(s\)（下方绿线，同时进两个网络），策略网络（Actor）据此出动作
+\(a\)（上方红线）作用回环境，环境给出的奖励
+\(r\)（蓝线）进价值网络（Critic），Critic
+算出的优势（Advantage，紫线）再回到 Actor 手里。图上写的是 Value
+Network（价值网络）而不是 Q 网络，与本讲 critic 估 \(V(s)\) 的口径一致}
+
+\end{figure}%
+
+骨架好记，但它把两件事留在了环外：优势具体怎么算出来，以及 critic
+自己靠什么变准。把这两件事画进去，才是代码里真正在跑的那张图------也才看得出\textbf{优化主体始终是策略，critic
+只是给策略梯度当参照物}：
+
 \begin{figure}[H]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig-actor-critic-a2c.png}
@@ -1113,15 +1148,20 @@ GAE}\label{ux4eceux57faux7ebfux5230-criticactor-critic-ux4e0e-gae}
 
 \caption{A2C 的 Actor-Critic
 分工：actor（策略网络）出动作，critic（价值网络）估状态价值、帮 actor
-算优势。优化主体仍是策略，critic 只当参照物}
+算优势。图里按通路性质分了三种颜色------灰色是前向的数据流，绿色是
+critic 把 \(V\)
+供给优势计算，红色与紫色是两条各自独立的训练回流（红的更新
+actor，紫的更新 critic）。优化主体仍是策略，critic 只当参照物}
 
 \end{figure}%
 
-顺着图上的箭头走一遍就是一轮更新：actor 出动作交给环境，环境回一个 \(r\)
-和一个 \(s'\)；critic 拿状态估出
-\(V(s)\)、\(V(s')\)，两路汇到右边那个框里算出优势 \(A\)；红箭头把 \(A\)
-送回 actor 给策略梯度加权，绿箭头让 critic 继续把 \(V\)
-估得更准。优势框里上下写了两个式子------下面那个一步版最直观，上面那个多步平滑版
+顺着这张图的箭头走一遍就是一轮更新：actor 出动作交给环境，环境回一个
+\(r\) 和一个 \(s'\)；critic 拿状态估出
+\(V(s)\)、\(V(s')\)，沿绿箭头汇到右边那个框里算出优势
+\(A\)------这就是上一张环图里那根紫色''Advantage''箭头背后真正发生的事；红箭头把
+\(A\) 送回 actor 给策略梯度加权，紫箭头让 critic 自己回归 returns、把
+\(V\)
+估得更准。\textbf{红紫这两条是两件独立的事}------红的更新策略网络、紫的更新价值网络，各走各的损失项、各改各的参数，图上特意分成两种颜色，别当成一条回流的两截。优势框里上下写了两个式子------下面那个一步版最直观，上面那个多步平滑版
 \(\hat A^{\mathrm{GAE}}\) 才是代码里真正用的，本小节稍后就会讲到它。
 
 这里要把一条容易含糊的界线划清楚------\textbf{REINFORCE 和 Actor-Critic
@@ -1175,8 +1215,9 @@ GAE：
 \begin{Shaded}
 \begin{Highlighting}[]
 \CommentTok{\# 关键变化(1)：优势不再用常数基线，改用 critic 估值 + GAE（理论上降方差，见 5.1 节）}
-        \ControlFlowTok{with}\NormalTok{ torch.no\_grad():}
-\NormalTok{            next\_value }\OperatorTok{=} \VariableTok{self}\NormalTok{.model.value(critic\_obs)}
+        \ControlFlowTok{with}\NormalTok{ torch.no\_grad():    }\CommentTok{\# 采样阶段只要数值，不需要梯度}
+\NormalTok{            next\_value }\OperatorTok{=} \VariableTok{self}\NormalTok{.model.value(critic\_obs)    }\CommentTok{\# 末状态的价值：GAE 递推从它起头}
+        \CommentTok{\# 一次算出每步的优势和回报：优势喂给 actor，回报当 critic 的回归目标。}
 \NormalTok{        advantages, returns }\OperatorTok{=}\NormalTok{ compute\_gae(}
 \NormalTok{            reward\_steps, done\_steps, value\_steps, next\_value, }\VariableTok{self}\NormalTok{.gamma, }\VariableTok{self}\NormalTok{.lam)}
 \end{Highlighting}
@@ -1190,8 +1231,9 @@ value loss，优化器也从''只训 actor''改成训全部参数：
 \CommentTok{\# 关键变化(2)：critic 要回归 returns，于是 loss 多了一项 value\_loss}
         \CommentTok{\# 带基线的策略梯度：advantage 已减去 critic 估值；不做 ratio 裁剪。}
 \NormalTok{        policy\_loss }\OperatorTok{=} \OperatorTok{{-}}\NormalTok{(log\_probs }\OperatorTok{*}\NormalTok{ batch[}\StringTok{"advantages"}\NormalTok{]).mean()}
-\NormalTok{        value\_loss }\OperatorTok{=}\NormalTok{ torch.square(values }\OperatorTok{{-}}\NormalTok{ batch[}\StringTok{"returns"}\NormalTok{]).mean()}
+\NormalTok{        value\_loss }\OperatorTok{=}\NormalTok{ torch.square(values }\OperatorTok{{-}}\NormalTok{ batch[}\StringTok{"returns"}\NormalTok{]).mean()    }\CommentTok{\# critic 估值向回报靠拢}
 \NormalTok{        entropy\_loss }\OperatorTok{=}\NormalTok{ entropy.mean()}
+        \CommentTok{\# 三项加权合成一个 loss：value 前是加号（要降），熵前是减号（要升）。}
 \NormalTok{        loss }\OperatorTok{=}\NormalTok{ policy\_loss }\OperatorTok{+} \VariableTok{self}\NormalTok{.value\_loss\_coef }\OperatorTok{*}\NormalTok{ value\_loss }\OperatorTok{{-}} \VariableTok{self}\NormalTok{.entropy\_coef }\OperatorTok{*}\NormalTok{ entropy\_loss}
 \end{Highlighting}
 \end{Shaded}
@@ -1413,10 +1455,12 @@ v2 上加三块，正好对应上两节。第一块，policy loss
 \begin{Shaded}
 \begin{Highlighting}[]
 \CommentTok{\# 关键变化(1)：clip——用概率比值把更新夹在信赖域内（见 6.2 节的图）}
-\NormalTok{        ratio }\OperatorTok{=}\NormalTok{ torch.exp(log\_probs }\OperatorTok{{-}}\NormalTok{ batch[}\StringTok{"log\_probs"}\NormalTok{])}
-\NormalTok{        unclipped }\OperatorTok{=}\NormalTok{ ratio }\OperatorTok{*}\NormalTok{ batch[}\StringTok{"advantages"}\NormalTok{]}
+\NormalTok{        ratio }\OperatorTok{=}\NormalTok{ torch.exp(log\_probs }\OperatorTok{{-}}\NormalTok{ batch[}\StringTok{"log\_probs"}\NormalTok{])    }\CommentTok{\# 相减取指数 = 新旧概率之比 r}
+\NormalTok{        unclipped }\OperatorTok{=}\NormalTok{ ratio }\OperatorTok{*}\NormalTok{ batch[}\StringTok{"advantages"}\NormalTok{]    }\CommentTok{\# 不裁剪的目标：比值越大，好动作赚得越多}
+        \CommentTok{\# 把比值夹进 [1{-}ε, 1+ε] 再乘优势，得到一个"越界就不再涨"的版本。}
 \NormalTok{        clipped }\OperatorTok{=}\NormalTok{ (torch.clamp(ratio, }\FloatTok{1.0} \OperatorTok{{-}} \VariableTok{self}\NormalTok{.clip\_param, }\FloatTok{1.0} \OperatorTok{+} \VariableTok{self}\NormalTok{.clip\_param)}
                    \OperatorTok{*}\NormalTok{ batch[}\StringTok{"advantages"}\NormalTok{])}
+        \CommentTok{\# 取两者较小值 = 取更保守的估计：越界之后再推也赚不到分，梯度自然归零。}
 \NormalTok{        policy\_loss }\OperatorTok{=} \OperatorTok{{-}}\NormalTok{torch.}\BuiltInTok{min}\NormalTok{(unclipped, clipped).mean()}
 \end{Highlighting}
 \end{Shaded}
@@ -1428,11 +1472,11 @@ v2 上加三块，正好对应上两节。第一块，policy loss
 \begin{Shaded}
 \begin{Highlighting}[]
 \CommentTok{\# 关键变化(2)：一段 rollout 切成多个 minibatch、反复训几轮，样本效率更高}
-        \ControlFlowTok{for}\NormalTok{ \_ }\KeywordTok{in} \BuiltInTok{range}\NormalTok{(}\VariableTok{self}\NormalTok{.num\_learning\_epochs):}
-\NormalTok{            indices }\OperatorTok{=}\NormalTok{ torch.randperm(usable\_size, device}\OperatorTok{=}\NormalTok{flat[}\StringTok{"actions"}\NormalTok{].device)}
-            \ControlFlowTok{for}\NormalTok{ start }\KeywordTok{in} \BuiltInTok{range}\NormalTok{(}\DecValTok{0}\NormalTok{, usable\_size, mini\_batch\_size):}
-\NormalTok{                selected }\OperatorTok{=}\NormalTok{ indices[start : start }\OperatorTok{+}\NormalTok{ mini\_batch\_size]}
-\NormalTok{                mini\_batch }\OperatorTok{=}\NormalTok{ \{key: value[selected] }\ControlFlowTok{for}\NormalTok{ key, value }\KeywordTok{in}\NormalTok{ flat.items()\}}
+        \ControlFlowTok{for}\NormalTok{ \_ }\KeywordTok{in} \BuiltInTok{range}\NormalTok{(}\VariableTok{self}\NormalTok{.num\_learning\_epochs):    }\CommentTok{\# 同一段 rollout 反复训几轮}
+\NormalTok{            indices }\OperatorTok{=}\NormalTok{ torch.randperm(usable\_size, device}\OperatorTok{=}\NormalTok{flat[}\StringTok{"actions"}\NormalTok{].device)    }\CommentTok{\# 每轮重打乱}
+            \ControlFlowTok{for}\NormalTok{ start }\KeywordTok{in} \BuiltInTok{range}\NormalTok{(}\DecValTok{0}\NormalTok{, usable\_size, mini\_batch\_size):    }\CommentTok{\# 按 minibatch 大小切片}
+\NormalTok{                selected }\OperatorTok{=}\NormalTok{ indices[start : start }\OperatorTok{+}\NormalTok{ mini\_batch\_size]    }\CommentTok{\# 这一小批的下标}
+\NormalTok{                mini\_batch }\OperatorTok{=}\NormalTok{ \{key: value[selected] }\ControlFlowTok{for}\NormalTok{ key, value }\KeywordTok{in}\NormalTok{ flat.items()\}    }\CommentTok{\# 各字段同步取}
 \end{Highlighting}
 \end{Shaded}
 
@@ -1443,13 +1487,13 @@ v2 上加三块，正好对应上两节。第一块，policy loss
 \begin{Highlighting}[]
 \CommentTok{\# 关键变化(3)：按 KL 自适应调学习率——动得太猛减速，太小加速}
 \KeywordTok{def}\NormalTok{ adapt\_learning\_rate\_to\_kl(optimizer, kl, desired\_kl, min\_lr}\OperatorTok{=}\FloatTok{1.0e{-}5}\NormalTok{, max\_lr}\OperatorTok{=}\FloatTok{1.0e{-}2}\NormalTok{):}
-\NormalTok{    current\_lr }\OperatorTok{=}\NormalTok{ optimizer.param\_groups[}\DecValTok{0}\NormalTok{][}\StringTok{"lr"}\NormalTok{]}
-\NormalTok{    kl\_value }\OperatorTok{=} \BuiltInTok{float}\NormalTok{(kl.detach().cpu())}
-    \ControlFlowTok{if}\NormalTok{ kl\_value }\OperatorTok{\textgreater{}} \FloatTok{2.0} \OperatorTok{*}\NormalTok{ desired\_kl:}
-\NormalTok{        current\_lr }\OperatorTok{=} \BuiltInTok{max}\NormalTok{(min\_lr, current\_lr }\OperatorTok{/} \FloatTok{1.5}\NormalTok{)}
-    \ControlFlowTok{elif} \FloatTok{0.0} \OperatorTok{\textless{}}\NormalTok{ kl\_value }\OperatorTok{\textless{}} \FloatTok{0.5} \OperatorTok{*}\NormalTok{ desired\_kl:}
-\NormalTok{        current\_lr }\OperatorTok{=} \BuiltInTok{min}\NormalTok{(max\_lr, current\_lr }\OperatorTok{*} \FloatTok{1.5}\NormalTok{)}
-\NormalTok{    optimizer.param\_groups[}\DecValTok{0}\NormalTok{][}\StringTok{"lr"}\NormalTok{] }\OperatorTok{=}\NormalTok{ current\_lr}
+\NormalTok{    current\_lr }\OperatorTok{=}\NormalTok{ optimizer.param\_groups[}\DecValTok{0}\NormalTok{][}\StringTok{"lr"}\NormalTok{]    }\CommentTok{\# 读优化器里当前的学习率}
+\NormalTok{    kl\_value }\OperatorTok{=} \BuiltInTok{float}\NormalTok{(kl.detach().cpu())    }\CommentTok{\# 搬到 CPU 变成普通浮点数，后面只做比较}
+    \ControlFlowTok{if}\NormalTok{ kl\_value }\OperatorTok{\textgreater{}} \FloatTok{2.0} \OperatorTok{*}\NormalTok{ desired\_kl:    }\CommentTok{\# KL 超目标一倍以上：这一步迈太大了}
+\NormalTok{        current\_lr }\OperatorTok{=} \BuiltInTok{max}\NormalTok{(min\_lr, current\_lr }\OperatorTok{/} \FloatTok{1.5}\NormalTok{)    }\CommentTok{\# 降速；max 兜住下限}
+    \ControlFlowTok{elif} \FloatTok{0.0} \OperatorTok{\textless{}}\NormalTok{ kl\_value }\OperatorTok{\textless{}} \FloatTok{0.5} \OperatorTok{*}\NormalTok{ desired\_kl:    }\CommentTok{\# KL 不到目标一半：步子太小，可以加速}
+\NormalTok{        current\_lr }\OperatorTok{=} \BuiltInTok{min}\NormalTok{(max\_lr, current\_lr }\OperatorTok{*} \FloatTok{1.5}\NormalTok{)    }\CommentTok{\# 提速；min 兜住上限}
+\NormalTok{    optimizer.param\_groups[}\DecValTok{0}\NormalTok{][}\StringTok{"lr"}\NormalTok{] }\OperatorTok{=}\NormalTok{ current\_lr    }\CommentTok{\# 写回优化器，下一步生效}
     \ControlFlowTok{return}\NormalTok{ current\_lr}
 \end{Highlighting}
 \end{Shaded}

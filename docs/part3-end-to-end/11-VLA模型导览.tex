@@ -245,6 +245,8 @@
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
+\listoffigures
+\listoftables
 
 \section{1 从 LLM 到
 VLA：模型是怎么学会''动手''的}\label{ux4ece-llm-ux5230-vlaux6a21ux578bux662fux600eux4e48ux5b66ux4f1aux52a8ux624bux7684}
@@ -1326,7 +1328,7 @@ PaliGemma 基于 Gemma 2B 语言模型。下表两列分别是 VLM
 Transformer 配置，数值取自官方实现的模型配置（LeRobot 包内
 \texttt{lerobot/policies/pi0/modeling\_pi0.py} 里的
 \texttt{get\_gemma\_config}，与 openpi 包内
-\texttt{src/openpi/models/gemma.py} 一致；LeRobot 由 \texttt{uv sync}
+\texttt{src/openpi/models/gemma.py} 一致；LeRobot 由 \texttt{uv\ sync}
 从我们维护的 fork 装入，仓库内不存源码树）：
 
 \begin{center}
@@ -2741,8 +2743,7 @@ OpenVLA 离散路线的极简版。
 \subsection{6.4 两个版本：3B 官方版 与 0.5B
 小型版}\label{ux4e24ux4e2aux7248ux672c3b-ux5b98ux65b9ux7248-ux4e0e-0.5b-ux5c0fux578bux7248}
 
-VLA-0
-的''零改装''思路不挑骨干，于是有两档实现，第12讲的微调实验和第15讲的强化学习后训练都会用到：
+VLA-0 的''零改装''思路不挑骨干，于是有两档实现：
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1186\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3495\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.0683\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4635\linewidth - 2\tabcolsep\relax}@{}}
@@ -2756,71 +2757,12 @@ vla0\_\allowbreak smol（社区） & SmolVLM2-500M & 0.5B & 已被做成 \textbf
 \end{center}
 
 \begin{quote}
-备注：第12讲的 VLA-0 微调实验、以及第15讲对 VLA-0
-的强化学习后训练，都采用 \textbf{0.5B 的
-vla0\_smol}。原因是它在单张消费级显卡上就能完成监督微调与后续的强化学习后训练，并且天生接在
-LeRobot / SO-101 这套实验体系里------这两点 3B 版本都做不到那么顺。
+备注：两档里 \textbf{0.5B 的 vla0\_smol}
+门槛低得多------它在单张消费级显卡上就能完成监督微调，并且天生接在
+LeRobot / SO-101 这套实验体系里，这两点 3B 版本都做不到那么顺。
 \end{quote}
 
-\subsection{6.5 上手：跑一次 VLA-0
-推理}\label{ux4e0aux624bux8dd1ux4e00ux6b21-vla-0-ux63a8ux7406}
-
-``动作就是一串数字''最好的证明方式，是把模型的原始输出打印出来看。配套代码仓的
-\texttt{code/vla/4\_vla\_inference/4\_3\_vla0\_infer/} 加载 0.5B 的
-vla0\_smol checkpoint（第15讲 GRPO
-后训练跑出来的权重，落在本机训练产物目录下），闭环一次并把
-第一个动作块的原始文本打印出来：
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\BuiltInTok{cd}\NormalTok{ code}
-\ExtensionTok{uv}\NormalTok{ run python vla/4\_vla\_inference/4\_3\_vla0\_infer/vla0\_demo.py}
-\end{Highlighting}
-\end{Shaded}
-
-这一个 demo 与本讲其余五个不同：它读的权重是\textbf{第15讲 GRPO
-后训练自己跑出来的产物}，落在本机训练产物目录下，没有可自动下载的公开版本。还没跑过第15讲的话，这里先看下面的输出即可，想亲手跑一遍就换成
-\texttt{code/vla/4\_vla\_inference/4\_4\_smolvla\_infer/}
-那个------它的权重会自动从 Hub 拉。
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{数字串（8步×7维）: 255 255 255 215 255 253 0 255 255 255 215 255 253 0 ...}
-\end{Highlighting}
-\end{Shaded}
-
-这一行空格分隔的 56 个整数就是模型的\textbf{全部输出}------8 步 × 7
-维，每个整数是 6.2.1 节说的 bin 编号（512 bin 下
-255\(\approx\)中位，对应''这一维基本不动''；末尾的 0 是
-夹爪张开）。解码只有几行：按空格切开、查 bin 中心表映射回
-\([-1,1]\)，没有动作头、 没有扩词表，6.2.3
-节''零改装''的主张在代码里就是这么直白。demo 里另外两处对应
-本节机制：\texttt{xgr.contrib.hf.LogitsProcessor} 挂在
-\texttt{generate()} 上做 6.2.2 节的
-受约束解码（模型只可能吐合法数字），贪婪解码保证评测可复现。
-
-任务「pick up the alphabet soup and place it in the
-basket」（libero\_object） 固定初始状态下 154 步完成：
-
-\begin{figure}[H]
-
-{\centering \includegraphics[width=0.98\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture11/ref/vla0/rollout_keyframes.png}
-
-}
-
-\caption{VLA-0
-跑通「拿起字母汤罐头放进篮子」的关键帧。画面里的每一个关节增量，都是从上面那串整数解码回来的（图片出自本书配套代码的实测录像）}
-
-\end{figure}%
-
-想连评多个初始状态，同目录的
-\texttt{code/vla/4\_vla\_inference/4\_3\_vla0\_infer/vla0\_eval.sh}
-是对应的 \texttt{lerobot-eval}
-入口。它和另外四个模块有一处不同：指向的是第15讲训练产物
-目录里的本地权重，而不是 Hugging Face 上的公开
-checkpoint------没跑过第15讲的 GRPO 后训练，就没有这份权重。
-
-\subsection{6.6 本节小结}\label{ux672cux8282ux5c0fux7ed3-4}
+\subsection{6.5 本节小结}\label{ux672cux8282ux5c0fux7ed3-4}
 
 \textbf{数据流总结}
 
@@ -3436,7 +3378,7 @@ g \geq \frac{\mathbb{E}[\ell_S] / \Delta t}{n}
 \end{Highlighting}
 \end{Shaded}
 
-代码依旧与 \(\pi_0\) 的 demo 逐行同构------这已经是本讲第 5
+代码依旧与 \(\pi_0\) 的 demo 逐行同构------这已经是本讲第 4
 个共用同一段闭环模板的模型。 体感上的差别在于\textbf{规模}：0.45B 的
 SmolVLA 加载和每步推理都比 2.6 节那个 7B 的 OpenVLA 快一个数量级，这就是
 7.1 节''可及性''设计目标最直接的兑现。同一个任务 「push the plate to the

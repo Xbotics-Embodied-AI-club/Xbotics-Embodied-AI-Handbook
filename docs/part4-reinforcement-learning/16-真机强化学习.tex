@@ -229,6 +229,8 @@
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
+\listoffigures
+\listoftables
 
 \section{1
 上一讲留下的账：真机上样本有多贵}\label{ux4e0aux4e00ux8bb2ux7559ux4e0bux7684ux8d26ux771fux673aux4e0aux6837ux672cux6709ux591aux8d35}
@@ -243,8 +245,9 @@
 个环境同时跑，一次迭代就采回几万步经验，训练三千次迭代，累计消耗的环境交互在\textbf{上亿步}这个量级。仿真里这不算事：GPU
 多算一会儿而已。
 
-第15讲，我们用 GRPO 给 VLM 和 VLA-0
-做后训练：同一道题采一组回答（或同一个初始状态采一组
+第15讲，我们用 GRPO 给 VLM 做后训练，也看了 SimpleVLA-RL
+把同一套外壳搬到 VLA 的动作 token
+上：同一道题采一组回答（或同一个初始状态采一组
 rollout），组内比较出相对优势。它省掉了
 critic，但没省掉采样------每一次更新都要新鲜采一组，而且\textbf{采完这一批、更新完就扔}。
 
@@ -539,10 +542,46 @@ CartPole：一根杆立在小车上，左右推车让杆不倒，动作只有''�
 
 \subsubsection{任务}\label{ux4efbux52a1}
 
-CartPole
-的观测是四个连续量（小车位置、小车速度、杆的角度、杆的角速度），动作只有''左推
-/ 右推''两个；每活一步得 1 分，杆倒或小车出界即回合结束，单回合最高 500
-分。两个版本用同一个任务、同一套统计口径（回合回报），\textbf{版本之间的差异就是这一节的知识点}。
+先把这个场景在脑子里立起来：一辆小车卡在一条水平轨道上，只能左右滑；车顶有一个\textbf{不受驱动的转轴}，一根杆子铰在上面。没有任何电机去扶那根杆------它只受重力和小车加速度的摆布。策略唯一能做的事就是\textbf{把车往左推或往右推}，靠车身的移动把杆一次次''接''回竖直附近。这也是它反直觉的地方：想让杆往右倒回来，你得先把车往右推。
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{观测}：四个连续量------小车位置、小车速度、杆的角度、杆的角速度。
+\item
+  \textbf{动作}：两个离散选项------左推、右推。\textbf{没有''不动''这一档}，每一拍都必须选一边。
+\item
+  \textbf{奖励与终止}：每活一步得 1 分。杆偏离竖直超过约 12°（弧度约
+  0.21）、或小车滑出轨道 ±2.4，回合立即结束；撑满 500
+  步则回合正常结束，拿满分
+  500。所以''回合回报''和''杆立住了几步''是同一个数。
+\item
+  \textbf{什么算成功}：单回合 500
+  分叫\textbf{满分}，但真正的门槛是\textbf{稳定拿满分}------后面会看到，``偶尔打出一次
+  500''和''最后 50 个回合大多是 500''是两回事。
+\end{itemize}
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture16/ref/fig16-cartpole-task.png}
+
+}
+
+\caption{CartPole
+的两道终止线与那个反直觉的动作方向。左半把上面四条要素画进同一个场景：红色虚线是轨道两端的
+±2.4，越过就出界；橙色扇形是竖直方向左右各 12°（≈0.21
+rad）的可用范围，杆尖越出扇形回合当场结束------两道线卡的不是同一件事，一道管车能滑多远、一道管杆能歪多少。车顶那个白心圆是\textbf{自由转轴}，没有电机，杆只受重力和车身加速度摆布。①②③④
+分别标出四个观测量各自对应的物理量。右半是那一下反直觉的动作：杆已经倒到
+11°，正确的做法是把车也\textbf{往右}推，让车追到杆的正下方，杆才回正；往左''顶回去''只会让它倒得更快。动作只有
+0 / 1 两档，没有''不动''这一档}
+
+\end{figure}%
+
+选它当入门例子有三个具体理由：状态只有四维，\textbf{表格法勉强还做得动}，这才谈得上和
+DQN 同台对照（换成机械臂，表格法连起跑线都站不上）；纯 CPU
+几分钟就能训完一轮，不需要仿真器也不需要机器人；而它的观测是连续量、动作是离散档，恰好卡在''必须分桶''和''可以用网络''的分界线上------这一节要讲的就是这条线。
+
+两个版本用同一个任务、同一套统计口径（回合回报），\textbf{版本之间的差异就是这一节的知识点}。
 
 \subsubsection{第一版：表格
 Q-learning}\label{ux7b2cux4e00ux7248ux8868ux683c-q-learning}
@@ -554,10 +593,14 @@ Q-learning}\label{ux7b2cux4e00ux7248ux8868ux683c-q-learning}
 
 \begin{Shaded}
 \begin{Highlighting}[]
+        \CommentTok{\# 四维桶索引接上动作号，拼成五元组——它就是这张表里唯一一格的下标}
 \NormalTok{        cell }\OperatorTok{=} \BuiltInTok{tuple}\NormalTok{(state.tolist()) }\OperatorTok{+}\NormalTok{ (}\BuiltInTok{int}\NormalTok{(action),)}
+        \CommentTok{\# 只用 next\_state 的四维索引取出"下一状态那一行"，再取 max：}
+        \CommentTok{\# Q{-}learning 学的是"下一步按最优走"，与这一步实际怎么采样无关，off{-}policy 由此而来}
 \NormalTok{        best\_next }\OperatorTok{=} \VariableTok{self}\NormalTok{.model.table[}\BuiltInTok{tuple}\NormalTok{(next\_state.tolist())].}\BuiltInTok{max}\NormalTok{()}
+        \CommentTok{\# (1.0 {-} done)：回合终止时后面没有"下一步"了，把 bootstrap 项整个乘没}
 \NormalTok{        target }\OperatorTok{=}\NormalTok{ reward }\OperatorTok{+} \VariableTok{self}\NormalTok{.gamma }\OperatorTok{*}\NormalTok{ best\_next }\OperatorTok{*}\NormalTok{ (}\FloatTok{1.0} \OperatorTok{{-}}\NormalTok{ done)}
-\NormalTok{        td\_error }\OperatorTok{=}\NormalTok{ target }\OperatorTok{{-}} \VariableTok{self}\NormalTok{.model.table[cell]}
+\NormalTok{        td\_error }\OperatorTok{=}\NormalTok{ target }\OperatorTok{{-}} \VariableTok{self}\NormalTok{.model.table[cell]     }\CommentTok{\# 目标与现值之差，就是这一格错了多少}
 
         \CommentTok{\# 这一行就是表格 Q{-}learning 的全部：把这一格往目标挪 ALPHA 那么多。}
         \VariableTok{self}\NormalTok{.model.table[cell] }\OperatorTok{+=} \VariableTok{self}\NormalTok{.alpha }\OperatorTok{*}\NormalTok{ td\_error}
@@ -605,12 +648,15 @@ Q 表''的做法叫\textbf{函数近似}。
 
 \begin{Shaded}
 \begin{Highlighting}[]
+        \CommentTok{\# 网络一次吐出全部动作的 Q 值，gather 按实际执行的那个动作号把对应列挑出来}
+        \CommentTok{\# ——相当于表格版的 table[cell]，只是现在这一格是算出来的，不是查出来的}
 \NormalTok{        q\_values }\OperatorTok{=} \VariableTok{self}\NormalTok{.online(states).gather(}\DecValTok{1}\NormalTok{, actions.unsqueeze(}\DecValTok{1}\NormalTok{)).squeeze(}\DecValTok{1}\NormalTok{)}
-        \ControlFlowTok{with}\NormalTok{ torch.no\_grad():}
+        \ControlFlowTok{with}\NormalTok{ torch.no\_grad():        }\CommentTok{\# 目标是常数，不能让梯度顺着它流回目标网络}
             \CommentTok{\# 采集时 dones 写的是 terminated（不含 truncated），}
             \CommentTok{\# 所以真正失败才不 bootstrap，这里直接乘 (1 {-} dones)。}
-\NormalTok{            next\_q }\OperatorTok{=} \VariableTok{self}\NormalTok{.target(next\_states).}\BuiltInTok{max}\NormalTok{(dim}\OperatorTok{=}\DecValTok{1}\NormalTok{).values}
+\NormalTok{            next\_q }\OperatorTok{=} \VariableTok{self}\NormalTok{.target(next\_states).}\BuiltInTok{max}\NormalTok{(dim}\OperatorTok{=}\DecValTok{1}\NormalTok{).values    }\CommentTok{\# 用 target 网络，不是 online}
 \NormalTok{            td\_target }\OperatorTok{=}\NormalTok{ rewards }\OperatorTok{+} \VariableTok{self}\NormalTok{.gamma }\OperatorTok{*}\NormalTok{ next\_q }\OperatorTok{*}\NormalTok{ (}\FloatTok{1.0} \OperatorTok{{-}}\NormalTok{ dones)}
+        \CommentTok{\# 表格版是"把这一格挪一点"，这里换成对整批做一次回归——梯度下降替代了直接赋值}
 \NormalTok{        loss }\OperatorTok{=}\NormalTok{ nn.functional.mse\_loss(q\_values, td\_target)}
 \end{Highlighting}
 \end{Shaded}
@@ -646,9 +692,10 @@ minibatch} 做回归------而这个 batch
 }
 
 \caption{CartPole 两级值学习的回合回报对照：v1 表格 Q-learning 跑满 20
-万步也没稳住，滑动均值前 8 万步一直压在 100 分以下，之后在 100～350
-分之间大幅起落、收在 193 分；v2 DQN 约 3 万步就打出第一个 500
-分满分回合，5 万步收工时末 50 回合里已有 31 个满分。原始记录见
+万步也没稳住，滑动均值到约 3.6 万步才第一次站上 100 分，此后在 100～350
+分之间大幅起落、8 万步前还数次跌回 100 以下，末 50 回合均值收在 193
+分；v2 DQN 约 3 万步就打出第一个 500 分满分回合，5 万步收工时末 50
+回合里已有 31 个满分。原始记录见
 \texttt{code/rl/3\_offpolicy/result/cartpole-qlearning.json} 与
 \texttt{cartpole-dqn.json}，这张图由同模块的
 \texttt{code/rl/3\_offpolicy/3\_1\_cartpole\_value\_rl/plot\_returns.py}
@@ -802,9 +849,8 @@ G1 行走上从 REINFORCE 爬到 PPO
 
 \end{figure}%
 
-环境复用的正是 VLA 课用过的那套 SO-101
-仿真（\texttt{code/platform/so101\_sim/}）。这里先记住一个贯穿全讲的事实：\textbf{强化学习训练用的环境，和
-VLA
+环境复用的正是 VLA 课用过的那套 SO-101 仿真（\texttt{so101\_sim}
+包）。这里先记住一个贯穿全讲的事实：\textbf{强化学习训练用的环境，和 VLA
 课评测、复现数据用的，是同一个环境}------只是这里开一千个并行实例快速采样，VLA
 那边开一个实例做评测。等爬到第 6 级
 squint，我们会看到这条线怎么闭合成一整个数据闭环。
@@ -813,10 +859,27 @@ squint，我们会看到这条线怎么闭合成一整个数据闭环。
 +1''那样一片荒漠。
 
 \begin{quote}
-关于复现：下面四级的曲线与成功率，都是在\textbf{单相机版的 ReachCube
-场景}上跑出来的，那个场景后来随 \texttt{so101\_sim}
-重构下线了。四个训练脚本（\texttt{code/rl/3\_offpolicy/3\_2\_so101\_offpolicy/train\_v3\_ddpg.py}、\texttt{code/rl/3\_offpolicy/3\_2\_so101\_offpolicy/train\_v4\_td3.py}、\texttt{code/rl/3\_offpolicy/3\_2\_so101\_offpolicy/train\_v5\_sac.py}、\texttt{code/rl/3\_offpolicy/3\_2\_so101\_offpolicy/train\_v6\_squint.py}）里的任务名现在指向仓库里还在的双相机抓放场景，\textbf{照着跑能跑通整条代码路径，但复现不出下面这组数值}------任务换了，奖励尺度和难度都不一样。要对着看的是''每一级改了什么、曲线形状怎么变''，不是这几个具体数字。模块
-README 里也记着这条。
+关于复现，有三件事要先说清楚，否则你照着跑一遍会以为是自己配错了：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{数值复现不了。}
+  下面四级的曲线与成功率，都是在\textbf{单相机版的 ReachCube
+  场景}上跑出来的，那个场景后来随 \texttt{so101\_sim}
+  重构下线了。四个训练脚本（\texttt{code/rl/3\_offpolicy/3\_2\_so101\_offpolicy/train\_v3\_ddpg.py}、\texttt{code/rl/3\_offpolicy/3\_2\_so101\_offpolicy/train\_v4\_td3.py}、\texttt{code/rl/3\_offpolicy/3\_2\_so101\_offpolicy/train\_v5\_sac.py}、\texttt{code/rl/3\_offpolicy/3\_2\_so101\_offpolicy/train\_v6\_squint.py}）里的任务名现在指向仓库里还在的\textbf{双相机抓放场景}------任务换了，奖励尺度和难度都不一样，跑出来的数不会是下面这组。要对着看的是''每一级改了什么、曲线形状怎么变''，不是这几个具体数字。
+\item
+  \textbf{能跑通的只有 v3/v4/v5。}
+  这三级吃关节状态、不过渲染管线，在新场景上照着跑没有问题。\textbf{第 6
+  级 squint 现在直接跑会报错}，原因和修法见 6.2 节的注意框。
+\item
+  \textbf{原始训练记录没有随仓库分发。}
+  \texttt{code/rl/3\_offpolicy/result/} 下只留了 CartPole 那两级的
+  \texttt{*.json}；下面几张 SO-101
+  曲线图是当时那次实验的截图，图里的数在仓库里找不到对应的原始记录，也就无法逐点核对。模块
+  README 里也记着这条，本模块的算法阶梯待重新整训。
+\end{enumerate}
 \end{quote}
 
 \subsection{3.2 DDPG 的两个网络：Actor 出动作，Critic
@@ -1202,9 +1265,8 @@ squint：从像素学会，顺手把数据也生成了}\label{squintux4eceux50cf
 
 第 6 级叫 \textbf{squint}{[}7{]}------加州大学圣迭戈分校做的一套视觉 SAC
 配方，名字就是''眯着眼看''：它故意把相机画面压到极低的分辨率，像人眯眼一样只留下轮廓，反而训得又快又稳。我们这一讲从头到尾用的
-SO-101
-仿真场景，本身就是从它的开源任务集分叉来的（\texttt{code/platform/so101\_sim/so101\_sim/tasks/UPSTREAM.md}
-记着这条来路）。
+SO-101 仿真场景，本身就是从它的开源任务集分叉来的（\texttt{so101\_sim}
+包里的 \texttt{tasks/UPSTREAM.md} 记着这条来路）。
 
 它在 SAC 上叠了两件事：一是把输入从状态换成\textbf{像素}，二是把 Critic
 从标量升级成\textbf{分布式}------顺带，它训好的策略还能直接拿去\textbf{生成
@@ -1239,11 +1301,18 @@ Critic 和大规模并行采样，它照样能从零学会 ReachCube，成功率
 \texttt{LayerNorm}，归一化已经长在网络结构里。
 
 \begin{quote}
-注意：\textbf{这一级现在还跑不起来。} 文件里的 \texttt{CNNEncoder} 和
-\texttt{ReplayBuffer} 是按单相机 3
-通道图像写的，而仓库里现存的三个场景都出双相机（顶视 + 腕视）6
-通道观测，直接跑会因通道数不匹配报错。要跑通得先把编码器和回放池改成吃 6
-通道------这本身是一道不错的练手题，前五级都是可以直接跑的。
+注意：\textbf{这一级现在还跑不起来。} 文件里的
+\texttt{CNNEncoder}（第一层 \texttt{nn.Conv2d(3,\ 32,\ ...)}）和
+\texttt{ReplayBuffer}（\texttt{rgb} 缓冲按 \texttt{(容量,\ H,\ W,\ 3)}
+开）都是按单相机 3
+通道图像写死的，而仓库里现存的三个场景都出双相机（顶视 + 腕视），经
+\texttt{FlattenRGBDObservationWrapper} 沿通道轴拼成 6
+通道。所以报错来得比想象中早：\textbf{策略还没开始跑，热身阶段用随机动作采的第一批帧往回放池里写的时候就对不上了}------池子按
+3 通道开，帧是 6
+通道的。要跑通得把这两处都改成按环境实际通道数构造（\texttt{run\_training}
+已经用 \texttt{observation\_space{[}"state"{]}.shape{[}-1{]}}
+推状态维，图像通道数同法可得）；\texttt{code/rl/3\_offpolicy/3\_2\_so101\_offpolicy/datagen/rollout.py}
+直接复用同一个编码器，要一起改。这本身是一道不错的练手题，前五级都是可以直接跑的。
 \end{quote}
 
 \subsection{6.3
@@ -1259,17 +1328,17 @@ squint
 VLA 课要的标准数据集格式------一套 VLA
 微调数据就这么''顺手''生成出来了。这条流水线独立收在
 \texttt{code/rl/3\_offpolicy/3\_2\_so101\_offpolicy/datagen/}
-里，前三个文件各管一步，第四个把三步串起来：
+里，下表只写这个目录内的文件名。前三个文件各管一步，第四个把三步串起来：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.6673\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3327\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2500\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6562\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 文件 & 这一步干什么 \\
 \midrule\noalign{}
-\texttt{code/rl/3\_\allowbreak offpolicy/3\_\allowbreak 2\_\allowbreak so101\_\allowbreak offpolicy/datagen/rollout.py} & 加载训好的策略，跑出成功轨迹 \\
-\texttt{code/rl/3\_\allowbreak offpolicy/3\_\allowbreak 2\_\allowbreak so101\_\allowbreak offpolicy/datagen/replay.py} & 把每条轨迹换个外观（黑臂、白底）重渲一遍 \\
-\texttt{code/rl/3\_\allowbreak offpolicy/3\_\allowbreak 2\_\allowbreak so101\_\allowbreak offpolicy/datagen/to\_\allowbreak lerobot.py} & 转成 LeRobot 数据集格式 \\
-\texttt{code/rl/3\_\allowbreak offpolicy/3\_\allowbreak 2\_\allowbreak so101\_\allowbreak offpolicy/datagen/gen\_\allowbreak dataset.py} & 一条命令把上面三步串起来 \\
+\texttt{rollout.py} & 加载训好的策略，跑出成功轨迹 \\
+\texttt{replay.py} & 把每条轨迹换个外观（黑臂、白底）重渲一遍 \\
+\texttt{to\_\allowbreak lerobot.py} & 转成 LeRobot 数据集格式 \\
+\texttt{gen\_\allowbreak dataset.py} & 一条命令把上面三步串起来 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -1277,19 +1346,31 @@ VLA 课要的标准数据集格式------一套 VLA
 这里正好回收 VLA 课埋下的那个伏笔：\textbf{第9讲 2.6 节、第12讲 3.2
 节里，你们用来微调 VLA
 的那批仿真数据，当时只说''是用视觉强化学习从零生成的''、没有展开。现在你自己走到了这一步------从零训一个视觉
-RL
-策略、让它生成数据------也就真正理解了那批数据是怎么来的，甚至能自己复现一份。}
+RL 策略、让它生成数据------也就真正理解了那批数据是怎么来的。}
 一门课里''先给你用、最后教你造''的完整闭环，到这里合上了。
+
+\begin{quote}
+注意：这条流水线\textbf{现在整条跑不通}，卡在上一小节那个 3/6
+通道问题上------第一步要
+\texttt{code/rl/3\_offpolicy/3\_2\_so101\_offpolicy/train\_v6\_squint.py}
+训出 \texttt{sac\_ckpt.pt}，而 v6 现在起不来；第二步
+\texttt{code/rl/3\_offpolicy/3\_2\_so101\_offpolicy/datagen/rollout.py}
+直接 \texttt{from\ train\_v6\_squint\ import\ CNNEncoder}，就算有现成
+ckpt
+也会在同一处挂。两处按上一小节说的一起改成按环境实际通道数构造，链子才通。所以这四个文件现在的读法是''看清数据是怎么造出来的''，还不是''照着跑一遍''。
+\end{quote}
 
 \subsection{6.4 本节小结}\label{ux672cux8282ux5c0fux7ed3-5}
 
 squint 在 SAC 的随机策略基础上做两件事：把标量 Critic 换成 C51 分布式
 Critic（估回报的整条分布而非一个均值，每步更新的训练信号更丰富），把输入''眯''成
 16×16
-像素（贴近真机部署形态，又不让高分辨率拖垮回放池和编码器）。它从零学会
-ReachCube 成功率 0.99，训好的策略再顺手 rollout + 换色生成 VLA
-微调数据集，回收了第9讲 2.6 节、第12讲 3.2 节''数据是视觉 RL
-生成''的伏笔，把这一讲和 VLA 课闭成一个''先用后造''的完整数据闭环。
+像素（贴近真机部署形态，又不让高分辨率拖垮回放池和编码器）。它在当初那个单相机
+ReachCube 上从零学会、成功率 0.99，训好的策略再顺手 rollout + 换色生成
+VLA 微调数据集，回收了第9讲 2.6 节、第12讲 3.2 节''数据是视觉 RL
+生成''的伏笔，把这一讲和 VLA
+课闭成一个''先用后造''的完整数据闭环。要动手跑这一级和它的数据链，得先补上
+6.2 节说的那个通道数改造。
 
 \section{7 同一个 G1，换 off-policy 再走一遍：15
 分钟学会走路}\label{ux540cux4e00ux4e2a-g1ux6362-off-policy-ux518dux8d70ux4e00ux904d15-ux5206ux949fux5b66ux4f1aux8d70ux8def}
@@ -2025,11 +2106,11 @@ off-policy 不挑数据来源这一条根性质。
 RL，放进一张表里，差异一目了然：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1336\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2905\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2203\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3555\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1281\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2871\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2566\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3281\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
  & 第14讲 & 第15讲 & 第16讲 \\
 \midrule\noalign{}
-载体 & G1 人形行走/动作跟随 & VLM 数数、VLA-0 操作 & SO-101 接触任务 \\
+载体 & G1 人形行走/动作跟随 & VLM 数数（动手）、VLA 操作（导读） & SO-101 接触任务 \\
 训练地点 & 仿真（大规模并行） & 仿真 rollout / GPU 答题 & \textbf{真机在线} \\
 动作 & 连续关节控制 & 离散 token & 连续 EE 控制 \\
 奖励 & 手写密集奖励 & 可验证规则，稀疏但免费 & \textbf{学出来的}视觉 0/1 \\

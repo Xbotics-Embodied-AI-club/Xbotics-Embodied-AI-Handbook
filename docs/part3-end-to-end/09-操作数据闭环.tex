@@ -232,6 +232,8 @@
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
+\listoffigures
+\listoftables
 
 \section{1 为什么数据决定 VLA
 的上限}\label{ux4e3aux4ec0ux4e48ux6570ux636eux51b3ux5b9a-vla-ux7684ux4e0aux9650}
@@ -925,8 +927,8 @@ LeRobotDataset 是 HuggingFace
 \begin{quote}
 备注（版本口径）：本节及后文的目录结构、\texttt{meta/}
 字段、类名与源码文件位置，都基于 \textbf{LeRobot v0.5.1、LeRobotDataset
-v3.0，核验日期 2026-07-21}------本课装的 lerobot
-fork（\texttt{main} 分支）基线就是这一版。LeRobot 是一个迭代很快的库，目录布局、CLI
+v3.0，核验日期 2026-07-21}------本课装的 lerobot fork（\texttt{main}
+分支）基线就是这一版。LeRobot 是一个迭代很快的库，目录布局、CLI
 参数名和源码文件名都可能随版本变动。照着跑之前先确认自己装的版本；对不上时以官方文档与当前源码为准。
 \end{quote}
 
@@ -1352,24 +1354,25 @@ Rerun 里能同步看到多相机图像、动作各维曲线、本体状态各�
 对比度抖动等），LeRobot 内置 \texttt{ImageTransforms}，作为
 \texttt{image\_transforms} 传入即可，落盘数据本身不动。
 
-最后给一张''想改源码时去哪找''的速查表，路径都相对 lerobot
-包根（\textbf{与版本相关}，按上文的 v0.5.1 / v3.0
+最后给一张''想改源码时去哪找''的速查表。下表的路径都写在
+\texttt{lerobot} 包根之内，即前面都省掉了一层
+\texttt{lerobot/}（\textbf{与版本相关}，按上文的 v0.5.1 / v3.0
 口径记录；新版本里文件可能改名或拆分，找不到就直接在源码树里搜类名）：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.5046\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4954\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.4056\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5944\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 文件 & 作用 \\
 \midrule\noalign{}
-\texttt{lerobot/datasets/lerobot\_\allowbreak dataset.py} & 核心类 \texttt{LeRobotDataset} \\
-\texttt{lerobot/datasets/dataset\_\allowbreak metadata.py} & \texttt{LeRobotDatasetMetadata}（\texttt{meta/} 的读写，\texttt{dataset.meta} 就是它） \\
-\texttt{lerobot/datasets/multi\_\allowbreak dataset.py} & \texttt{MultiLeRobotDataset}（多份数据集合训） \\
-\texttt{lerobot/datasets/streaming\_\allowbreak dataset.py} & \texttt{StreamingLeRobotDataset}（流式读取） \\
-\texttt{lerobot/datasets/video\_\allowbreak utils.py} & 视频编解码（torchcodec / pyav） \\
-\texttt{lerobot/datasets/transforms.py} & 图像数据增强 \\
-\texttt{lerobot/datasets/compute\_\allowbreak stats.py} & 计算数据集统计（mean/std），写 \texttt{stats.json} \\
-\texttt{lerobot/datasets/factory.py} & \texttt{make\_\allowbreak dataset()}：从训练配置创建数据集 \\
-\texttt{lerobot/scripts/lerobot\_\allowbreak dataset\_\allowbreak viz.py} & 本地可视化（Rerun）------注意它在 \texttt{scripts/} 而不是 \texttt{datasets/} 下 \\
+\texttt{datasets/lerobot\_\allowbreak dataset.py} & 核心类 \texttt{LeRobotDataset} \\
+\texttt{datasets/dataset\_\allowbreak metadata.py} & \texttt{LeRobotDatasetMetadata}（\texttt{meta/} 的读写，\texttt{dataset.meta} 就是它） \\
+\texttt{datasets/multi\_\allowbreak dataset.py} & \texttt{MultiLeRobotDataset}（多份数据集合训） \\
+\texttt{datasets/streaming\_\allowbreak dataset.py} & \texttt{StreamingLeRobotDataset}（流式读取） \\
+\texttt{datasets/video\_\allowbreak utils.py} & 视频编解码（torchcodec / pyav） \\
+\texttt{datasets/transforms.py} & 图像数据增强 \\
+\texttt{datasets/compute\_\allowbreak stats.py} & 计算数据集统计（mean/std），写 \texttt{stats.json} \\
+\texttt{datasets/factory.py} & \texttt{make\_\allowbreak dataset()}：从训练配置创建数据集 \\
+\texttt{scripts/lerobot\_\allowbreak dataset\_\allowbreak viz.py} & 本地可视化（Rerun）------注意它在 \texttt{scripts/} 而不是 \texttt{datasets/} 下 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}

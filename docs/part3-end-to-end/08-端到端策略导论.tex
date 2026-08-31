@@ -232,6 +232,8 @@
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
+\listoffigures
+\listoftables
 
 \section{1 两种机器人：手写 pipeline 还是端到端
 policy}\label{ux4e24ux79cdux673aux5668ux4ebaux624bux5199-pipeline-ux8fd8ux662fux7aefux5230ux7aef-policy}
@@ -796,16 +798,18 @@ LIBERO{[}10{]}
 
 \begin{Shaded}
 \begin{Highlighting}[]
+\CommentTok{\# LIBERO 按「套件 + 任务 id」组织，这里取 libero\_spatial 的第 0 个任务}
 \NormalTok{env\_cfg }\OperatorTok{=}\NormalTok{ LiberoEnvConfig(}
-\NormalTok{    task}\OperatorTok{=}\StringTok{"libero\_spatial"}\NormalTok{,}
-\NormalTok{    task\_ids}\OperatorTok{=}\NormalTok{[}\DecValTok{0}\NormalTok{],}
+\NormalTok{    task}\OperatorTok{=}\StringTok{"libero\_spatial"}\NormalTok{,         }\CommentTok{\# 四个套件之一：空间关系类任务}
+\NormalTok{    task\_ids}\OperatorTok{=}\NormalTok{[}\DecValTok{0}\NormalTok{],                  }\CommentTok{\# 套件里的第几个任务，一次可以列多个}
 \NormalTok{    obs\_type}\OperatorTok{=}\StringTok{"pixels\_agent\_pos"}\NormalTok{,   }\CommentTok{\# 图像 + 本体状态 两路观测}
-\NormalTok{    observation\_height}\OperatorTok{=}\DecValTok{256}\NormalTok{,}
+\NormalTok{    observation\_height}\OperatorTok{=}\DecValTok{256}\NormalTok{,        }\CommentTok{\# 渲染分辨率：它决定策略拿到的图有多大}
 \NormalTok{    observation\_width}\OperatorTok{=}\DecValTok{256}\NormalTok{,}
 \NormalTok{)}
 
+\CommentTok{\# make\_env 建的是向量环境（可以并行开多份），n\_envs=1 就是只开一份}
 \NormalTok{envs }\OperatorTok{=}\NormalTok{ make\_env(env\_cfg, n\_envs}\OperatorTok{=}\DecValTok{1}\NormalTok{)}
-\NormalTok{env  }\OperatorTok{=}\NormalTok{ envs[}\StringTok{\textquotesingle{}libero\_spatial\textquotesingle{}}\NormalTok{][}\DecValTok{0}\NormalTok{]}
+\NormalTok{env  }\OperatorTok{=}\NormalTok{ envs[}\StringTok{\textquotesingle{}libero\_spatial\textquotesingle{}}\NormalTok{][}\DecValTok{0}\NormalTok{]   }\CommentTok{\# 按「套件名 → 任务 id」两级取出这一个环境}
 \end{Highlighting}
 \end{Shaded}
 
@@ -816,8 +820,10 @@ LIBERO{[}10{]}
 
 \begin{Shaded}
 \begin{Highlighting}[]
+\CommentTok{\# single\_action\_space 是「一个子环境」的动作空间，不含 n\_envs 那一维}
 \NormalTok{action\_space }\OperatorTok{=}\NormalTok{ env.single\_action\_space}
 \BuiltInTok{print}\NormalTok{(}\SpecialStringTok{f"Action space: }\SpecialCharTok{\{}\NormalTok{action\_space}\SpecialCharTok{\}}\SpecialStringTok{"}\NormalTok{)}
+\CommentTok{\# LIBERO 是 7 维末端增量控制（xyz 位移 3 + 姿态 3 + 夹爪 1）}
 \ControlFlowTok{assert}\NormalTok{ action\_space.shape }\OperatorTok{==}\NormalTok{ (}\DecValTok{7}\NormalTok{,)}
 \end{Highlighting}
 \end{Shaded}
@@ -839,12 +845,17 @@ rollout}：策略不是预测一次就完事，而是要在自己造成的后果
 
 \begin{Shaded}
 \begin{Highlighting}[]
+    \CommentTok{\# 这份权重是 π0 在 LIBERO 上微调过的版本，不是基座}
 \NormalTok{    policy\_path }\OperatorTok{=} \StringTok{"lerobot/pi0\_libero\_finetuned\_v044"}
+    \CommentTok{\# 配置和权重存在一起：网络怎么搭、动作块多长，都由它说了算}
 \NormalTok{    policy\_cfg }\OperatorTok{=}\NormalTok{ PreTrainedConfig.from\_pretrained(policy\_path)}
 \NormalTok{    policy\_cfg.device }\OperatorTok{=} \StringTok{"cuda"} \ControlFlowTok{if}\NormalTok{ torch.cuda.is\_available() }\ControlFlowTok{else} \StringTok{"cpu"}
+    \CommentTok{\# strict=False：权重里有少量 buffer 的命名和当前 lerobot 版本对不上，}
+    \CommentTok{\# 这些 buffer 不参与前向计算，跳过它们不影响推理结果。}
 \NormalTok{    policy }\OperatorTok{=}\NormalTok{ get\_policy\_class(policy\_cfg.}\BuiltInTok{type}\NormalTok{).from\_pretrained(}
 \NormalTok{        policy\_path, config}\OperatorTok{=}\NormalTok{policy\_cfg, strict}\OperatorTok{=}\VariableTok{False}
 \NormalTok{    )}
+    \CommentTok{\# 归一化统计量也跟着权重一起存，所以这两个 processor 从同一个 policy\_path 读}
 \NormalTok{    preprocessor, postprocessor }\OperatorTok{=}\NormalTok{ make\_pre\_post\_processors(policy\_cfg, pretrained\_path}\OperatorTok{=}\NormalTok{policy\_path)}
 \end{Highlighting}
 \end{Shaded}
@@ -860,20 +871,26 @@ rollout}：策略不是预测一次就完事，而是要在自己造成的后果
 
 \begin{Shaded}
 \begin{Highlighting}[]
-        \ControlFlowTok{for}\NormalTok{ \_ }\KeywordTok{in} \BuiltInTok{range}\NormalTok{(max\_steps):}
+        \ControlFlowTok{for}\NormalTok{ \_ }\KeywordTok{in} \BuiltInTok{range}\NormalTok{(max\_steps):    }\CommentTok{\# 超时上限：任务没做完也得停，否则闭环不会自己结束}
+            \CommentTok{\# 四步预处理各修一种对不上：先把环境的嵌套观测摊平成 LeRobot 约定的 key，}
 \NormalTok{            observation\_batch }\OperatorTok{=}\NormalTok{ preprocess\_observation(observation)}
+            \CommentTok{\# 再补上任务的语言指令（环境的观测里没有它，但 VLA 的输入接口要），}
 \NormalTok{            observation\_batch }\OperatorTok{=}\NormalTok{ add\_envs\_task(env, observation\_batch)}
+            \CommentTok{\# 然后过环境侧口径对齐，最后过策略侧归一化——顺序不能换。}
 \NormalTok{            observation\_batch }\OperatorTok{=}\NormalTok{ env\_preprocessor(observation\_batch)}
 \NormalTok{            observation\_batch }\OperatorTok{=}\NormalTok{ preprocessor(observation\_batch)}
 
-            \ControlFlowTok{with}\NormalTok{ torch.inference\_mode():}
+            \CommentTok{\# 整个闭环里策略只做这一件事：看一眼观测，给出一个动作。}
+            \ControlFlowTok{with}\NormalTok{ torch.inference\_mode():    }\CommentTok{\# 推理不建计算图，省显存也省时间}
 \NormalTok{                action }\OperatorTok{=}\NormalTok{ policy.select\_action(observation\_batch)}
 
+            \CommentTok{\# 回程按去路的逆序拆：先反归一化，再还原成环境认的动作口径}
 \NormalTok{            action }\OperatorTok{=}\NormalTok{ postprocessor(action)}
 \NormalTok{            action }\OperatorTok{=}\NormalTok{ env\_postprocessor(\{}\StringTok{"action"}\NormalTok{: action\})[}\StringTok{"action"}\NormalTok{].cpu().numpy()}
 
+            \CommentTok{\# 动作作用回环境，换来下一帧观测——闭环的下一圈从这里开始}
 \NormalTok{            observation, \_, terminated, truncated, info }\OperatorTok{=}\NormalTok{ env.step(action)}
-\NormalTok{            frames.append(env.envs[}\DecValTok{0}\NormalTok{].render())}
+\NormalTok{            frames.append(env.envs[}\DecValTok{0}\NormalTok{].render())    }\CommentTok{\# 每步单独渲一帧，攒完写成 mp4}
 \end{Highlighting}
 \end{Shaded}
 
@@ -931,8 +948,13 @@ libero\_goal
 \begin{Shaded}
 \begin{Highlighting}[]
 \KeywordTok{def}\NormalTok{ replace\_images\_with\_white\_noise(observation\_batch: }\BuiltInTok{dict}\NormalTok{[}\BuiltInTok{str}\NormalTok{, Any]) }\OperatorTok{{-}\textgreater{}} \BuiltInTok{dict}\NormalTok{[}\BuiltInTok{str}\NormalTok{, Any]:}
+    \CommentTok{\# 遍历观测字典的全部字段，逐个判断该不该换掉}
     \ControlFlowTok{for}\NormalTok{ key, value }\KeywordTok{in}\NormalTok{ observation\_batch.items():}
+        \CommentTok{\# 前缀这一条锁定了"只有相机图会被换掉"；is\_tensor 那一条是保险，}
+        \CommentTok{\# 万一某个同前缀的字段不是张量，rand\_like 会当场报错}
         \ControlFlowTok{if}\NormalTok{ key.startswith(}\StringTok{"observation.images."}\NormalTok{) }\KeywordTok{and}\NormalTok{ torch.is\_tensor(value):}
+            \CommentTok{\# rand\_like 而不是 rand：形状、dtype、所在设备全部照抄原图，}
+            \CommentTok{\# 这样"只改内容、不改口径"，网络那一侧感觉不到任何别的变化}
 \NormalTok{            observation\_batch[key] }\OperatorTok{=}\NormalTok{ torch.rand\_like(value)}
     \ControlFlowTok{return}\NormalTok{ observation\_batch}
 \end{Highlighting}

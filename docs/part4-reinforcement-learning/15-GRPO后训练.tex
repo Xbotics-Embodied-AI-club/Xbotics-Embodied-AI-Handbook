@@ -229,6 +229,8 @@
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
+\listoffigures
+\listoftables
 
 \section{1 从 PPO 到
 GRPO：为什么不再请评分员}\label{ux4ece-ppo-ux5230-grpoux4e3aux4ec0ux4e48ux4e0dux518dux8bf7ux8bc4ux5206ux5458}
@@ -342,7 +344,7 @@ critic 与策略共不共享骨干、怎么并行与 offload，没有一个放�
 
 \begin{quote}
 备注：组内标准化给出的只是\textbf{相对}优势------每条回答是跟''这一组的平均''比，而不是跟一个绝对的价值估计比。软肋也正在这里：万一一组里的回答全对或全错，组内没有差异，标准化后优势全为零，这一组就不产生任何梯度。所以
-GRPO 格外依赖''组里有对有错''的题目；第 6、8
+GRPO 格外依赖''组里有对有错''的题目；第 6
 节里调采样温度、做动态采样，很大程度上就是在保证每组内部有信号可比。
 \end{quote}
 
@@ -401,8 +403,8 @@ GRPO 是对 PPO
 KL，但那只是用来\textbf{自适应调学习率}的旁路，真正约束单步步长的是
 clip；GRPO 新增的这条 KL
 则全程锚定在同一个冻结的参考模型上，防的是''训着训着整个人变了''。一个盯''这一步迈太大''（clip）、一个盯''整场训练跑偏''（KL
-锚）------两件事各管各的。本讲第 8 节的实验会让你亲眼看到这条 KL
-锚有多重要。
+锚）------两件事各管各的。这条 KL 锚该不该留，第 6.3.5
+节还会再算一次账。
 \end{quote}
 
 完整的 GRPO 目标函数我们放到第 6 节讲 SimpleVLA-RL
@@ -498,18 +500,20 @@ Reference Model 是冻结的，只承担 1.5 节那条 KL。
 一概不问。
 
 这就是本讲的题眼：\textbf{强化学习外环和策略本体是解耦的}。语言模型输出文本
-token；而有一类 VLA 模型（比如后面会反复出现的
-VLA-0）把机器人动作离散成整数、当成文本打出来------动作 token 和文本
-token 在数学上是同一个东西：都是大模型词表上的 categorical 分布，log
+token；而有一类 VLA 模型（比如第 6 节 SimpleVLA-RL 用的那个保留动作
+token 头的 OpenVLA-OFT 变体）把机器人动作离散成整数 token
+打出来------动作 token 和文本 token
+在数学上是同一个东西：都是大模型词表上的 categorical 分布，log
 概率的算法一模一样。
 
 于是一个大胆的推论自然成立：\textbf{给 VLM 做数数后训练的那套 GRPO
 外壳，几乎一行不改，就能套到 VLA 的动作 token
-上}------只要把''答案对不对''的判分脚本换成''任务成没成''的仿真判定。本讲的两个实验就是沿这条线展开的。
+上}------只要把''答案对不对''的判分脚本换成''任务成没成''的仿真判定。第
+4 节的数数实验和第 6 节的 SimpleVLA-RL 就是这条线的两端。
 
 反过来，这个题眼也划出了边界：如果动作头不是离散 token，而是 flow
 matching 或扩散模型输出的连续动作，第 2 条要求（干净的 log
-概率）就不满足，这套外壳套不上去。怎么办？第 9 节的 \(\pi^{*}_{0.6}\)
+概率）就不满足，这套外壳套不上去。怎么办？第 8 节的 \(\pi^{*}_{0.6}\)
 会给出一条绕行的路，下一讲（第16讲）的价值方法则是另一条正面解决的路。
 
 \subsection{2.4 本节小结}\label{ux672cux8282ux5c0fux7ed3-1}
@@ -643,22 +647,27 @@ DeepSeek-R1 以来 RLVR 训练的通用小技巧。
 \begin{Shaded}
 \begin{Highlighting}[]
 \KeywordTok{def}\NormalTok{ extract\_answer(text: }\BuiltInTok{str}\NormalTok{) }\OperatorTok{{-}\textgreater{}} \BuiltInTok{str} \OperatorTok{|} \VariableTok{None}\NormalTok{:}
+    \CommentTok{\# 三个细节都是被模型的实际输出逼出来的：\textasciigrave{}(.*?)\textasciigrave{} 非贪婪，一段里出现多对标签时只取第一对，}
+    \CommentTok{\# 不会从第一个 \textless{}answer\textgreater{} 一路吞到最后一个 \textless{}/answer\textgreater{}；IGNORECASE 容忍模型写成 \textless{}Answer\textgreater{}；}
+    \CommentTok{\# DOTALL 让 \textasciigrave{}.\textasciigrave{} 也能匹配换行，答案跨行时照样抓得到。}
 \NormalTok{    match }\OperatorTok{=}\NormalTok{ re.search(}\VerbatimStringTok{r"\textless{}answer\textgreater{}}\DecValTok{\textbackslash{}s}\OperatorTok{*}\KeywordTok{(}\DecValTok{.}\OperatorTok{*?}\KeywordTok{)}\DecValTok{\textbackslash{}s}\OperatorTok{*}\VerbatimStringTok{\textless{}/answer\textgreater{}"}\NormalTok{, text, flags}\OperatorTok{=}\NormalTok{re.IGNORECASE }\OperatorTok{|}\NormalTok{ re.DOTALL)}
     \ControlFlowTok{if}\NormalTok{ match }\KeywordTok{is} \VariableTok{None}\NormalTok{:}
-        \ControlFlowTok{return} \VariableTok{None}
-    \ControlFlowTok{return}\NormalTok{ match.group(}\DecValTok{1}\NormalTok{).strip()}
+        \ControlFlowTok{return} \VariableTok{None}                      \CommentTok{\# 没有合法标签：交给调用方判成 0 分，不在这里给分}
+    \ControlFlowTok{return}\NormalTok{ match.group(}\DecValTok{1}\NormalTok{).strip()        }\CommentTok{\# 去掉两端空白，后面才好做纯字符串比较}
 
 
 \KeywordTok{def}\NormalTok{ format\_reward(completion: }\BuiltInTok{str}\NormalTok{) }\OperatorTok{{-}\textgreater{}} \BuiltInTok{float}\NormalTok{:}
+    \CommentTok{\# 只问"抽不抽得出"，不问答对没答对——所以每条回答都判得动，信号密集}
     \ControlFlowTok{return} \FloatTok{1.0} \ControlFlowTok{if}\NormalTok{ extract\_answer(completion) }\KeywordTok{is} \KeywordTok{not} \VariableTok{None} \ControlFlowTok{else} \FloatTok{0.0}
 
 
 \KeywordTok{def}\NormalTok{ correctness\_reward(completion: }\BuiltInTok{str}\NormalTok{, target: }\BuiltInTok{str}\NormalTok{) }\OperatorTok{{-}\textgreater{}} \BuiltInTok{float}\NormalTok{:}
 \NormalTok{    predicted }\OperatorTok{=}\NormalTok{ normalize\_answer(extract\_answer(completion))}
+    \CommentTok{\# 标准答案两种形态都要接住：带标签的整段，或者干脆就是裸答案，所以 \textasciigrave{}or target\textasciigrave{} 兜底}
 \NormalTok{    expected }\OperatorTok{=}\NormalTok{ normalize\_answer(extract\_answer(target) }\KeywordTok{or}\NormalTok{ target)}
     \ControlFlowTok{if}\NormalTok{ predicted }\KeywordTok{is} \VariableTok{None} \KeywordTok{or}\NormalTok{ expected }\KeywordTok{is} \VariableTok{None}\NormalTok{:}
-        \ControlFlowTok{return} \FloatTok{0.0}
-    \ControlFlowTok{return} \FloatTok{1.0} \ControlFlowTok{if}\NormalTok{ predicted }\OperatorTok{==}\NormalTok{ expected }\ControlFlowTok{else} \FloatTok{0.0}
+        \ControlFlowTok{return} \FloatTok{0.0}                       \CommentTok{\# 格式没立住就没法比对错，直接 0 分}
+    \ControlFlowTok{return} \FloatTok{1.0} \ControlFlowTok{if}\NormalTok{ predicted }\OperatorTok{==}\NormalTok{ expected }\ControlFlowTok{else} \FloatTok{0.0}     \CommentTok{\# 归一化之后是全等比较，不给部分分}
 \end{Highlighting}
 \end{Shaded}
 
@@ -767,7 +776,7 @@ LIBERO{[}8{]}
 仿真器还顺手兑现了第 1 节埋下的伏笔。GRPO 要求''同一道题答 \(G\)
 遍''，机器人版的''同一道题''就是\textbf{同一个初始状态}------仿真器可以把场景精确重置到同一初始布局，让策略从完全相同的起点跑
 \(G\) 条轨迹。真机上这两件事（自动判定、精确重置）都很难，所以本讲的 VLA
-后训练全部在仿真里完成；真实世界的路怎么走，第 9 节和下一讲各给一条。
+后训练全部在仿真里完成；真实世界的路怎么走，第 8 节和下一讲各给一条。
 
 \subsection{5.2
 三个层次的代表工作}\label{ux4e09ux4e2aux5c42ux6b21ux7684ux4ee3ux8868ux5de5ux4f5c}
@@ -782,53 +791,16 @@ LIBERO{[}8{]}
 \midrule\noalign{}
 SimpleVLA-RL{[}9{]}（第 6 节） & 算法 & GRPO 搬上 VLA 到底行不行、能涨多少 \\
 RLinf-VLA{[}10{]}（第 7 节） & 系统 & 大规模 VLA 强化学习的 GPU 资源怎么编排 \\
-\(\pi^{*}_{0.6}\){[}11{]}（第 9 节） & 落地 & 连续动作头、真实世界部署怎么办 \\
+\(\pi^{*}_{0.6}\){[}11{]}（第 8 节） & 落地 & 连续动作头、真实世界部署怎么办 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
 本讲把三篇都过一遍：先看代表作怎么把路走通（第 6
 节），再看基建怎么把路修宽（第 7
-节），然后自己动手在单卡上复刻一个最小版（第 8
-节），最后看前沿怎么把它推向真实世界（第 9 节）。
+节），最后看前沿怎么把它推向真实世界（第 8 节）。
 
-\subsection{5.3
-本课载体：VLA-0，动作即整数文本}\label{ux672cux8bfeux8f7dux4f53vla-0ux52a8ux4f5cux5373ux6574ux6570ux6587ux672c}
-
-第11讲的模型导览里我们见过 VLA-0{[}12{]}：它对 VLM
-零架构改装，直接把机器人动作离散成整数、按文本打印出来------``动作即文本''路线的极简代表。
-
-\begin{figure}[H]
-
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture15/ref/fig155-vla0-teaser_arxiv-2510.13054.png}}
-
-}
-
-\caption{VLA-0 的动作表示：机器人动作被离散化为整数序列，作为普通文本
-token 由 VLM 直接生成，模型架构零改装}
-
-\end{figure}%
-
-当时它是导览里的一个极简方案，现在轮到它当主角了。回到第 2
-节的题眼------GRPO 外环只要求''离散选择 + log 概率''，逐项检查 VLA-0：
-
-\begin{itemize}
-\tightlist
-\item
-  动作是整数文本 token，\textbf{log 概率与文字完全同构}，GRPO
-  外壳直接套；
-\item
-  模型只有 0.5B 参数量级的版本，\textbf{单卡放得下}训练和采样；
-\item
-  社区有现成的策略实现，SFT 起点唾手可得。
-\end{itemize}
-
-反观 \(\pi_0\)、SmolVLA 这类 flow matching
-动作头：动作是连续向量，没有干净的 log
-概率，这套外壳套不上------它们的后训练要走第 9 节的绕行路线。选
-VLA-0，是让''外壳不变、载体更换''这件事以最干净的方式发生。
-
-\subsection{5.4 SFT
+\subsection{5.3 SFT
 基线为什么重要}\label{sft-ux57faux7ebfux4e3aux4ec0ux4e48ux91cdux8981}
 
 动手之前还有最后一个概念要建立。稀疏 0/1 奖励下，GRPO
@@ -839,15 +811,14 @@ VLA-0，是让''外壳不变、载体更换''这件事以最干净的方式发�
 
 所以 VLA
 后训练开工前必须先量两个数：\textbf{基座成功率是不是大于零}（有没有信号）、\textbf{离天花板还有多远}（有没有提升空间）。最舒服的起点是成功率居中的基座------一组里既有成功又有失败，每次采样都带信息。这条规律看似朴素，第
-6 节 SimpleVLA-RL 的失败边界实验和第 8
-节我们自己的实验都会结结实实撞上它。
+6.4.6 节 SimpleVLA-RL 的失败边界实验会结结实实撞上它。
 
-\subsection{5.5 本节小结}\label{ux672cux8282ux5c0fux7ed3-4}
+\subsection{5.4 本节小结}\label{ux672cux8282ux5c0fux7ed3-4}
 
 机器人仿真任务自带成功判定和精确重置，天然满足可验证奖励和 GRPO
-分组采样的两个前提。三篇代表作分别站在算法、系统、落地三个层次上，本课的动手载体则选定''动作即整数文本''的
-VLA-0------log
-概率与文本同构，数数实验的外壳可以原样搬来。唯一的新前提是基座成功率必须''不为零也不满分''，这个数字决定了后训练有没有得学、有没有得涨。
+分组采样的两个前提。三篇代表作分别站在算法、系统、落地三个层次上。能套上这套外壳的
+VLA 有一个硬条件：动作得以离散 token 的形式生成------只有这样 log
+概率才与文本同构，数数实验的外壳才能原样搬来。此外还有一个新前提：基座成功率必须''不为零也不满分''，这个数字决定了后训练有没有得学、有没有得涨。
 
 \section{6 SimpleVLA-RL：把 GRPO 搬上 VLA
 的代表作}\label{simplevla-rlux628a-grpo-ux642cux4e0a-vla-ux7684ux4ee3ux8868ux4f5c}
@@ -913,7 +884,7 @@ SFT''，往下扩展时会撞上两堵墙。一堵是\textbf{数据稀缺}：把
 要解决的核心技术问题，下一节先把这些差异摆清楚。
 
 SimpleVLA-RL 本身是一个面向 VLA 的高效在线 RL 框架，基于字节跳动的
-veRL{[}13{]}（一个通用 LLM RL 框架）改造而来。它做了四件事：\textbf{把
+veRL{[}12{]}（一个通用 LLM RL 框架）改造而来。它做了四件事：\textbf{把
 LLM RL 框架适配到 VLA}（实现 VLA
 特有的交互式轨迹采样与损失计算）；\textbf{只用结果奖励}（成功 1、失败
 0，不手工设计过程奖励）；\textbf{加了一组探索增强手段}（动态采样、放宽裁剪上界、提高采样温度）显著提升训练效率；以及一个意外收获------RL
@@ -1048,7 +1019,7 @@ Computation''是同一个东西。
 SimpleVLA-RL 应用于 OpenVLA-OFT，骨干是 LLaMA2-7B，带 action
 chunk（第10讲 2.2
 节那个''一次预测未来若干步''的动作块）与并行解码。这里要说清一个容易混的前提：第11讲
-2.5 节介绍的 OFT+{[}14{]} 默认把动作头换成了\textbf{连续值 L1 回归}，而
+2.5 节介绍的 OFT+{[}13{]} 默认把动作头换成了\textbf{连续值 L1 回归}，而
 SimpleVLA-RL 用的是\textbf{保留离散 action token
 输出}的那个变体------并行解码照用，动作仍以 token
 形式生成。选它的原因正是第 2 节的题眼：\textbf{只有还在吐 token
@@ -1156,9 +1127,8 @@ GRPO）在组内所有轨迹获得相同奖励时会产生零梯度------优势�
 
 \begin{quote}
 备注：这三招都是在''基座已经相当强''（SFT 成功率
-91\%）的前提下鼓励探索。第 8
-节我们的基座只有四五成功率时，会看到同样的旋钮要往\textbf{相反}方向拧------温度要降、KL
-要加回来。方法没有对错，对不对要看基座。
+91\%）的前提下鼓励探索，别当成放之四海的调参口诀。基座本来就只有四五成功率时，升温会把成功轨迹进一步摊薄，组内全败的比例反而上去------同一个旋钮，很可能要往相反方向拧。6.4.6
+节那张失败边界表说的是同一件事：这三招管不管用，先看基座站在哪。
 \end{quote}
 
 \subsubsection{6.3.5 训练目标}\label{ux8badux7ec3ux76eeux6807}
@@ -1406,11 +1376,11 @@ SimpleVLA-RL 最硬的一条边界写在它的名字之外：它只适用于\tex
 token 形式输出动作}的 VLA（如 6.3.1 节说的那个保留 token 头的
 OpenVLA-OFT 变体）。原因很实在------GRPO 要算 log 概率，而动作头换成
 flow matching（比如
-\(\pi_0\)）或连续回归之后，这个量压根算不出来。这条限制也就解释了第 9
+\(\pi_0\)）或连续回归之后，这个量压根算不出来。这条限制也就解释了第 8
 节为什么要另起炉灶：\(\pi^{*}_{0.6}\) 面对的正是 flow matching
 这一类''算不出 log 概率''的模型。
 
-另一条边界我们在本讲 8.3 节会亲自撞上：RL
+另一条边界就写在 6.4.6 节那张表的第一行：RL
 需要一个最低初始能力。基础模型完全不会做时，一组轨迹全军覆没，组内优势齐刷刷是零，训练就地空转------所以
 SFT
 打底仍然省不掉。这件事和奖励的稀疏性是同一枚硬币：二值的结果奖励在初始成功率极低时几乎不给信号，想改善，就得掺一点过程奖励（比如''离目标近了多少''）来引导早期探索。
@@ -1436,7 +1406,8 @@ RL，这意味着示教数据不再是扩展性能的唯一通道。
 RL 确实能提升真实世界的成功率，只是离可靠部署还有距离。
 
 但这一切都有个前提------模型得先有\textbf{偶尔成功}的能力。二值奖励太稀疏，全败的一组给不出任何梯度，RL
-根本启动不了。这条前提，正是我们自己在本讲 8.3 节要正面撞上的那道坎。
+根本启动不了。这条前提在 6.4.6 节那张表的第一行摆得最直白：0 条示教、0\%
+成功率，RL 接上去仍然是 0。
 
 局限也同样清楚：只适用于自回归动作头、离不开仿真器、在基座太弱时无法启动。不过对本讲来说，它最重要的角色是''把路走通的人''------证明了数数实验的那套
 GRPO 外壳搬到 VLA 上真的能涨点。下一个问题随之而来：这样的训练要用一整个
@@ -1517,7 +1488,7 @@ GPU 分配模式}：
 130 个 LIBERO 任务上取得 98.11\% 成功率、25 个 ManiSkill 任务上
 97.66\%、六个 RoboTwin 任务平均 84.63\%。面板里每根柱子的实心段是 SFT
 起点、斜线段是 RL 补上的增量，不同任务的增量宽窄差得很远------这本身就是
-5.4 节那条规律的又一次印证：起点越低，RL 能补的越多。
+5.3 节那条规律的又一次印证：起点越低，RL 能补的越多。
 
 \subsection{7.3
 对本讲的启示}\label{ux5bf9ux672cux8bb2ux7684ux542fux793a}
@@ -1527,280 +1498,18 @@ RLinf
 强化学习正在从''单篇论文附带的训练脚本''走向''可复用的公共基础设施''}------就像当年深度学习从手写反向传播走向框架。对使用者，复现门槛在下降；对研究者，比较不同算法终于有了同一条起跑线。
 
 同时它反过来印证了第 2 节的题眼：基建做得再庞大，中间那层''RL
-算法''始终只有薄薄一页纸------PPO、GRPO，插在仿真器和模型之间。系统复杂化的是\textbf{资源编排}，不是\textbf{学习原理}。这给了我们十足的底气：下一节就把这页纸从集群里抽出来，在单卡上手写一个最小可用版。
+算法''始终只有薄薄一页纸------PPO、GRPO，插在仿真器和模型之间。系统复杂化的是\textbf{资源编排}，不是\textbf{学习原理}。所以读这类工作时，要分清哪些复杂度是算法带来的、哪些只是为了让集群不空转。
 
 \subsection{7.4 本节小结}\label{ux672cux8282ux5c0fux7ed3-6}
 
 RLinf-VLA 用统一接口把仿真器、VLA 模型、RL
 算法三个维度解耦，用共置/分置/混合三种 GPU 编排把训练吞吐提高到最多 2.27
 倍，并以单一模型在三大仿真基准上验证了大规模 VLA
-强化学习的有效性。它的存在说明这条技术路线已经开始沉淀为基础设施；而算法内核依然轻薄，正适合我们亲手复刻。
+强化学习的有效性。它的存在说明这条技术路线已经开始沉淀为基础设施；而算法内核依然轻薄------庞大的是编排，不是
+GRPO 本身。
 
-\section{8 实验：让 VLA-0
-自我提升成功率}\label{ux5b9eux9a8cux8ba9-vla-0-ux81eaux6211ux63d0ux5347ux6210ux529fux7387}
-
-\subsection{8.1
-动手之前：先量提升空间}\label{ux52a8ux624bux4e4bux524dux5148ux91cfux63d0ux5347ux7a7aux95f4}
-
-按第 5.4 节的规矩，动手前先量基线。不巧的是，官方训练充分的 VLA-0 在
-LIBERO 四个套件上平均成功率已经刷到
-94.7\%（物体套件更高，97.8\%）------接近饱和。对这样的基座做
-GRPO，组内几乎全是成功轨迹，既没有学习信号，也没有提升空间。
-
-解法是\textbf{自造一个弱基座}：换用 VLA-0 的 0.5B 版本（SmolVLM2
-骨干，社区实现），在 LIBERO 的物体抓放套件上做\textbf{少步
-SFT}，故意停在一个欠训练的 checkpoint
-上，使它在目标任务上的成功率停在四到五成。5.4
-节把这种起点叫''最舒服的''：每组轨迹里既有成功也有失败，组内比较每次都有话可说。
-
-\begin{quote}
-备注：这个基座''弱''有两个来源，别只记住一个。一是\textbf{少步
-SFT}------训练没跑完就取了
-checkpoint；二是\textbf{骨干小六倍}------官方那 94.7\% 跑的是
-Qwen2.5-VL-3B，我们换成了 0.5B 的 SmolVLM2。所以 94.7\%
-与四五成之间的落差不能全算在训练步数头上。真实工程里你多半会拿到一个''已经很强''的基座，那时该做的不是硬做
-RL，而是去找它还不行的更难任务（SimpleVLA-RL
-的高价值场景全都是低成功率起点）；这里反其道自造弱基座，为的是让''后训练前后''的对比一眼可见。
-\end{quote}
-
-\subsection{8.2
-训练循环：把数数的外壳搬过来}\label{ux8badux7ec3ux5faaux73afux628aux6570ux6570ux7684ux5916ux58f3ux642cux8fc7ux6765}
-
-相对第 4 节的数数实验，这里的训练循环只换了两样东西------\textbf{策略的
-token 含义}和\textbf{判分的方式}。整个循环如下：
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  从任务的初始状态池里选一个初始状态，把 \(G=8\)
-  个并行仿真环境\textbf{重置到同一初始状态}------机器人版的''同一道题''；
-\item
-  当前策略以温度 1.0 采样：每个环境里，VLA-0
-  把当前观测读进去，打印出一串整数、解码成动作执行，一步步走到任务成功或超时，得到
-  8 条轨迹；
-\item
-  仿真器逐条判定成败，给出 0/1 奖励；
-\item
-  组内标准化算出每条轨迹的相对优势（第 1.4 节的公式）；
-\item
-  重放每条轨迹的 token 序列，在当前策略下重新计算每个动作 token 的 log
-  概率，按 GRPO 目标更新------外加一项对参考模型（冻结的 SFT 起点）的逐
-  token KL 惩罚。
-\end{enumerate}
-
-和数数实验逐项对照：
-
-\begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1499\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3137\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5364\linewidth - 2\tabcolsep\relax}@{}}
-\toprule\noalign{}
-环节 & VLM 数数（第 4 节） & VLA-0（本节） \\
-\midrule\noalign{}
-一道题 & 一张图 + 一个问题 & 一个初始状态 + 一条任务指令 \\
-一次作答 & 生成一段回答 & rollout 一条轨迹（逐步与环境交互） \\
-判分 & 比对答案字符串 & 仿真器判定任务成败 \\
-log 概率 & 文本 token & 动作 token（数学上同构） \\
-更新 & GRPO & GRPO + KL \\
-\bottomrule\noalign{}
-\end{tabular}
-\end{center}
-
-这个''同构''落到代码上就是一目了然的：\texttt{training\_step}
-的损失只由两项拼起来，第一项是策略梯度、第二项是 KL 锚：
-
-\begin{Shaded}
-\begin{Highlighting}[]
-            \ControlFlowTok{for}\NormalTok{ rec, adv }\KeywordTok{in}\NormalTok{ active:}
-\NormalTok{                lp\_tok, valid }\OperatorTok{=}\NormalTok{ sequence\_logprob\_tok(}\VariableTok{self}\NormalTok{.policy.model, rec, requires\_grad}\OperatorTok{=}\VariableTok{True}\NormalTok{)}
-\NormalTok{                denom }\OperatorTok{=}\NormalTok{ valid.}\BuiltInTok{sum}\NormalTok{().clamp(}\BuiltInTok{min}\OperatorTok{=}\DecValTok{1}\NormalTok{)}
-\NormalTok{                lp }\OperatorTok{=}\NormalTok{ (lp\_tok }\OperatorTok{*}\NormalTok{ valid).}\BuiltInTok{sum}\NormalTok{() }\OperatorTok{/}\NormalTok{ denom}
-\NormalTok{                loss }\OperatorTok{=} \OperatorTok{{-}}\NormalTok{(adv }\OperatorTok{*}\NormalTok{ lp)}
-                \CommentTok{\# KL{-}to{-}ref（k3 估计器，逐 token ≥ 0）：把策略锚在冻结基座附近。}
-\NormalTok{                lp\_ref, \_ }\OperatorTok{=}\NormalTok{ sequence\_logprob\_tok(}\VariableTok{self}\NormalTok{.ref\_model, rec, requires\_grad}\OperatorTok{=}\VariableTok{False}\NormalTok{)}
-\NormalTok{                delta }\OperatorTok{=}\NormalTok{ lp\_ref }\OperatorTok{{-}}\NormalTok{ lp\_tok}
-\NormalTok{                kl\_tok }\OperatorTok{=}\NormalTok{ torch.exp(delta) }\OperatorTok{{-}}\NormalTok{ delta }\OperatorTok{{-}} \FloatTok{1.0}
-\NormalTok{                loss }\OperatorTok{=}\NormalTok{ loss }\OperatorTok{+} \VariableTok{self}\NormalTok{.beta\_kl }\OperatorTok{*}\NormalTok{ (kl\_tok }\OperatorTok{*}\NormalTok{ valid).}\BuiltInTok{sum}\NormalTok{() }\OperatorTok{/}\NormalTok{ denom}
-                \VariableTok{self}\NormalTok{.manual\_backward(loss }\OperatorTok{/} \BuiltInTok{len}\NormalTok{(active))}
-\end{Highlighting}
-\end{Shaded}
-
-\texttt{rec} 是一条轨迹的 token 序列，\texttt{adv}
-是它在组内的相对优势。\texttt{loss\ =\ -(adv\ *\ lp)}
-这一行就是第14讲那个策略梯度的原样搬运------好轨迹提概率、差轨迹压概率；后面那项
-KL 把策略锚在冻结的 SFT 基座附近，防止越训越野，正是 8.4
-节那道坎的解药。
-
-有个细节值得停一秒：上面循环遍历的那个
-\texttt{active}，只保留了\textbf{优势非零}的生成记录。
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{active }\OperatorTok{=}\NormalTok{ [(r, a) }\ControlFlowTok{for}\NormalTok{ r, a }\KeywordTok{in} \BuiltInTok{zip}\NormalTok{(batch[}\StringTok{"records"}\NormalTok{], batch[}\StringTok{"advantages"}\NormalTok{]) }\ControlFlowTok{if} \BuiltInTok{abs}\NormalTok{(a) }\OperatorTok{\textgreater{}=} \FloatTok{1e{-}8}\NormalTok{]}
-\end{Highlighting}
-\end{Shaded}
-
-一组 8 条轨迹如果\textbf{全成或全败}，组内标准化后每条的优势都是
-0，这一组对梯度毫无贡献------采样白跑了。所以采集端会专门统计''组内有成有败''的组数：
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{R }\OperatorTok{=}\NormalTok{ np.array(grp\_rewards)}
-\ControlFlowTok{if} \FloatTok{0.0} \OperatorTok{\textless{}}\NormalTok{ R.mean() }\OperatorTok{\textless{}} \FloatTok{1.0}\NormalTok{:}
-\NormalTok{    mixed\_groups }\OperatorTok{+=} \DecValTok{1}   \CommentTok{\# 组内有成有败，才有非零优势信号}
-\end{Highlighting}
-\end{Shaded}
-
-\texttt{mixed\_groups\ /\ n\_groups} 这个比值就是 8.3
-节那道坎的体温计------它一旦长期为 0，训练就是在空转。完整代码在
-\texttt{code/rl/2\_grpo\_posttraining/2\_2\_grpo\_vla0\_libero/train\_grpo.py}。
-
-第 2
-节的题眼在数学上完全兑现：优势计算、概率比值、梯度回传，一行都不用改。工程上多出来的是与仿真器的交互------rollout
-比纯文本生成慢几个量级，CPU 仿真是瓶颈、GPU 大部分时间在等待。第 7
-节集群要解的资源编排问题，在单卡上以''等''的形式亲身体会了一遍。
-
-外壳虽然照搬，路却不是一次走通的。接下来三小节是这次训练结结实实踩过的三道坎------每一道都对应稀疏奖励
-RL 后训练的一条通用规律。
-
-\subsection{8.3
-第一道坎：组里没有信号}\label{ux7b2cux4e00ux9053ux574eux7ec4ux91ccux6ca1ux6709ux4fe1ux53f7}
-
-\textbf{现象}：起初照搬''提高采样温度鼓励探索''的思路（第 6.3.4 节
-SimpleVLA-RL 的第三招），把温度设到明显高于 1，结果训练几乎纹丝不动。
-
-\textbf{原因}：温度是把双刃剑。对成功率 91\%
-的强基座，升温能让千篇一律的成功轨迹里冒出新解法；但对四五成功率的弱基座，升温后的随机扰动直接把有效成功率压到一成上下------8
-条一组，接近半数的迭代整组全败，组内标准差为零、优势全零、\textbf{零梯度}。动态采样要过滤掉的就是这种病态组，只不过在弱基座下病态组成了多数，过滤完也剩不下什么。
-
-\textbf{修法}：把温度收回 1.0，即策略自己的自然分布。此时绝大多数（约
-97\%）的组是有成有败的混合组，每次迭代都有梯度可用。
-
-这道坎留下的规律：\textbf{探索旋钮的方向由基座强弱决定}------强基座升温买多样性，弱基座守住温度保信号密度。同一个旋钮，两篇工作拧向相反，两边都是对的。
-
-\subsection{8.4
-第二道坎：学了这个忘那个}\label{ux7b2cux4e8cux9053ux574eux5b66ux4e86ux8fd9ux4e2aux5fd8ux90a3ux4e2a}
-
-\textbf{现象}：信号密了，训练动了，新问题浮出水面------每次迭代只在一个初始状态上更新时，策略在这个状态上稳步进步，其他初始状态的成功率却断崖式下跌，甚至从五成直接归零。
-
-\textbf{原因}：大模型对窄分布的连续梯度极其敏感。连着多步只看同一个初始状态，等于在这个状态上过拟合，把别的状态上辛苦学来的能力''挤''掉了------顾此失彼。
-
-\textbf{修法}：把每次迭代的更新摊到\textbf{多个初始状态}上，而且专挑那些\textbf{基座成功率既不为零也不为一}的初始状态：全败的死状态采了也是白采（8.3
-的教训），全成的状态没东西可学（5.4
-的天花板）。把采样预算全部花在''有信号''的状态上，既不遗忘、每步又都有效。
-
-这与 6.3.4
-的动态采样是同一个思想的两面：动态采样在\textbf{采完之后}过滤掉病态组，我们在\textbf{采样之前}就把预算押在有信号的状态上------单卡采样太贵，浪费不起。
-
-\subsection{8.5
-第三道坎：越训越差}\label{ux7b2cux4e09ux9053ux574eux8d8aux8badux8d8aux5dee}
-
-\textbf{现象}：前两道坎迈过，训练有梯度、状态不遗忘，可确定性评测给出了最反直觉的结果------成功率不升反降，几次迭代后从四五成掉到一成多。
-
-\textbf{原因}：稀疏 0/1
-奖励的信用分配是糊的。一条失败轨迹里其实有大量正确的动作（比如前半段完美接近了物体），整条被判负优势，好动作跟着挨罚；一条成功轨迹里也夹着无关甚至错误的动作，整条加分，坏习惯跟着受赏。没有任何约束时，这种带噪声的更新会把策略从
-SFT 辛苦到达的胜任区\textbf{一步步拖走}。注意这不同于 8.4
-的遗忘------那是状态之间的顾此失彼，这是整体能力的漂移退化。
-
-\textbf{修法}：把第 1.5 节介绍的 KL 锚加回来------对冻结的参考模型（SFT
-起点）逐 token 施加 KL
-惩罚。它像一根锚链：策略梯度仍然可以在链长范围内向高奖励方向探索，但再也无法漂离胜任区。
-
-这一修的效果有一组干净的消融作证：同样的配置、同样的训练步数，唯一的区别是有没有
-KL------\textbf{无 KL 的策略掉到 16.7\%，有 KL 的升到
-66.7\%}。一个变量，天壤之别。
-
-对照第 6 节又是一处''方向相反、两边都对''：SimpleVLA-RL
-特意\textbf{移除} KL（6.3.5 的表），因为强基座加 clip 已经够稳，去掉 KL
-省显存、放开探索；弱基座上我们实测必须加回来。学习率同理------过大的学习率同样会把策略推出胜任区，这里用小学习率与
-KL 配合。
-
-\subsection{8.6
-结果：涨点、对照与早停}\label{ux7ed3ux679cux6da8ux70b9ux5bf9ux7167ux4e0eux65e9ux505c}
-
-把整条训练线的关键数字放在一张图里：
-
-\begin{figure}[H]
-
-{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture15/ref/fig15-8-vla0-success.png}
-
-}
-
-\caption{VLA-0 在 LIBERO
-物体抓放任务上的后训练成功率对照（自绘，数字取自下方表格）：弱基座
-50\%，无 KL 的 GRPO 退化到 16.7\%，加 KL 锚定后升到
-66.7\%。\textbf{每根柱子都标了评测规模 n}，因为四次评测不是同一个
-n；顶上那道蓝色双向箭头连的，是四根柱子里唯一评测规模相同的一对。四次评测都用贪婪解码}
-
-\end{figure}%
-
-\begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3750\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5469\linewidth - 2\tabcolsep\relax}@{}}
-\toprule\noalign{}
-配置 & 任务成功率（贪婪评测） \\
-\midrule\noalign{}
-弱基座（少步 SFT） & 40\%～50\%（两轮评测，n=10 / n=20） \\
-GRPO 无 KL，两次迭代后 & 16.7\% \\
-\textbf{GRPO + KL，两次迭代后} & \textbf{66.7\%}（n=12）/ 60\%（n=20） \\
-GRPO + KL，四次迭代后 & 16.7\% \\
-\bottomrule\noalign{}
-\end{tabular}
-\end{center}
-
-上图画的是表里前三行，其中''GRPO +
-KL''这一行的两次评测各占一根柱子；第四行''训到四次迭代''只在表里。看柱子时要连着
-n 一起看：66.7\% 那根是 n=12 的评测，拿它直接跟 n=20
-的弱基座比并不严谨，所以图上另画了一根 n=20
-的复评（60\%），和最左边那根凑成唯一一组同口径对照。这张表要读出三件事：
-
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  \textbf{涨点成立}。同一套 GRPO 外壳作用在动作 token 上，把弱基座从
-  40\%～50\% 推到 60\%～67\%------第 2 节的题眼从推论变成了实测；
-\item
-  \textbf{KL
-  是关键变量}。中间两行的消融再次强调：稀疏奖励下没有锚，纯组相对策略梯度会亲手毁掉基座；
-\item
-  \textbf{峰值之后会退化}。最后一行是最诚实的一行：继续训到四次迭代，成功率又掉回
-  16.7\%。KL 延缓漂移但不根治，稀疏奖励 VLA
-  后训练的典型形态就是''\textbf{早峰值、后退化}''------必须边训边评，在峰值处\textbf{早停}、取走峰值
-  checkpoint。这不是实现粗糙，而是该方向公认的不稳定性；SimpleVLA-RL
-  用强基座和大规模采样缓解了它，但同样要挑 checkpoint。
-\end{enumerate}
-
-\begin{quote}
-备注：判断''学没学到''必须看\textbf{贪婪解码}的确定性评测。训练过程中的采样成功率带着温度，天然偏低（这里只有两三成），那是探索的代价，不是策略的真实水平------只盯训练曲线会严重低估模型。
-\end{quote}
-
-最后看一眼画面。下图两排取自\textbf{同一个初始状态}------桌上物件的位置、机械臂的起始姿态逐一对应，这正是仿真器''精确重置''给的便利。
-
-\begin{figure}[H]
-
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture15/ref/fig156-vla0-grpo-rollout.png}}
-
-}
-
-\caption{同一初始状态下的后训练前后对照，每排四帧按时间从左到右：上排是弱基座，机械臂在目标物附近来回调整，最后一帧篮子仍是空的，回合判为失败；下排是
-GRPO 加 KL 后训练的模型，同样的起点，夹爪扣住目标物提起并送进篮子}
-
-\end{figure}%
-
-对着两排最后一帧看最省事：上排篮子空着、物件仍散在原处；下排夹爪已经把目标物带到篮口。中间两帧同样有差别------上排机械臂确实伸到了物件跟前，却始终没有把哪一件带离桌面；下排在第三帧手里就已经拎着东西了。\textbf{这就是那十几个百分点在画面上的样子}：动作的大体形状两排是一样的，差别在接近之后的那一下夹得准不准。这也正是稀疏
-0/1
-奖励唯一能提供的信息------它不告诉模型哪一步该改，只告诉它这一整条做成了没有；剩下的靠一组里的成败对比自己去找。
-
-\subsection{8.7 本节小结}\label{ux672cux8282ux5c0fux7ed3-7}
-
-把 token 从文字换成动作、判分从比答案换成仿真判定，同一套 GRPO
-外壳在单卡可及的规模上给 VLA-0 带来了 40\%～50\% 到 60\%～67\%
-的真实涨点。三道坎各留一条规律：采样温度的方向要看基座强弱；更新要摊到多个有信号的初始状态；稀疏奖励必须
-KL
-锚定，且峰值后退化不可避免、要靠早停收获成果。局限同样明确：单任务、离不开仿真器的判定与重置。它们指向同一个问题------真实世界里既没有自动判分、也没有一键重置，VLA
-的后训练还能做吗？下一节的 \(\pi^{*}_{0.6}\) 给出了目前最有分量的回答。
-
-\section{\texorpdfstring{9 \(\pi^{*}_{0.6}\)：让 VLA
-从真实经验中学习}{9 \textbackslash pi\^{}\{*\}\_\{0.6\}：让 VLA 从真实经验中学习}}\label{pi_0.6ux8ba9-vla-ux4eceux771fux5b9eux7ecfux9a8cux4e2dux5b66ux4e60}
+\section{\texorpdfstring{8 \(\pi^{*}_{0.6}\)：让 VLA
+从真实经验中学习}{8 \textbackslash pi\^{}\{*\}\_\{0.6\}：让 VLA 从真实经验中学习}}\label{pi_0.6ux8ba9-vla-ux4eceux771fux5b9eux7ecfux9a8cux4e2dux5b66ux4e60}
 
 \begin{quote}
 论文：\emph{\(\pi^{*}_{0.6}\): a VLA That Learns From
@@ -1833,9 +1542,9 @@ high-level / low-level / action expert，还多挂了一个黄色的
 \texttt{interventions\ and\ labeling}，是人接管纠偏并打标。第 1 到 8
 节的所有方法里，这两条箭头都不存在------仿真器自动重置、自动判分，不需要人；到了真实的厨房和衣柜前，这两件事只能由人来做。
 
-\subsection{9.1 背景与动机}\label{ux80ccux666fux4e0eux52a8ux673a-1}
+\subsection{8.1 背景与动机}\label{ux80ccux666fux4e0eux52a8ux673a-1}
 
-\subsubsection{9.1.1
+\subsubsection{8.1.1
 从模仿学习到经验学习}\label{ux4eceux6a21ux4effux5b66ux4e60ux5230ux7ecfux9a8cux5b66ux4e60}
 
 第 11、12 讲里我们认识了 \(\pi_0\) 和 \(\pi_{0.5}\)；\(\pi_{0.6}\)
@@ -1848,7 +1557,7 @@ cloning）：给模型看专家示教，让它模仿每一步动作。
 人类学习技能的方式不是这样的。人类在学会基本动作后，会通过\textbf{反复练习}来精进------从失败中学习，从纠正中改进，逐渐超越最初的教学水平。\(\pi^{*}_{0.6}\)
 和 RECAP 方法正是要把这种''从经验中学习''的能力赋予 VLA 模型。
 
-\subsubsection{9.1.2 VLA
+\subsubsection{8.1.2 VLA
 强化学习的挑战}\label{vla-ux5f3aux5316ux5b66ux4e60ux7684ux6311ux6218}
 
 第14讲和本讲前几节已经建立了 RL 后训练 VLA 的基本思路，也亲手跑通了 GRPO
@@ -1872,7 +1581,7 @@ cloning）：给模型看专家示教，让它模仿每一步动作。
 概率，GRPO 那套外壳套不上去。\(\pi^{*}_{0.6}\)
 走的就是那条''绕行的路''。
 
-\subsubsection{9.1.3 RECAP
+\subsubsection{8.1.3 RECAP
 的核心思路}\label{recap-ux7684ux6838ux5fc3ux601dux8def}
 
 RECAP（\textbf{R}L with \textbf{E}xperience and \textbf{C}orrections via
@@ -1908,10 +1617,10 @@ PPO/GRPO 的 RL 方案：\textbf{advantage conditioning}（优势条件化）。
   重新训练策略
 \end{enumerate}
 
-\subsection{9.2 从正则化强化学习到 Advantage
+\subsection{8.2 从正则化强化学习到 Advantage
 Conditioning}\label{ux4eceux6b63ux5219ux5316ux5f3aux5316ux5b66ux4e60ux5230-advantage-conditioning}
 
-\subsubsection{9.2.1 问题设定}\label{ux95eeux9898ux8bbeux5b9a}
+\subsubsection{8.2.1 问题设定}\label{ux95eeux9898ux8bbeux5b9a}
 
 RECAP 使用标准的 RL 框架。策略 \(\pi(\mathbf{a}_t | \mathbf{o}_t)\)
 根据观测 \(\mathbf{o}_t\) 选择动作 \(\mathbf{a}_t\)。一条轨迹定义为：
@@ -1957,7 +1666,7 @@ V^\pi(\mathbf{o}_t) = \mathbb{E}\left[\sum_{t'=t}^T r_{t'}\right], \quad A^\pi(\
 靠''同题采一组''把 critic
 请走，靠的是仿真里可以随意重复初始状态；真实世界没有这个奢侈条件，每条轨迹的初始状态都独一无二，组内比较无从谈起，``平均水平''的参照只能重新请价值函数来估。请走与请回，都是同一笔账在不同场景下的最优解。
 
-\subsubsection{9.2.2
+\subsubsection{8.2.2
 正则化强化学习}\label{ux6b63ux5219ux5316ux5f3aux5316ux5b66ux4e60}
 
 RECAP 的理论基础来自\textbf{正则化 RL}。与直接最大化回报不同，正则化 RL
@@ -1974,10 +1683,11 @@ RECAP 的理论基础来自\textbf{正则化 RL}。与直接最大化回报不�
 设定中不使用折扣，所以上一节等价于 \(\gamma=1\)；这里保留 \(\gamma\)
 是为了呈现正则化 RL 的通用写法。
 
-这个''别偏离参考策略太远''的思想我们已经见过两次了：第 1.5 节 GRPO 的 KL
-项、第 8.5 节救回训练的那根锚链，都是它。当 \(D\) 取 KL
+这个''别偏离参考策略太远''的思想我们已经见过两次了：第 1.5 节 GRPO
+挂的那条 KL、6.3.5 节 SimpleVLA-RL
+为放开探索特意把它移除时权衡的，都是它。当 \(D\) 取 KL
 散度时，这个优化问题有一个经典的闭式解（推导用拉格朗日乘子法 + 对
-\(\pi\) 求泛函导数即可，AWR{[}15{]}、MPO{[}16{]}
+\(\pi\) 求泛函导数即可，AWR{[}14{]}、MPO{[}15{]}
 等论文都给过；这里直接借用结果）：
 
 \[
@@ -2020,7 +1730,7 @@ RECAP 的理论基础来自\textbf{正则化 RL}。与直接最大化回报不�
 这个结果是 PPO、AWR、MPO 等很多 RL 算法的理论基础。RECAP 的 advantage
 conditioning 也从这里出发，但走了一条不同的路。
 
-\subsubsection{9.2.3 从闭式解到 Advantage
+\subsubsection{8.2.3 从闭式解到 Advantage
 Conditioning}\label{ux4eceux95edux5f0fux89e3ux5230-advantage-conditioning}
 
 上面的闭式解虽然优美，但直接用它来更新策略并不容易------尤其是当策略用
@@ -2059,7 +1769,7 @@ p(I | A^{\pi_\text{ref}}(\mathbf{o}, \mathbf{a})) = \frac{g(A^{\pi_\text{ref}}(\
 \hat{\pi}(\mathbf{a}|\mathbf{o}) \propto \pi_\text{ref}(\mathbf{a}|\mathbf{o}) \, p(I | A^{\pi_\text{ref}}(\mathbf{o}, \mathbf{a}))^\beta
 \]
 
-CFGRL{[}17{]}
+CFGRL{[}16{]}
 证明这个策略\textbf{保证优于参考策略}（\(\mathcal{J}(\hat{\pi}) \geq \mathcal{J}(\pi_\text{ref})\)）。直觉与前面一致：\(\pi_\text{ref}\)
 提供动作分布的''底座''，\(p(I|A)^\beta\)
 负责把''更像改进动作''的动作放大、其他压低。本质上换汤不换药------只是把
@@ -2178,7 +1888,7 @@ p(I | A^{\pi_\text{ref}}(\mathbf{o}, \mathbf{a})) \;\propto\; \frac{\pi_\text{re
 log-likelihood、不需要策略梯度。
 \end{quote}
 
-\subsection{9.3 RECAP 方法详解}\label{recap-ux65b9ux6cd5ux8be6ux89e3}
+\subsection{8.3 RECAP 方法详解}\label{recap-ux65b9ux6cd5ux8be6ux89e3}
 
 RECAP 的完整流程由三个步骤组成，可以迭代执行：
 
@@ -2195,7 +1905,7 @@ RECAP 的完整流程由三个步骤组成，可以迭代执行：
   VLA 策略
 \end{enumerate}
 
-\subsubsection{9.3.1
+\subsubsection{8.3.1
 分布式价值函数训练}\label{ux5206ux5e03ux5f0fux4ef7ux503cux51fdux6570ux8badux7ec3}
 
 \textbf{为什么需要价值函数}。Advantage conditioning 需要知道每个动作的
@@ -2279,7 +1989,7 @@ head），它算出的 advantage 经过一次二值化
 
 这张图把前面几页公式拼成了一条可以用手指走的通路，值得从下往上读一遍。最下面是价值函数，输入和策略一样是三路图像加提示词，末端多一个
 value head；它的输出进到 \texttt{advantage} 那个方框里，算式逐字就是
-9.3.2 节马上要写出的 \(A(o,a)=r_{t:N}+V(o_{t+N})-V(o_t)\)；再往上一格是
+8.3.2 节马上要写出的 \(A(o,a)=r_{t:N}+V(o_{t+N})-V(o_t)\)；再往上一格是
 \texttt{binarization}，把这个实数压成一个是非题。压完的结果就是策略输入行里那个绿红三角------它挤在
 \texttt{metadata} 和 action expert
 之间，位置很说明问题：\textbf{它排在语言子任务之后、动作之前，所以只影响动作怎么生成，不影响模型说什么。}
@@ -2323,11 +2033,9 @@ episode 内部的起伏}。左边这一段最后是成功的，可价值曲线�
 秒的绿色区间是''重新叠好''，曲线随之爬回去。右边那段最后失败了，可它中途有一段陡升，对应绿色的''成功打开冰箱门''；直到
 95 秒附近碰倒滤水器，曲线才掉下来。\textbf{这正是 advantage conditioning
 能用上失败数据的原因}：整条轨迹的成败只有一个
-0/1，而价值函数能指出这条轨迹里\textbf{哪几步}是好的、哪几步是坏的------第
-8
-节那个''一条失败轨迹里其实有大量正确动作''的抱怨，在这里被一个学出来的价值函数正面回答了。
+0/1，而价值函数能指出这条轨迹里\textbf{哪几步}是好的、哪几步是坏的------二值结果奖励最大的软肋（一条失败轨迹里其实有大量正确动作，却被整条判负）在这里被一个学出来的价值函数正面回答了。
 
-\subsubsection{9.3.2 Advantage
+\subsubsection{8.3.2 Advantage
 条件化策略训练}\label{advantage-ux6761ux4ef6ux5316ux7b56ux7565ux8badux7ec3}
 
 \textbf{改进指示器}。有了价值函数，就可以计算每个动作的 advantage：
@@ -2480,10 +2188,10 @@ advantage 标签}。这是它训练稳定的关键来源------拿来训普通 VL
 
 整条
 episode（包括自主部分和纠正部分）都会被加入数据集，无论是否发生了纠正。这种做法类似于
-HG-DAgger{[}18{]}（Human-Gated DAgger，人把关的 DAgger），但 RECAP
+HG-DAgger{[}17{]}（Human-Gated DAgger，人把关的 DAgger），但 RECAP
 额外利用了 RL 框架来处理自主数据。
 
-\subsubsection{9.3.3 推理时的策略改进：Classifier-Free
+\subsubsection{8.3.3 推理时的策略改进：Classifier-Free
 Guidance}\label{ux63a8ux7406ux65f6ux7684ux7b56ux7565ux6539ux8fdbclassifier-free-guidance}
 
 训练完成后，默认使用 \(\beta = 1\)，即直接从
@@ -2498,7 +2206,7 @@ flow matching 的框架下，模型学到的实际上是 log-likelihood
 \nabla_\mathbf{a} \log \hat{\pi} = \nabla_\mathbf{a} \log \pi_\theta(\mathbf{a} | \mathbf{o}, \ell) + \beta \left(\nabla_\mathbf{a} \log \pi_\theta(\mathbf{a} | I, \mathbf{o}, \ell) - \nabla_\mathbf{a} \log \pi_\theta(\mathbf{a} | \mathbf{o}, \ell)\right)
 \]
 
-这个式子怎么来的？其实就是把 9.2.3 节最终的策略改进解
+这个式子怎么来的？其实就是把 8.2.3 节最终的策略改进解
 
 \[\hat{\pi}(\mathbf{a}|\mathbf{o},\ell) \propto \pi_\text{ref}(\mathbf{a}|\mathbf{o},\ell)\,\left[\pi_\text{ref}(\mathbf{a}|I,\mathbf{o},\ell)/\pi_\text{ref}(\mathbf{a}|\mathbf{o},\ell)\right]^\beta\]
 
@@ -2532,7 +2240,7 @@ flow matching 的框架下，模型学到的实际上是 log-likelihood
 \(\epsilon_\ell\) 来控制策略质量，只在需要时使用适度的
 CFG（\(\beta \in [1.5, 2.5]\)）。
 
-\subsubsection{9.3.4
+\subsubsection{8.3.4
 完整算法流程}\label{ux5b8cux6574ux7b97ux6cd5ux6d41ux7a0b}
 
 RECAP 的完整算法可以分为预训练和迭代改进两个阶段：
@@ -2581,13 +2289,13 @@ RECAP 的完整算法可以分为预训练和迭代改进两个阶段：
 
 每轮迭代都从预训练 checkpoint
 开始微调，而不是从上一轮的模型继续。这样做可以避免多轮迭代中的策略漂移------第
-8.5 节我们靠 KL 锚链对抗的那种漂移，RECAP
-用''每轮回到起点重训''从结构上杜绝了。
+1.5 节那条 KL 锚要对抗的正是这种漂移，RECAP
+换了个办法，用''每轮回到起点重训''从结构上杜绝了它。
 
-\subsection{9.4
+\subsection{8.4
 与其他策略提取方法的对比}\label{ux4e0eux5176ux4ed6ux7b56ux7565ux63d0ux53d6ux65b9ux6cd5ux7684ux5bf9ux6bd4}
 
-\subsubsection{9.4.1 为什么不用
+\subsubsection{8.4.1 为什么不用
 PPO}\label{ux4e3aux4ec0ux4e48ux4e0dux7528-ppo}
 
 上一讲介绍了 PPO，本讲前几节的 GRPO 一族也是当前 VLA
@@ -2605,7 +2313,7 @@ offline，同一批经验可以反复榨，这在''一条真机数据都不舍�
 最后是稳定性。论文的实验里，PPO 想在 off-policy
 数据上稳住，必须把信赖域收得非常小；而信赖域一小，策略每次能改进的幅度也就跟着被锁死了------稳是稳了，却也走不动。
 
-\subsubsection{9.4.2 为什么不用
+\subsubsection{8.4.2 为什么不用
 AWR}\label{ux4e3aux4ec0ux4e48ux4e0dux7528-awr}
 
 AWR（Advantage Weighted Regression）是另一种常见的 offline RL 方法，它用
@@ -2617,14 +2325,14 @@ AWR 的问题是：它会\textbf{丢弃或大幅降权大量数据}。低 advant
 advantage conditioning
 让模型从所有数据中学习------好数据教模型''什么是好动作''，坏数据教模型''什么是坏动作''。
 
-\subsubsection{9.4.3 实验对比}\label{ux5b9eux9a8cux5bf9ux6bd4}
+\subsubsection{8.4.3 实验对比}\label{ux5b9eux9a8cux5bf9ux6bd4}
 
 论文在最难的叠衣服任务上，把 advantage conditioning 与 AWR、PPO
 摆在一起比。结论不必记完整图表：advantage conditioning 最稳------它把
 positive 和 negative
 数据一起用上，既提成功率、又不牺牲执行速度，吞吐量因此最高。AWR
 输在速度上：它会过滤或降权大量低 advantage
-的数据，学出来的策略偏保守，吞吐量跟不上。PPO 则受限于 9.4.1
+的数据，学出来的策略偏保守，吞吐量跟不上。PPO 则受限于 8.4.1
 节说过的那个矛盾------为了在 off-policy
 数据上稳住，信赖域必须收得很小，而信赖域一小，改进幅度也就锁死了。
 
@@ -2632,9 +2340,9 @@ positive 和 negative
 flow matching VLA 加真机离线数据这个组合，把 advantage
 当条件输入喂进去，比直接做策略梯度或加权回归更适合工程落地}。
 
-\subsection{9.5 实验结果}\label{ux5b9eux9a8cux7ed3ux679c}
+\subsection{8.5 实验结果}\label{ux5b9eux9a8cux7ed3ux679c}
 
-\subsubsection{9.5.1 评估任务}\label{ux8bc4ux4f30ux4efbux52a1}
+\subsubsection{8.5.1 评估任务}\label{ux8bc4ux4f30ux4efbux52a1}
 
 论文在三类复杂的真实世界任务上评估
 RECAP：叠衣服、制作咖啡和组装箱子。它们共同覆盖了变形物体、液体操作、长时序多步骤任务和真实工厂部署场景。
@@ -2674,7 +2382,7 @@ RECAP：叠衣服、制作咖啡和组装箱子。它们共同覆盖了变形物
 6.5 节最后那条局限为什么值得一提：SimpleVLA-RL
 为了效率把腕部相机去掉了，而这里三路一个都不能少。
 
-\subsubsection{9.5.2 主要结果}\label{ux4e3bux8981ux7ed3ux679c}
+\subsubsection{8.5.2 主要结果}\label{ux4e3bux8981ux7ed3ux679c}
 
 先看核心指标。论文没有只报成功率，而是用\textbf{吞吐量}（每小时成功完成的任务数）当主指标------因为它同时装下了两件事：任务做没做成、做得够不够快。
 
@@ -2724,19 +2432,19 @@ SFT 之后成功率就已经接近上限了，可 RECAP
 97\%。\textbf{RECAP
 不只是整体提分，还能用相对较少的数据改变策略的偏好、消掉某个特定的错误模式}------这一点对真机落地比''平均分涨了几个点''实用得多。
 
-\subsection{9.6 RECAP
+\subsection{8.6 RECAP
 与本讲方法的关系}\label{recap-ux4e0eux672cux8bb2ux65b9ux6cd5ux7684ux5173ux7cfb}
 
-\subsubsection{9.6.1
+\subsubsection{8.6.1
 在课程体系中的位置}\label{ux5728ux8bfeux7a0bux4f53ux7cfbux4e2dux7684ux4f4dux7f6e}
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1083\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2701\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1138\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2536\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2543\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1053\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2010\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1322\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2682\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2934\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 出处 & 方法 & RL 类型 & 策略提取 & 适用场景 \\
 \midrule\noalign{}
 第14讲 & PPO & 在线 RL & 策略梯度 & 从零训练控制策略 \\
-本讲第 6、8 节 & SimpleVLA-RL / VLA-0 GRPO & 在线 RL（GRPO） & 组内相对优势 & 仿真环境中输出离散动作 token 的 VLA \\
+本讲第 6 节 & SimpleVLA-RL & 在线 RL（GRPO） & 组内相对优势 & 仿真环境中输出离散动作 token 的 VLA \\
 \textbf{本节} & \textbf{RECAP} & \textbf{迭代离线 RL} & \textbf{Advantage conditioning} & \textbf{大规模 VLA + 真实机器人} \\
 \bottomrule\noalign{}
 \end{tabular}
@@ -2758,13 +2466,13 @@ RECAP 与前面方法的关键区别：
   上运行，处理数万小时的多任务多机器人数据
 \end{enumerate}
 
-\subsubsection{9.6.2 与 Reward Conditioning
+\subsubsection{8.6.2 与 Reward Conditioning
 文献的关系}\label{ux4e0e-reward-conditioning-ux6587ux732eux7684ux5173ux7cfb}
 
 Advantage conditioning 并非 RECAP 首创。把 RL
 问题改写成''以某个期望回报为条件的序列建模''，这条思路早有前身：Decision
-Transformer{[}19{]} 以 return-to-go 为条件，Upside-Down RL{[}20{]}
-直接把期望回报当输入条件训练策略，而 CFGRL{[}17{]} 把 classifier-free
+Transformer{[}18{]} 以 return-to-go 为条件，Upside-Down RL{[}19{]}
+直接把期望回报当输入条件训练策略，而 CFGRL{[}16{]} 把 classifier-free
 guidance 引进 RL------那是 RECAP 最直接的理论基础。
 
 RECAP
@@ -2772,12 +2480,12 @@ RECAP
 VLA
 预训练一路贯到特定任务的迭代微调，并且在复杂的真实世界任务上验证了它真的管用------不只是仿真里的漂亮曲线。
 
-\subsection{9.7 本节小结}\label{ux672cux8282ux5c0fux7ed3-8}
+\subsection{8.7 本节小结}\label{ux672cux8282ux5c0fux7ed3-7}
 
 RECAP 和 \(\pi^{*}_{0.6}\) 给出的是一条把 RL 用到大规模 VLA
 上的实用路径，而这条路的枢纽是一个很轻的动作：\textbf{把''这个动作好不好''编码成输入条件，推理时只管请求''好动作''}。不做策略梯度，不求
 log-likelihood，于是 flow matching
-这类算不出概率的现代生成模型也能顺理成章地被优化------9.4.1
+这类算不出概率的现代生成模型也能顺理成章地被优化------8.4.1
 节说的那三道坎，一次全绕开了。
 
 支撑这个条件的是一个分布式价值函数：用蒙特卡洛回报训练，输出的是价值分布而不是一个标量，多任务共享同一份，训练简单也稳。有了它，异构数据才能被塞进同一个框架------示教数据、自主
@@ -2785,34 +2493,34 @@ rollout、人类纠正干预，好的标 positive、坏的标 negative、纠正�
 positive，来源的差异就此被抹平。
 
 效果上，论文摘要只给了一句总口径：在最难的几个任务上，RECAP
-把吞吐量拉高一倍以上、把失败率压掉约一半。更细的数字在 9.5.2
+把吞吐量拉高一倍以上、把失败率压掉约一半。更细的数字在 8.5.2
 节那张表里：最终模型在咖啡制作、叠 T 恤/短裤、箱子组装上达到 90\%
 以上成功率------\textbf{最难的多样叠衣服是那张表里明确标出的例外}，做咖啡能连续跑十三个小时。
 
 还有一件事值得单独记一笔：为了拿到 advantage，RECAP
 必须让操作员\textbf{看着机器人跑、随时接管纠偏}，纠正片段回流进数据集并强制标成
-positive。这是本讲第一次把''人''正式放进训练回路------在此之前，人只出现在离线的示教数据里，不参与训练当中的任何一次决策。9.2.1
-节请回来的价值函数，加上这里请进来的人，就是第 10 节要收束的两条线。
+positive。这是本讲第一次把''人''正式放进训练回路------在此之前，人只出现在离线的示教数据里，不参与训练当中的任何一次决策。8.2.1
+节请回来的价值函数，加上这里请进来的人，就是第 9 节要收束的两条线。
 
-\section{10 本讲小结}\label{ux672cux8bb2ux5c0fux7ed3}
+\section{9 本讲小结}\label{ux672cux8bb2ux5c0fux7ed3}
 
-\subsection{10.1
+\subsection{9.1
 一套外壳，两个载体}\label{ux4e00ux5957ux5916ux58f3ux4e24ux4e2aux8f7dux4f53}
 
 本讲开头把 GRPO 从 PPO 里''减''了出来：\textbf{去
 critic}------同题采一组、组内平均分当基线；\textbf{可验证奖励}------判分脚本替掉人工标注和奖励模型；\textbf{KL
-锚定参考模型}------防止整场训练漂离胜任区。然后同一套外壳跑了两个载体：
+锚定参考模型}------防止整场训练漂离胜任区。然后同一套外壳换了两种载体：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1792\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3093\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5115\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1615\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3400\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4985\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
- & VLM 数数（第 4 节） & VLA-0 抓放（第 8 节） \\
+ & VLM 数数（第 4 节，动手） & VLA 操作（第 6 节 SimpleVLA-RL） \\
 \midrule\noalign{}
-策略 token & 文本 & 动作（离散成整数的文本） \\
+策略 token & 文本 & 动作（离散成 token 的关节量） \\
 判分 & 答案字符串比对 & 仿真器任务成败判定 \\
-后训练前 & 准确率 0.095 & 成功率 40\%～50\% \\
-后训练后 & 准确率 0.44 & 成功率 60\%～67\% \\
-各自的坎 & 先学格式、再学正确 & 温度方向、状态遗忘、KL 锚定与早停 \\
+一道题 & 一张图 + 一个问题 & 一个初始状态 + 一条任务指令 \\
+后训练效果 & 准确率 0.095 → 0.44 & LIBERO 平均成功率 91.0 → 99.1 \\
+各自的坎 & 先学格式、再学正确 & 组内全成或全败就零梯度，靠动态采样过滤 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -2821,12 +2529,12 @@ critic}------同题采一组、组内平均分当基线；\textbf{可验证奖�
 节题眼''强化学习外环与策略本体解耦''的完整兑现。判断一个模型能不能套这个外壳，只看一件事：它能不能给出离散选择的干净
 log 概率。
 
-\subsection{10.2
+\subsection{9.2
 一条越走越宽的路}\label{ux4e00ux6761ux8d8aux8d70ux8d8aux5bbdux7684ux8def}
 
-本讲的四个主角恰好排成一条路线图：SimpleVLA-RL 把 GRPO 搬上
-VLA、证明路能走通；RLinf
-把训练做成基础设施、把路修宽；我们自己的实验把算法内核抽出来、在单卡上走了一遍最小闭环；\(\pi^{*}_{0.6}\)
+本讲的主角恰好排成一条路线图：数数实验先在单卡上把 GRPO
+的最小闭环走了一遍；SimpleVLA-RL 把同一套外壳搬上
+VLA、证明路能走通；RLinf 把训练做成基础设施、把路修宽；\(\pi^{*}_{0.6}\)
 则把它推进真实世界------那里没有同题重采，价值函数被重新请了回来，人类纠正走进了训练回路。
 
 回望上一讲的算法地图，本讲的 GRPO 一族仍然站在 on-policy
@@ -2840,7 +2548,7 @@ SO-101 在一小时内学会接触型任务。
 一句话总结：GRPO 用组内相对优势替掉
 critic、用可验证奖励替掉人工标注，而它对策略的全部要求只是''离散选择 +
 log 概率''------所以同一套后训练外壳，既能让 VLM
-学会数数，也能让把动作写成整数文本的 VLA-0
+学会数数，也能让把动作写成离散 token 的 VLA
 自我提升；仿真给了它同题重采的奢侈，真实世界则逼出了价值函数与人在环的回归。
 \end{quote}
 
@@ -2897,44 +2605,39 @@ https://arxiv.org/abs/2510.06710.
 from experience{[}EB/OL{]}. (2025-11-18){[}2026-08-29{]}.
 https://arxiv.org/abs/2511.14759.
 
-{[}12{]} GOYAL A, HADFIELD H, YANG X, et al.~VLA-0: Building
-state-of-the-art VLAs with zero modification{[}EB/OL{]}.
-(2025-10-15){[}2026-08-29{]}. https://arxiv.org/abs/2510.13054.
-
-{[}13{]} BYTEDANCE. verl: Volcano engine reinforcement learning for
+{[}12{]} BYTEDANCE. verl: Volcano engine reinforcement learning for
 LLMs{[}EB/OL{]}. {[}2026-08-29{]}. https://github.com/volcengine/verl.
 
-{[}14{]} KIM M J, FINN C, LIANG P. Fine-tuning vision-language-action
+{[}13{]} KIM M J, FINN C, LIANG P. Fine-tuning vision-language-action
 models: Optimizing speed and success{[}EB/OL{]}.
 (2025-02-27){[}2026-08-29{]}. https://arxiv.org/abs/2502.19645.
 
-{[}15{]} PENG X B, KUMAR A, ZHANG G, et al.~Advantage-weighted
+{[}14{]} PENG X B, KUMAR A, ZHANG G, et al.~Advantage-weighted
 regression: Simple and scalable off-policy reinforcement
 learning{[}EB/OL{]}. (2019-10-01){[}2026-08-29{]}.
 https://arxiv.org/abs/1910.00177.
 
-{[}16{]} ABDOLMALEKI A, SPRINGENBERG J T, TASSA Y, et al.~Maximum a
+{[}15{]} ABDOLMALEKI A, SPRINGENBERG J T, TASSA Y, et al.~Maximum a
 posteriori policy optimisation{[}EB/OL{]}. (2018-06-14){[}2026-08-29{]}.
 https://arxiv.org/abs/1806.06920.
 
-{[}17{]} FRANS K, PARK S, ABBEEL P, et al.~Diffusion guidance is a
+{[}16{]} FRANS K, PARK S, ABBEEL P, et al.~Diffusion guidance is a
 controllable policy improvement operator{[}EB/OL{]}.
 (2025-05-29){[}2026-08-29{]}. https://arxiv.org/abs/2505.23458.
 
-{[}18{]} KELLY M, SIDRANE C, DRIGGS-CAMPBELL K, et al.~HG-DAgger:
+{[}17{]} KELLY M, SIDRANE C, DRIGGS-CAMPBELL K, et al.~HG-DAgger:
 Interactive imitation learning with human experts{[}EB/OL{]}.
 (2018-10-05){[}2026-08-29{]}. https://arxiv.org/abs/1810.02890.
 
-{[}19{]} CHEN L, LU K, RAJESWARAN A, et al.~Decision Transformer:
+{[}18{]} CHEN L, LU K, RAJESWARAN A, et al.~Decision Transformer:
 Reinforcement learning via sequence modeling{[}EB/OL{]}.
 (2021-06-02){[}2026-08-29{]}. https://arxiv.org/abs/2106.01345.
 
-{[}20{]} SCHMIDHUBER J. Reinforcement learning upside down: Don't
+{[}19{]} SCHMIDHUBER J. Reinforcement learning upside down: Don't
 predict rewards --- just map them to actions{[}EB/OL{]}.
 (2019-12-05){[}2026-08-29{]}. https://arxiv.org/abs/1912.02875.
 
-本讲中的 VLM 数数前后对照图、VLA-0 成功率对照图与前后 rollout
-抽帧对照图，均为本课程实验渲染。
+本讲中的 VLM 数数前后对照图为本课程实验渲染。
 
 
 

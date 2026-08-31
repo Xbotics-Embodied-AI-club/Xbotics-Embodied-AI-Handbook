@@ -227,6 +227,8 @@
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
+\listoffigures
+\listoftables
 
 \section{1
 朴素行为克隆撞墙：为什么需要生成式策略}\label{ux6734ux7d20ux884cux4e3aux514bux9686ux649eux5899ux4e3aux4ec0ux4e48ux9700ux8981ux751fux6210ux5f0fux7b56ux7565}
@@ -1227,9 +1229,13 @@ ACT（无真机用仿真器替代）}\label{ux5728-so-101-ux4e3bux4eceux81c2ux4e
 \NormalTok{    dataset\_id }\OperatorTok{=} \StringTok{"lerobot/libero"}
 \NormalTok{    target\_task }\OperatorTok{=} \StringTok{"put the bowl on the plate"}
 
+    \CommentTok{\# 只读 meta/ 就能拿到任务表，不用把整份数据集下下来}
 \NormalTok{    metadata }\OperatorTok{=}\NormalTok{ LeRobotDatasetMetadata(dataset\_id)}
+    \CommentTok{\# 从 40 个任务里挑出这一条的 episode 序号，后面用它做单任务训练}
 \NormalTok{    episodes }\OperatorTok{=}\NormalTok{ get\_task\_episodes(metadata, target\_task)}
 
+    \CommentTok{\# 超参全用 ACTConfig 的默认值：chunk\_size=100、latent\_dim=32、kl\_weight=10.0。}
+    \CommentTok{\# 这组值来自原始 ACT 那批任务，换任务时至少要重调 chunk\_size（它按秒理解才有意义）。}
 \NormalTok{    policy\_cfg }\OperatorTok{=}\NormalTok{ ACTConfig(}
 \NormalTok{        device}\OperatorTok{=}\StringTok{"cuda"}\NormalTok{,}
 \NormalTok{        push\_to\_hub}\OperatorTok{=}\VariableTok{False}\NormalTok{,}
@@ -1242,6 +1248,8 @@ ACT（无真机用仿真器替代）}\label{ux5728-so-101-ux4e3bux4eceux81c2ux4e
 \NormalTok{        video\_backend}\OperatorTok{=}\StringTok{"pyav"}\NormalTok{,}
 \NormalTok{    )}
 
+    \CommentTok{\# 评估环境要和数据集对齐：同一个套件、同一条任务、同样的图像尺寸，}
+    \CommentTok{\# 否则策略在评估时看到的画面和训练时不是一回事。}
 \NormalTok{    env\_cfg }\OperatorTok{=}\NormalTok{ LiberoEnvConfig(}
 \NormalTok{        task}\OperatorTok{=}\StringTok{"libero\_goal"}\NormalTok{,}
 \NormalTok{        task\_ids}\OperatorTok{=}\NormalTok{[}\DecValTok{8}\NormalTok{],}
