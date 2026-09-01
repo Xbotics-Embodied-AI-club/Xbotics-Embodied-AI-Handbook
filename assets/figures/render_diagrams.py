@@ -804,68 +804,6 @@ def long_horizon_paradigms():
     save(fig, "lecture13", "fig13-2-long-horizon-paradigms")
 
 
-# ── 第13讲 4.1：三条线切的是同一刀，刀口位置各不相同 ───────────────────
-# 三条 bullet 用文字说不清的是**几何关系**：同一个"切开"的招式，落在三条链路的
-# 不同维度上（时间 / 信息 / 职责）。三格共用同一套视觉语法，让"同一个招式"由图形自己说。
-def one_cut_three_lines():
-    fig, ax = canvas(7.8, 3.6)
-
-    def cut(x0, y0, x1, y1):
-        """统一的刀口符号：红色虚线 + 中点一个红菱形。"""
-        ax.plot([x0, x1], [y0, y1], color=RED, linewidth=1.5, linestyle=(0, (3, 2)))
-        ax.plot((x0 + x1) / 2, (y0 + y1) / 2, marker="D", color=RED, markersize=5)
-
-    # 实时线：刀切在时间上。
-    label(ax, 0.16, 0.885, "实时线：切在时间上", BLUE, 11, True)
-    label(ax, 0.16, 0.705, "正在执行的动作块", "#999999", 10)
-    plain_box(ax, 0.03, 0.545, 0.115, 0.085, GREY, fill="#EDEDED")
-    label(ax, 0.0875, 0.5875, "已冻结", INK, 10)
-    plain_box(ax, 0.175, 0.545, 0.115, 0.085, BLUE)
-    label(ax, 0.2325, 0.5875, "可重画", INK, 10)
-    cut(0.16, 0.50, 0.16, 0.675)
-    label(ax, 0.16, 0.465, "时间轴 →", "#999999", 10)
-    label(ax, 0.16, 0.335, "刀口：软过渡段", RED, 10)
-    label(ax, 0.16, 0.245, "左边来不及改，", INK, 10)
-    label(ax, 0.16, 0.165, "右边重新生成", INK, 10)
-
-    # 记忆线：刀切在信息上。
-    label(ax, 0.5, 0.885, "记忆线：切在信息上", GREEN, 11, True)
-    label(ax, 0.435, 0.775, "每帧刷新", "#999999", 10)
-    label(ax, 0.625, 0.775, "写入与巩固", "#999999", 10)
-    plain_box(ax, 0.375, 0.665, 0.12, 0.075, BLUE)
-    label(ax, 0.435, 0.7025, "当下单帧", INK, 10)
-    plain_box(ax, 0.565, 0.665, 0.12, 0.075, GREEN)
-    label(ax, 0.625, 0.7025, "记忆库", INK, 10)
-    cut(0.53, 0.615, 0.53, 0.79)
-    # 两条汇入线走正交：竖直下来，再横到决策框顶边的两个点上。
-    for x_from, x_to in ((0.435, 0.500), (0.625, 0.560)):
-        _polyline(ax, [(x_from, 0.660), (x_from, 0.605), (x_to, 0.605), (x_to, 0.565)],
-                  EDGE, 1.4, 0.012)
-    plain_box(ax, 0.465, 0.485, 0.13, 0.075, GREY, fill="#F0F0F0")
-    label(ax, 0.53, 0.5225, "决策", INK, 10)
-    label(ax, 0.53, 0.335, "刀口：检索 + 门控融合", RED, 10)
-    label(ax, 0.53, 0.245, "两边各存各的，", INK, 10)
-    label(ax, 0.53, 0.165, "各有各的更新节奏", INK, 10)
-
-    # 人形线：刀切在职责上。
-    label(ax, 0.845, 0.885, "人形线：切在职责上", ORANGE, 11, True)
-    plain_box(ax, 0.775, 0.735, 0.14, 0.070, GREY, fill="#F0F0F0")
-    label(ax, 0.845, 0.770, "语言指令", INK, 10)
-    arrow(ax, (0.845, 0.730), (0.845, 0.705), EDGE)
-    plain_box(ax, 0.735, 0.625, 0.22, 0.075, ORANGE)
-    label(ax, 0.845, 0.6625, "S2：懂任务的大脑", INK, 10)
-    cut(0.715, 0.575, 0.975, 0.575)
-    plain_box(ax, 0.735, 0.485, 0.22, 0.075, ORANGE)
-    label(ax, 0.845, 0.5225, "S1：会走路的身体", INK, 10)
-    arrow(ax, (0.845, 0.480), (0.845, 0.450), EDGE)
-    label(ax, 0.845, 0.415, "电机指令", INK, 10)
-    label(ax, 0.845, 0.335, "刀口：潜在 verb / 分块命令", RED, 10)
-    label(ax, 0.845, 0.245, "上面不学走路，", INK, 10)
-    label(ax, 0.845, 0.165, "下面不懂任务", INK, 10)
-
-    save(fig, "lecture13", "fig13-4-one-cut-three-lines")
-
-
 # ── 第8讲 2.3：策略的四档谱系 ──────────────────────────────────────────
 # 正文用整段描述了一条谱系却没有图。图要多给的是**递进关系**：每往右一档，
 # 观测里多进来一样东西，能听懂的指令就宽一层——这条"加法"是文字列举给不出的。
@@ -1609,14 +1547,16 @@ def action_head_map():
     fig, ax = plt.subplots(figsize=(7.5, 4.3))
 
     # (x=动作表示, y=参数量 B, 名字, 标签方向)
+    # 纵坐标一律取正文 3.6.1 那张对照表里的数，不自己估：
+    # OpenVLA 7B、pi0-FAST 3.3B、VLA-0 3B（Qwen2.5-VL-3B）、pi0 3.3B、SmolVLA 0.45B、
+    # ACT ~80M（论文自报数量级）。
     points = [
         (0.10, 7.0, "OpenVLA", BLUE, "right"),
         (0.16, 3.3, "$\\pi_0$-FAST", BLUE, "left"),
-        (0.27, 2.35, "VLA-0", BLUE, "right"),
+        (0.30, 3.0, "VLA-0", BLUE, "right"),
         (0.86, 3.3, "$\\pi_0$", GREEN, "right"),
         (0.90, 0.45, "SmolVLA", GREEN, "right"),
         (0.94, 0.08, "ACT（参照）", GREY, "left"),
-        (0.74, 0.12, "Diffusion Policy（参照）", GREY, "left"),
     ]
     for x, y, name, color, side in points:
         ax.scatter([x], [y], s=70, facecolor=FILL[color], edgecolor=color, linewidth=2.0, zorder=4)
@@ -1632,8 +1572,14 @@ def action_head_map():
     ax.text(0.61, 3.28, "$\\pi_{0.5}$：预训练离散、后训练连续", ha="center", va="center",
             fontsize=10, color=ORANGE, zorder=5)
 
+    # Diffusion Policy：正文 3.6.1 明说"那篇没有给一个统一的模型大小，这一格写不出一个数"，
+    # 所以它没有纵坐标，只在横轴一侧标出它的动作表示是连续量。
+    ax.text(0.02, 0.055, "Diffusion Policy（参照）：论文未给统一模型大小，故不在纵轴上取位",
+            ha="left", va="center", fontsize=9.5, color=GREY, zorder=5,
+            transform=ax.transAxes)
+
     for (xa, ya), (xb, yb), color in (((0.10, 7.0), (0.16, 3.3), BLUE),
-                                      ((0.16, 3.3), (0.27, 2.35), BLUE),
+                                      ((0.16, 3.3), (0.30, 3.0), BLUE),
                                       ((0.86, 3.3), (0.90, 0.45), GREEN)):
         ax.annotate("", xy=(xb, yb), xytext=(xa, ya), zorder=2,
                     arrowprops=dict(arrowstyle="-|>", color=color, linewidth=1.8,
@@ -1690,8 +1636,15 @@ def two_axes_map():
                   lw=2.2 if main else 1.6)
         label(ax, x0 + (j + 0.5) * cw, cy, text, INK, 10, main)
 
-    label(ax, 0.5, 0.075, "参数更新范围：越往右，被更新的参数越少", "#555555", 10)
-    label(ax, 0.012, 0.905, "训练信号\n↑", "#888888", 10, ha="left")
+    # 两条轴名对称摆：横轴名在网格正下方居中，纵轴名竖排在网格左侧，
+    # 各自带一条指向增长方向的箭头。原来纵轴名孤零零挂在左上角、箭头与网格不相干。
+    ax.annotate("", xy=(x0 + 3 * cw, y0 - 0.052), xytext=(x0, y0 - 0.052),
+                arrowprops=dict(arrowstyle="-|>", color="#999999", linewidth=1.2))
+    label(ax, x0 + 1.5 * cw, y0 - 0.098, "参数更新范围：越往右，被更新的参数越少", INK, 10)
+    ax.annotate("", xy=(x0 - 0.150, y0 + 3 * ch), xytext=(x0 - 0.150, y0),
+                arrowprops=dict(arrowstyle="-|>", color="#999999", linewidth=1.2))
+    ax.text(x0 - 0.178, y0 + 1.5 * ch, "训练信号", rotation=90, ha="center", va="center",
+            fontsize=10, color=INK)
     save(fig, "lecture12", "fig12-1-two-axes-map")
 
 
@@ -1770,7 +1723,6 @@ abs_vs_delta_axis()
 mismatch_failures()
 q99_normalization()
 long_horizon_paradigms()
-one_cut_three_lines()
 action_space()
 discount_horizon()
 policy_distribution()
