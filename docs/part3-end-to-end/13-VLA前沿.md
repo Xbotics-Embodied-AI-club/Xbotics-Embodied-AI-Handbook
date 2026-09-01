@@ -17,6 +17,17 @@ format:
     colorlinks: true
     keep-tex: true
     tbl-colwidths: false
+    # 单讲 PDF 不出图索引 / 表索引；图的落位允许「就放这儿」（LaTeX 默认只给 tbp，
+    # 装不下就整张推到次页、原地留一大片空白）；浮动体参数放宽，让图和正文共用一页。
+    lof: false
+    lot: false
+    fig-pos: 'htbp'
+    include-in-header:
+      text: |
+        \renewcommand{\topfraction}{0.9}
+        \renewcommand{\bottomfraction}{0.7}
+        \renewcommand{\textfraction}{0.1}
+        \renewcommand{\floatpagefraction}{0.75}
 header-includes:
   - |
       \usepackage{array}
