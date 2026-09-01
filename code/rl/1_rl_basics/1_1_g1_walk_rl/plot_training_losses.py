@@ -11,14 +11,17 @@
 """
 
 import json
+import sys
 from pathlib import Path
 
 import matplotlib
 import matplotlib.pyplot as plt
 
 matplotlib.use("Agg")
-plt.rcParams["font.sans-serif"] = ["Noto Sans CJK SC", "Noto Sans CJK JP", "WenQuanYi Zen Hei"]
-plt.rcParams["axes.unicode_minus"] = False
+# 全书统一字体：西文 Times New Roman、中文宋体。字体路径走环境变量，取不到就报错停下。
+sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "assets" / "figures"))
+import figstyle  # noqa: E402  —— 必须在 sys.path 补好之后再导入
+FONT_NAME = figstyle.apply()
 
 here = Path(__file__).parent
 curves = json.loads((here.parent / "result" / "1_1_g1_walk_rl" / "train-loss-curves.json").read_text())
@@ -102,5 +105,5 @@ for ax, (key, title, note) in zip(axes.flat, PANELS):
 fig.suptitle(f"G1 行走：三个算法的训练损失（细线为原始值，粗线为 {WINDOW} 次迭代滑动平均）",
              fontsize=14, fontweight="bold")
 fig.tight_layout(rect=(0, 0.02, 1, 0.96))
-fig.savefig(out_path, dpi=200)
+fig.savefig(out_path, dpi=200, metadata={"Font": FONT_NAME})
 print(f"图已保存到 {out_path}")

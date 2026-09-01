@@ -31,11 +31,15 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Polygon
+from matplotlib.path import Path as MplPath
 from matplotlib.text import Text
 
+import figstyle
+
 matplotlib.use("Agg")
-plt.rcParams["font.sans-serif"] = ["Noto Sans CJK SC", "Noto Sans CJK JP", "WenQuanYi Zen Hei"]
-plt.rcParams["axes.unicode_minus"] = False
+
+# 全书统一字体：西文 Times New Roman、中文宋体（同目录 figstyle.py，字体路径走环境变量）。
+FONT_NAME = figstyle.apply()
 
 HERE = Path(__file__).parent
 
@@ -61,6 +65,25 @@ def box(ax, x, y, w, h, color, lines):
                 fontweight="bold" if bold else "normal", color=color if bold else "#444444")
 
 
+def side(x, y, w, h, where, t=0.5):
+    """取框某条边上的一点，默认边中点。
+
+    箭头接在边中点上，视觉上才是"连到这个框"；手填坐标容易落在靠近框角的位置，
+    看起来像从框身上长出来的。t 可在 0–1 之间挪动接点，用于同一条边接多根线。
+
+    Args:
+        x, y, w, h: 框的左下角与宽高，与 box() 同一套参数。
+        where: "top" / "bottom" / "left" / "right"。
+    """
+    if where == "top":
+        return (x + w * t, y + h)
+    if where == "bottom":
+        return (x + w * t, y)
+    if where == "left":
+        return (x, y + h * t)
+    return (x + w, y + h * t)
+
+
 def plain_box(ax, x, y, w, h, color, fill=None, style="solid", lw=1.6):
     """只画框不写字，供需要自己排版内部元素的图使用。"""
     ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.004,rounding_size=0.012",
@@ -71,6 +94,117 @@ def plain_box(ax, x, y, w, h, color, fill=None, style="solid", lw=1.6):
 def arrow(ax, a, b, color, rad=0.0, lw=1.7, style="-|>"):
     ax.add_patch(FancyArrowPatch(a, b, connectionstyle=f"arc3,rad={rad}", arrowstyle=style,
                                  mutation_scale=13, linewidth=lw, color=color))
+
+
+_NORMAL = {"top": (0, 1), "bottom": (0, -1), "left": (-1, 0), "right": (1, 0)}
+
+
+def connect(ax, src, src_side, dst, dst_side, color, lw=1.7, stub=0.055,
+            src_t=0.5, dst_t=0.5, lane=None, radius=0.016):
+    """把两个框用正交折线连起来，线从边中点**垂直离开**框，不贴任何框边跑。
+
+    这是流程图连线的基本要求：贴着框边走的线会和框线叠在一起，读者分不清
+    哪一段是框、哪一段是箭头（本图早先就是这个毛病）。所以两端各先垂直伸出
+    一小段 stub，进到空白区再拐弯。
+
+    Args:
+        src, dst: 两个框的 (x, y, w, h)，与 box() 同一套参数。
+        src_side, dst_side: 各自从哪条边出发/进入。
+        stub: 垂直离开框的那一小段有多长。
+        lane: 中间那条公共通道的位置；两端同向时用它指定绕行的横带/竖带，
+              避免两条线挤在同一条通道上。
+    """
+    p0 = side(*src, src_side, src_t)
+    p1 = side(*dst, dst_side, dst_t)
+    n0, n1 = _NORMAL[src_side], _NORMAL[dst_side]
+    a = (p0[0] + n0[0] * stub, p0[1] + n0[1] * stub)
+    b = (p1[0] + n1[0] * stub, p1[1] + n1[1] * stub)
+
+    mid = []
+    horiz0, horiz1 = n0[0] != 0, n1[0] != 0
+    if horiz0 and horiz1:                       # 两端都横着出来 → 中间走一条竖带
+        xm = lane if lane is not None else (a[0] + b[0]) / 2
+        mid = [(xm, a[1]), (xm, b[1])]
+    elif not horiz0 and not horiz1:             # 两端都竖着出来 → 中间走一条横带
+        ym = lane if lane is not None else (a[1] + b[1]) / 2
+        mid = [(a[0], ym), (b[0], ym)]
+    elif horiz0:                                # 先横后竖
+        mid = [(b[0], a[1])]
+    else:                                       # 先竖后横
+        mid = [(a[0], b[1])]
+
+    _polyline(ax, [p0, a] + mid + [b, p1], color, lw, radius)
+
+
+def _polyline(ax, pts, color, lw, radius):
+    """按给定折点画一条圆角正交折线，末端带箭头。"""
+    # 去掉重复点，否则圆角计算会除以零
+    clean = [pts[0]]
+    for q in pts[1:]:
+        if abs(q[0] - clean[-1][0]) > 1e-9 or abs(q[1] - clean[-1][1]) > 1e-9:
+            clean.append(q)
+    verts, codes = [clean[0]], [MplPath.MOVETO]
+    for i in range(1, len(clean) - 1):
+        prev, cur, nxt = np.array(clean[i - 1]), np.array(clean[i]), np.array(clean[i + 1])
+        din, dout = cur - prev, nxt - cur
+        din = din / (np.hypot(*din) or 1)
+        dout = dout / (np.hypot(*dout) or 1)
+        r = min(radius, np.hypot(*(cur - prev)) / 2, np.hypot(*(nxt - cur)) / 2)
+        verts += [tuple(cur - din * r), tuple(cur), tuple(cur + dout * r)]
+        codes += [MplPath.LINETO, MplPath.CURVE3, MplPath.CURVE3]
+    verts.append(clean[-1])
+    codes.append(MplPath.LINETO)
+    ax.add_patch(FancyArrowPatch(path=MplPath(verts, codes), arrowstyle="-|>",
+                                 mutation_scale=13, linewidth=lw, color=color,
+                                 joinstyle="round", capstyle="round"))
+
+
+def elbow(ax, a, b, color, via="v", lw=1.7, style="-|>", detour=None, radius=0.018):
+    """正交折线箭头：只走横平竖直，拐角是圆角直角。
+
+    跨半张图的长回环用弧线会在画面中间划出一道大圆弧，压住别的元素也看不出走向；
+    折线沿着版面的横竖骨架走，读者一眼能跟着拐弯看到终点。
+
+    Args:
+        a, b: 起点、终点。
+        via: "v" 先竖后横，"h" 先横后竖，"hvh" 先横到 detour 再竖再横（绕开中间的框）。
+        detour: via="hvh" 时那条竖直中段所在的 x。
+    """
+    (x0, y0), (x1, y1) = a, b
+    if via == "ring":
+        # 走外圈：先横到 detour 那条竖带，沿它竖直走到终点高度所在的横带，再横回终点。
+        # 用于两条回流互不相交时——内圈让给短的那条。
+        xm, ym = detour
+        pts = [(x0, y0), (xm, y0), (xm, ym), (x1, ym), (x1, y1)]
+    elif via == "vhv":
+        # 先竖到 detour 那条横带，沿它横过去，再竖进终点——用来绕开中间的框走上下空带。
+        ym = detour if detour is not None else (y0 + y1) / 2
+        pts = [(x0, y0), (x0, ym), (x1, ym), (x1, y1)]
+    elif via == "hvh":
+        xm = detour if detour is not None else (x0 + x1) / 2
+        pts = [(x0, y0), (xm, y0), (xm, y1), (x1, y1)]
+    elif via == "h":
+        pts = [(x0, y0), (x1, y0), (x1, y1)]
+    else:
+        pts = [(x0, y0), (x0, y1), (x1, y1)]
+
+    # 直角处切掉一小段、用圆角接上，避免尖角在小尺寸下显得毛躁。
+    verts, codes = [pts[0]], [MplPath.MOVETO]
+    for i in range(1, len(pts) - 1):
+        prev, cur, nxt = np.array(pts[i - 1]), np.array(pts[i]), np.array(pts[i + 1])
+        din = cur - prev
+        dout = nxt - cur
+        din = din / (np.hypot(*din) or 1)
+        dout = dout / (np.hypot(*dout) or 1)
+        r = min(radius, np.hypot(*(cur - prev)) / 2, np.hypot(*(nxt - cur)) / 2)
+        verts += [tuple(cur - din * r), tuple(cur), tuple(cur + dout * r)]
+        codes += [MplPath.LINETO, MplPath.CURVE3, MplPath.CURVE3]
+    verts.append(pts[-1])
+    codes.append(MplPath.LINETO)
+
+    ax.add_patch(FancyArrowPatch(path=MplPath(verts, codes), arrowstyle=style,
+                                 mutation_scale=13, linewidth=lw, color=color,
+                                 joinstyle="round", capstyle="round"))
 
 
 def label(ax, x, y, text, color, size=10, bold=False, ha="center", va="center", bg=False):
@@ -93,9 +227,11 @@ def save(fig, lecture, name):
     """存图，并按模块开头那条字号规则核算这一张印出来够不够大。"""
     out = HERE / lecture / "ref" / f"{name}.png"
     out.parent.mkdir(parents=True, exist_ok=True)
+    # 缺字会渲成空方框而不报错，所以存盘前先把这张图上的字逐个对一遍字体覆盖。
+    figstyle.assert_covered("".join(t.get_text() for t in fig.findobj(Text)), name)
     smallest = min(t.get_fontsize() for t in fig.findobj(Text) if t.get_text().strip())
     fig.savefig(out, dpi=DPI, bbox_inches="tight", pad_inches=0.04, facecolor="white",
-                metadata={"Software": OWNER_TAG})
+                metadata={"Software": OWNER_TAG, "Font": FONT_NAME})
     plt.close(fig)
 
     # PNG 的 IHDR 就在文件头，宽度是第 17–20 字节；除以 dpi 得到落到纸上的真实作图宽度。
@@ -113,15 +249,16 @@ def save(fig, lecture, name):
 # 标签直接压在箭头弧顶上（白底），不再靠两侧留白摆放——留白一放大，字反而更小。
 def agent_env_loop():
     fig, ax = canvas(6.0, 3.0)
-    box(ax, 0.30, 0.70, 0.40, 0.22, BLUE,
-        [("智能体", 13, True), ("策略 π：看到什么 → 做什么", 10, False)])
-    box(ax, 0.30, 0.06, 0.40, 0.22, GREEN,
-        [("环境", 13, True), ("按物理规律推进一步", 10, False)])
+    agent = (0.30, 0.70, 0.40, 0.22)
+    env = (0.30, 0.06, 0.40, 0.22)
+    box(ax, *agent, BLUE, [("智能体", 13, True), ("策略 $\\pi$：看到什么 → 做什么", 10, False)])
+    box(ax, *env, GREEN, [("环境", 13, True), ("按物理规律推进一步", 10, False)])
 
-    arrow(ax, (0.705, 0.795), (0.705, 0.185), RED, rad=-0.42)
-    label(ax, 0.835, 0.49, "动作 $a_t$", RED, 11, True, bg=True)
-    arrow(ax, (0.295, 0.185), (0.295, 0.795), BLUE, rad=-0.42)
-    label(ax, 0.163, 0.49, "新状态 $s_{t+1}$\n奖励 $r_{t+1}$", BLUE, 11, True, bg=True)
+    # 闭环走正交折线，两端都接在框的边中点上：右侧下行送动作，左侧上行回状态。
+    elbow(ax, side(*agent, "right"), side(*env, "right"), RED, via="hvh", detour=0.87)
+    label(ax, 0.87, 0.49, "动作 $a_t$", RED, 11, True, bg=True)
+    elbow(ax, side(*env, "left"), side(*agent, "left"), BLUE, via="hvh", detour=0.13)
+    label(ax, 0.13, 0.49, "新状态 $s_{t+1}$\n奖励 $r_{t+1}$", BLUE, 11, True, bg=True)
     label(ax, 0.5, 0.49, "如此循环，直到回合结束", "#888888", 10)
     save(fig, "lecture14", "fig141-agent-env-loop")
 
@@ -129,7 +266,6 @@ def agent_env_loop():
 # ── 第14讲 2.2：动作空间分两类 ──────────────────────────────────────────
 def action_space():
     fig, ax = canvas(6.8, 3.2)
-    label(ax, 0.5, 0.955, "动作空间分两类", "#333333", 13, True)
     ax.plot([0.5, 0.5], [0.03, 0.89], color="#CCCCCC", linewidth=1.4, linestyle="--")
 
     label(ax, 0.25, 0.855, "离散动作空间", BLUE, 12, True)
@@ -148,7 +284,7 @@ def action_space():
     for tick in (0.60, 0.90):
         ax.plot([tick, tick], [0.445, 0.495], color=ORANGE, linewidth=2)
     ax.plot(0.74, 0.47, "o", color=RED, markersize=8)
-    label(ax, 0.60, 0.395, "−1.0", "#8A5A08", 10)
+    label(ax, 0.60, 0.395, "-1.0", "#8A5A08", 10)
     label(ax, 0.90, 0.395, "+1.0", "#8A5A08", 10)
     label(ax, 0.74, 0.555, "任一实数", RED, 10)
     label(ax, 0.75, 0.29, "取值有无穷多个，没法逐个枚举", "#555555", 10)
@@ -185,7 +321,7 @@ def discount_horizon():
 
     left.set_xlabel("往后第 $k$ 步", fontsize=10)
     left.set_ylabel("这一步奖励在回报里的权重 $\\gamma^{k}$", fontsize=10)
-    left.set_title("γ 决定未来的奖励还剩多少分量", fontsize=11, color="#444444")
+    left.set_title("$\\gamma$ 决定未来的奖励还剩多少分量", fontsize=11, color="#444444")
     left.set_xlim(0, 300); left.set_ylim(0, 1.02)
     left.set_xticks([0, 100, 200, 300])
     left.tick_params(labelsize=10)
@@ -196,7 +332,7 @@ def discount_horizon():
     right.axis("off")
     right.set_xticks([]); right.set_yticks([])
     right.set_xlim(0, 1); right.set_ylim(0, 1)
-    right.set_title("同样三个 γ，视野贴到一整个回合上", fontsize=11, color="#444444")
+    right.set_title("同样三个 $\\gamma$，视野贴到一整个回合上", fontsize=11, color="#444444")
 
     x0, span = 0.30, 0.68                       # 轴左端与全长，全长 = 1000 步
     right.annotate("", xy=(x0, 0.90), xytext=(x0 + span, 0.90),
@@ -245,7 +381,7 @@ def policy_distribution():
     box(ax, 0.02, 0.46, 0.24, 0.34, BLUE,
         [("状态 $s$", 12, True), ("关节角度、躯干姿态", 10, False), ("目标速度指令", 10, False)])
     box(ax, 0.32, 0.46, 0.20, 0.34, ORANGE,
-        [("策略网络 π", 12, True), ("参数 θ", 10, False)])
+        [("策略网络 $\\pi$", 12, True), ("参数 $\\theta$", 10, False)])
     arrow(ax, (0.265, 0.63), (0.315, 0.63), "#666666")
     arrow(ax, (0.525, 0.63), (0.575, 0.63), "#666666")
 
@@ -282,9 +418,6 @@ def policy_distribution():
         inset.spines[side].set_visible(False)
 
     # 说明文字只占左半幅，避免横穿到分布图下方压住它的 x 轴标签。
-    label(ax, 0.02, 0.27, "同一个状态下合理的动作往往不止一个，", "#555555", 10, ha="left")
-    label(ax, 0.02, 0.16, "所以策略给的是分布不是定值；", "#555555", 10, ha="left")
-    label(ax, 0.02, 0.05, "分布有多宽，探索就有多强。", "#555555", 10, ha="left")
     save(fig, "lecture14", "fig14-2-policy-distribution")
 
 
@@ -306,54 +439,87 @@ def onoff_dataflow():
     label(ax, 0.22, 0.185, "更新完立即作废", "#666666", 10)
     label(ax, 0.22, 0.09, "策略一变，全部重采", "#999999", 10)
 
-    # 右：三来源 → 经验池 → 目标策略
-    pool_top = 0.635
-    for cx, text, color in [(0.585, "旧策略经验", BLUE), (0.745, "人类示教", GREEN),
-                            (0.905, "人工干预", ORANGE)]:
-        box(ax, cx - 0.070, 0.75, 0.140, 0.10, color, [(text, 10, True)])
-        arrow(ax, (cx, 0.745), (cx * 0.35 + 0.745 * 0.65, pool_top + 0.005), color)
+    # 右：三来源 → 经验池 → 目标策略。三条入池线各自竖直落到经验池顶边的三个等分点上，
+    # 不用斜线汇聚——斜线在这种"多对一"里最容易看成随手连的。
+    pool = (0.52, 0.45, 0.44, 0.185)
+    sources = [(0.585, "旧策略经验", BLUE), (0.745, "人类示教", GREEN),
+               (0.905, "人工干预", ORANGE)]
+    for i, (cx, text, color) in enumerate(sources):
+        src = (cx - 0.070, 0.75, 0.140, 0.10)
+        box(ax, *src, color, [(text, 10, True)])
+        # 落点与源框中心同一条竖线 ⇒ 三条都是直上直下，视觉上并列
+        dst_t = (cx - pool[0]) / pool[2]
+        connect(ax, src, "bottom", pool, "top", color, dst_t=dst_t, stub=0.03)
 
-    box(ax, 0.52, 0.45, 0.44, 0.185, RED,
+    box(ax, *pool, RED,
         [("replay buffer（经验池）", 12, True), ("长期保存，反复使用", 10, True)])
-    arrow(ax, (0.63, 0.445), (0.63, 0.305), RED)
-    label(ax, 0.615, 0.375, "随机抽 batch", RED, 10, ha="right")
-    arrow(ax, (0.86, 0.305), (0.86, 0.445), GREY)
-    label(ax, 0.875, 0.375, "新经验入池", "#666666", 10, ha="left")
-    box(ax, 0.575, 0.16, 0.31, 0.145, RED, [("目标策略", 12, True)])
+    policy = (0.575, 0.16, 0.31, 0.145)
+    # 两条竖线落在同一对 x 上（pool 比 policy 宽，t 要各自换算），才是直上直下。
+    for x, color, src_first in ((0.665, RED, True), (0.815, "#999999", False)):
+        tp = (x - pool[0]) / pool[2]
+        tq = (x - policy[0]) / policy[2]
+        if src_first:
+            connect(ax, pool, "bottom", policy, "top", color, src_t=tp, dst_t=tq, stub=0.03)
+        else:
+            connect(ax, policy, "top", pool, "bottom", color, src_t=tq, dst_t=tp, stub=0.03)
+    label(ax, 0.645, 0.375, "随机抽 batch", RED, 10, ha="right")
+    label(ax, 0.90, 0.375, "新经验入池", "#666666", 10, ha="left")
+    box(ax, *policy, RED, [("目标策略", 12, True)])
     label(ax, 0.73, 0.075, "采数据的手 与 被训练的脑 解耦", "#666666", 10)
     save(fig, "lecture14", "fig-onoff-dataflow")
 
 
 # ── 第14讲 5.3：A2C 的 Actor-Critic 分工 ───────────────────────────────
 def actor_critic_a2c():
-    fig, ax = canvas(7.8, 3.6)
-    label(ax, 0.5, 0.965, "A2C：critic 只是给策略梯度当参照物", "#333333", 13, True)
+    """A2C 的四个角色与四条通路。
 
-    box(ax, 0.02, 0.55, 0.28, 0.18, BLUE, [("Actor（策略网络）", 11, True), ("π(a | s)　出动作", 10, False)])
-    box(ax, 0.02, 0.10, 0.28, 0.18, GREEN, [("Critic（价值网络）", 11, True), ("V(s)　估状态价值", 10, False)])
-    box(ax, 0.38, 0.55, 0.17, 0.18, GREY, [("环境", 11, True), ("给出 r 与 s′", 10, False)])
-    box(ax, 0.60, 0.27, 0.38, 0.26, ORANGE,
+    版面按网格排：左列 Actor / Critic 上下对齐、等宽等高，中列环境与优势各占一行，
+    行高与列宽都从同一组常量算出来，避免逐个框手填坐标排不齐。
+    """
+    fig, ax = canvas(7.8, 3.4)
+
+    COL_L, COL_M, COL_R = 0.045, 0.375, 0.655
+    W_SIDE, W_MID, W_ADV = 0.28, 0.20, 0.30
+    ROW_TOP, ROW_BOT = 0.62, 0.10
+    H = 0.19
+
+    actor = (COL_L, ROW_TOP, W_SIDE, H)
+    critic = (COL_L, ROW_BOT, W_SIDE, H)
+    envb = (COL_M, ROW_TOP, W_MID, H)
+    adv = (COL_R, ROW_BOT, W_ADV, 0.30)
+
+    box(ax, *actor, BLUE,
+        [("Actor（策略网络）", 11, True), ("$\\pi(a\\,|\\,s)$　出动作", 10, False)])
+    box(ax, *envb, GREY, [("环境", 11, True), ("给出 $r$、$s'$", 10, False)])
+    box(ax, *critic, GREEN,
+        [("Critic（价值网络）", 11, True), ("$V(s)$　估状态价值", 10, False)])
+    box(ax, *adv, ORANGE,
         [("优势 A：比平均水平好多少", 11, True),
-         ("代码里用多步平滑版 $\\hat{A}^{\\mathrm{GAE}}$", 10, False),
-         ("一步版：$A=r+\\gamma V(s')-V(s)$", 10, False)])
+         ("多步平滑版 $\\hat{A}^{\\mathrm{GAE}}$", 10, False),
+         ("一步版 $A=r+\\gamma V(s')-V(s)$", 10, False)])
 
-    # critic 在这张图里担两个角色，原先两条箭头同为绿色，正文只能靠位置区分"哪条绿箭头"。
-    # 现在按通路性质分色：灰=前向数据流，绿=critic 供给 V，红/紫=两条训练回流（actor 一条、
-    # critic 一条）。紫色只用于箭头与标签，不进 FILL，所以不加进模块级调色板。
+    # 紫色只用于这一条箭头与它的标签，不进 FILL，所以不加进模块级调色板。
     PURPLE = "#7D3C98"
 
-    arrow(ax, (0.305, 0.64), (0.375, 0.64), "#555555")
-    label(ax, 0.34, 0.70, "a", "#555555", 10)
-    arrow(ax, (0.555, 0.60), (0.605, 0.50), "#555555")
-    label(ax, 0.605, 0.62, "r, s′", "#555555", 10)
-    arrow(ax, (0.305, 0.20), (0.595, 0.34), GREEN, rad=-0.10)
-    # 标签压在绿箭头上方：下方那条带留给紫色的 critic 训练回流，两条通路各占一层
-    label(ax, 0.44, 0.30, "V(s), V(s′)", GREEN, 10, bg=True)
+    # 前向：actor 出动作进环境；环境的 r、s′ 进优势计算。
+    connect(ax, actor, "right", envb, "left", "#555555")
+    label(ax, (COL_L + W_SIDE + COL_M) / 2, ROW_TOP + H * 0.5 + 0.055, "$a$",
+          "#555555", 10)
+    connect(ax, envb, "right", adv, "top", "#555555", dst_t=0.3)
+    label(ax, 0.635, ROW_TOP + 0.10, "$r,\; s'$", "#555555", 10, bg=True)
 
-    arrow(ax, (0.78, 0.535), (0.16, 0.74), RED, rad=0.14)
-    label(ax, 0.48, 0.885, "用 A 加权策略梯度，更新 actor", RED, 11, True)
-    arrow(ax, (0.66, 0.265), (0.16, 0.09), PURPLE, rad=0.12)
-    label(ax, 0.44, 0.025, "critic 回归 returns，把 V 估得更准", PURPLE, 11, True)
+    # Critic 把 V 供给优势计算，走底行横带。
+    connect(ax, critic, "right", adv, "left", GREEN, dst_t=0.4)
+    label(ax, 0.50, ROW_BOT + H + 0.045, "$V(s),\; V(s')$", GREEN, 10)
+
+    # 两条训练回流（图注：红的更新 actor，紫的更新 critic）各走一条外围通道：
+    # 红的沿顶部横带回 Actor，紫的沿左列与中列之间的竖带下到 Critic。
+    connect(ax, adv, "top", actor, "top", RED, src_t=0.7, lane=0.94)
+    label(ax, 0.45, 0.965, "用 $A$ 加权策略梯度，更新 actor", RED, 11, True)
+    connect(ax, envb, "bottom", critic, "top", PURPLE,
+            src_t=0.3, dst_t=0.6, lane=0.345)
+    label(ax, 0.175, 0.435, "critic 回归 returns，\n把 $V$ 估得更准", PURPLE, 11, True)
+
     save(fig, "lecture14", "fig-actor-critic-a2c")
 
 
@@ -361,35 +527,55 @@ def actor_critic_a2c():
 # 四个角色围成一个环：actor 的更新方向取决于 critic 此刻的打分，critic 的回归目标又
 # 取决于 actor 此刻给出的 μ′(s′)。红箭头必须从 Critic 出发——∇a Q 是 critic 给的。
 def actor_critic_ddpg():
-    fig, ax = canvas(7.8, 4.2)
-    label(ax, 0.5, 0.99, "DDPG：Actor 直接吐连续动作，Critic 给它打分", "#333333", 13, True)
+    """DDPG 的四个角色与四条通路。
 
-    box(ax, 0.02, 0.66, 0.13, 0.20, GREY, [("环境", 11, True), ("给 s、r", 10, False)])
-    box(ax, 0.22, 0.62, 0.30, 0.28, BLUE,
+    与 A2C 同一套排法：左右两列、上下两行对齐，线一律用 connect() 从边中点垂直引出，
+    通道位置在这里一次定死，不各自即兴挑。
+    """
+    fig, ax = canvas(7.8, 4.0)
+
+    COL_L, COL_M, COL_R = 0.03, 0.24, 0.66
+    ROW_TOP, ROW_BOT = 0.60, 0.12
+    H = 0.26
+
+    envb = (COL_L, ROW_TOP + 0.03, 0.14, 0.20)
+    actor = (COL_M, ROW_TOP, 0.30, H)
+    buf = (COL_R, ROW_TOP, 0.31, H)
+    critic = (COL_M, ROW_BOT, 0.30, H)
+    target = (COL_R, ROW_BOT, 0.31, H)
+
+    box(ax, *envb, GREY, [("环境", 11, True), ("给 $s$、$r$", 10, False)])
+    box(ax, *actor, BLUE,
         [("Actor（确定性策略）", 11, True), ("$a=\\mu(s)$", 10, False),
          ("一步吐出连续动作", 10, False)])
-    box(ax, 0.66, 0.64, 0.32, 0.24, ORANGE,
-        [("replay buffer", 11, True), ("(s, a, r, s′) 反复使用", 10, False)])
-    box(ax, 0.20, 0.14, 0.30, 0.28, GREEN,
+    box(ax, *buf, ORANGE,
+        [("replay buffer", 11, True), ("$(s,a,r,s')$ 反复使用", 10, False)])
+    box(ax, *critic, GREEN,
         [("Critic（动作价值）", 11, True), ("$Q(s,a)$", 10, False),
-         ("学习主体，给 (s, a) 打分", 10, False)])
-    box(ax, 0.66, 0.12, 0.32, 0.30, RED,
+         ("学习主体，给 $(s,a)$ 打分", 10, False)])
+    box(ax, *target, RED,
         [("贝尔曼回归目标", 11, True), ("$y = r + \\gamma\\,Q'(s',\\mu'(s'))$", 10, False),
          ("目标网络软更新，稳住目标", 10, False)])
 
-    arrow(ax, (0.155, 0.76), (0.215, 0.76), "#555555")
-    label(ax, 0.185, 0.83, "$s$", "#555555", 10)
-    arrow(ax, (0.525, 0.76), (0.655, 0.76), "#555555")
-    label(ax, 0.59, 0.83, "新经验入池", "#555555", 10)
-    arrow(ax, (0.72, 0.635), (0.50, 0.40), ORANGE, rad=-0.12)
-    label(ax, 0.70, 0.50, "抽 batch", ORANGE, 10, bg=True)
-    arrow(ax, (0.505, 0.26), (0.655, 0.26), GREEN)
-    label(ax, 0.58, 0.32, "$Q$ 向 $y$ 回归", GREEN, 10)
+    connect(ax, envb, "right", actor, "left", "#555555")
+    label(ax, 0.205, ROW_TOP + H * 0.5 + 0.055, "$s$", "#555555", 10)
+    connect(ax, actor, "right", buf, "left", "#555555")
+    label(ax, 0.595, ROW_TOP + H * 0.5 + 0.05, "新经验入池", "#555555", 10, bg=True)
 
-    arrow(ax, (0.30, 0.425), (0.30, 0.615), RED, lw=2.2)
-    label(ax, 0.275, 0.52, "沿 $\\nabla_a Q(s,a)$\n更新 actor，把 Q 推高", RED, 11, True, ha="right")
-    label(ax, 0.5, 0.035, "与 A2C 的分工正好相反：这里 critic 是学习主体，"
-                          "actor 更像「帮连续动作找 Q 最大值」的执行器。", "#555555", 10)
+    # 经验池 → Critic：走右列与左列之间的竖带下来，不走斜线。
+    # 走两行之间那条横带，从 Critic 顶边偏右进——不穿过下排任何框。
+    connect(ax, buf, "bottom", critic, "top", ORANGE,
+            src_t=0.25, dst_t=0.75, lane=0.505)
+    label(ax, 0.72, 0.565, "抽 batch", ORANGE, 10)
+
+    connect(ax, critic, "right", target, "left", GREEN)
+    label(ax, 0.58, ROW_BOT + H * 0.5 + 0.055, "$Q$ 向 $y$ 回归", GREEN, 10)
+
+    # actor 的更新回流：从 Critic 顶边垂直上去进 Actor 底边，走两框之间的空带。
+    connect(ax, critic, "top", actor, "bottom", RED, src_t=0.25, dst_t=0.25, lw=2.2)
+    label(ax, 0.135, 0.50, "沿 $\\nabla_a Q(s,a)$\n更新 actor，把 $Q$ 推高",
+          RED, 11, True)
+
     save(fig, "lecture16", "fig162-actor-critic-ddpg")
 
 
@@ -454,7 +640,7 @@ def q_propagation():
         ax.annotate("", xy=(x_to, 1.12), xytext=(x_from, 1.12),
                     arrowprops=dict(arrowstyle="-|>", color="#9B3626", linewidth=1.4,
                                     connectionstyle="arc3,rad=0.30"))
-        ax.text((x_from + x_to) / 2, 1.30, "× γ", ha="center", fontsize=10, color="#9B3626")
+        ax.text((x_from + x_to) / 2, 1.30, "$\\times\\,\\gamma$", ha="center", fontsize=10, color="#9B3626")
     for x, v in ((0 + width, 0.81), (1.0, 0.9), (2 - width, 1.0)):
         ax.text(x, v + 0.03, f"{v:g}", ha="center", fontsize=10, color="#9B3626",
                 fontweight="bold")
@@ -493,8 +679,6 @@ def cartpole_task():
         ax.plot([px, ex], [py, ey], color=color, linewidth=lw, solid_capstyle="round")
         return ex, ey
 
-    label(ax, 0.5, 0.965, "CartPole：两个终止阈值管哪一块，以及为什么推车方向反直觉",
-          "#333333", 13, True)
     ax.plot([0.595, 0.595], [0.03, 0.90], color="#CCCCCC", linewidth=1.4, linestyle="--")
 
     # ── 左半：把两个阈值画在同一张场景里 ──────────────────────────────
@@ -503,7 +687,7 @@ def cartpole_task():
     PIVOT = (CART_X, TRACK_Y + CART_H)
 
     ax.plot([X0, X1], [TRACK_Y, TRACK_Y], color="#666666", linewidth=2.4)
-    for bx, name in ((X0, "−2.4"), (X1, "+2.4")):
+    for bx, name in ((X0, "-2.4"), (X1, "+2.4")):
         ax.plot([bx, bx], [TRACK_Y - 0.06, TRACK_Y + 0.17], color=RED,
                 linewidth=1.8, linestyle="--")
         label(ax, bx, TRACK_Y + 0.205, name, RED, 10, True)
@@ -526,13 +710,13 @@ def cartpole_task():
     ax.plot(*PIVOT, "o", color="#333333", markersize=9, markerfacecolor="white",
             markeredgewidth=1.8, zorder=6)
 
-    label(ax, 0.30, 0.815, "③ 杆角度 θ 只有 ±12° 可用", ORANGE, 10, True)
-    label(ax, 0.30, 0.768, "（≈0.21 rad）越出即回合结束", ORANGE, 10)
+    label(ax, 0.30, 0.815, "(3) 杆角度 $\\theta$ 只有 $\\pm 12^\\circ$ 可用", ORANGE, 10, True)
+    label(ax, 0.30, 0.768, "（$\\approx 0.21$ rad）越出即回合结束", ORANGE, 10)
 
     # ④ 角速度画成杆尖上的一小段转向弧，落在它描述的那个量上
     arrow(ax, (pole_x + 0.008, pole_y + 0.030), (pole_x + 0.042, pole_y - 0.030),
           "#8B5A2B", rad=-0.5, lw=1.4)
-    label(ax, pole_x + 0.050, pole_y - 0.048, "④ 杆角速度 $\\dot{\\theta}$",
+    label(ax, pole_x + 0.050, pole_y - 0.048, "(4) 杆角速度 $\\dot{\\theta}$",
           "#8B5A2B", 10, ha="left")
 
     # 自由转轴是这个任务的题眼：没有任何电机去扶那根杆
@@ -541,19 +725,16 @@ def cartpole_task():
 
     ax.annotate("", xy=(CART_X, TRACK_Y - 0.115), xytext=(XC, TRACK_Y - 0.115),
                 arrowprops=dict(arrowstyle="<|-|>", color=BLUE, linewidth=1.5))
-    label(ax, 0.31, TRACK_Y - 0.175, "① 车位置 x", BLUE, 10, True)
+    label(ax, 0.31, TRACK_Y - 0.175, "(1) 车位置 x", BLUE, 10, True)
     arrow(ax, (CART_X + 0.045, TRACK_Y + 0.028), (CART_X + 0.108, TRACK_Y + 0.028), BLUE, lw=1.5)
-    label(ax, CART_X + 0.118, TRACK_Y + 0.028, "② 车速度 $\\dot{x}$", BLUE, 10,
+    label(ax, CART_X + 0.118, TRACK_Y + 0.028, "(2) 车速度 $\\dot{x}$", BLUE, 10,
           ha="left", bg=True)
 
-    label(ax, 0.29, 0.078, "两道终止线卡的不是同一件事：红虚线卡住车能滑多远，", "#555555", 10)
-    label(ax, 0.29, 0.030, "橙扇形卡住杆能歪多少——越过任何一道，回合当场结束", "#555555", 10)
 
     # ── 右半上：动作只有两档 ──────────────────────────────────────────
     label(ax, 0.80, 0.845, "动作只有两档，没有第三个选项", "#333333", 11, True)
     for ax_x, txt, color in ((0.70, "0：左推 ←", BLUE), (0.90, "1：右推 →", RED)):
         box(ax, ax_x - 0.085, 0.735, 0.17, 0.075, color, [(txt, 11, True)])
-    label(ax, 0.80, 0.688, "没有「不动」这一档：每一拍都必须选一边", "#555555", 10)
 
     # ── 右半下：反直觉的那一下 ────────────────────────────────────────
     label(ax, 0.80, 0.605, "杆往右倒，车要往哪边推？", "#333333", 11, True)
@@ -568,10 +749,6 @@ def cartpole_task():
     arrow(ax, (0.762, 0.435), (0.828, 0.435), RED, lw=2.0)
     label(ax, 0.795, 0.478, "往右推", RED, 10, True)
 
-    label(ax, 0.80, 0.185, "杆往右倒就把车往右推——不是往左把它顶回去。", RED, 10, True)
-    label(ax, 0.80, 0.135, "车得追到杆的正下方，杆才会自己回正。", "#555555", 10)
-    label(ax, 0.80, 0.062, "四个观测量 ①②③④ 都是连续值，", "#555555", 10)
-    label(ax, 0.80, 0.018, "表格法必须先把每一维切成 8 段才存得下。", "#555555", 10)
     save(fig, "lecture16", "fig16-cartpole-task")
 
 
@@ -580,7 +757,6 @@ def cartpole_task():
 # 落在同一条推理链的不同位置上——这正是它们能叠加而不打架的原因，表格排不出来。
 def realtime_three_routes():
     fig, ax = canvas(7.8, 5.2)
-    label(ax, 0.5, 0.99, "同一条推理链路，三条实时路线各动一段", "#333333", 13, True)
 
     # 公共链路：一次推理从观测进来到控制器消费动作。
     chain = [(0.02, 0.145, "观测进来"), (0.145, 0.365, "VLM prefill"),
@@ -648,8 +824,6 @@ def realtime_three_routes():
     arrow(ax, (0.575, 0.063), (0.615, 0.063), ORANGE)
     label(ax, 0.62, 0.075, "命中 → 走旁路，绕开去噪", "#8A5A08", 10, ha="left")
     label(ax, 0.62, 0.038, "未命中 → 回主干完整推理 58 ms", "#8A5A08", 10, ha="left")
-    label(ax, 0.02, 0.0, "V2 不绕路，学的是「何时快、何时慢」——它调的是整条链的节奏",
-          "#8A5A08", 10, ha="left")
     save(fig, "lecture13", "fig13-1-realtime-three-routes")
 
 
@@ -658,16 +832,26 @@ def realtime_three_routes():
 # 分辨率也不够印；重画一版把三项勾叉与"掩码闸门到底掩掉了什么"讲清楚。
 def long_horizon_paradigms():
     fig, ax = canvas(7.8, 5.6)
-    label(ax, 0.5, 0.985, "长程操作的四种范式：统一模型 / 长程 / 技能串接 能不能同时占齐",
-          "#333333", 12, True)
 
     def marks(cx, y, flags):
         """一格底部的三项勾叉，是这张图真正要对照的东西。"""
         items = list(zip(("统一模型", "长程", "技能串接"), flags))
-        widths = [0.135, 0.085, 0.135]
+        widths = [0.150, 0.100, 0.150]
         x = cx - sum(widths) / 2
         for (name, ok), w in zip(items, widths):
-            label(ax, x, y, f"{name} {'✓' if ok else '×'}", GREEN if ok else RED, 10, ha="left")
+            color = GREEN if ok else RED
+            label(ax, x, y, name, color, 10, ha="left")
+            # 对勾用线段画，不用 ✓ 字形：TimesSong 没有 U+2713，用字形会渲成豆腐块。
+            mark_x = x + 0.034 + 0.019 * len(name)
+            if ok:
+                ax.plot([mark_x, mark_x + 0.007, mark_x + 0.020],
+                        [y + 0.001, y - 0.007, y + 0.013],
+                        color=color, linewidth=1.6, solid_capstyle="round", zorder=5)
+            else:
+                for dx in (0.0, 0.017):
+                    ax.plot([mark_x + dx, mark_x + 0.017 - dx],
+                            [y - 0.007, y + 0.011],
+                            color=color, linewidth=1.6, solid_capstyle="round", zorder=5)
             x += w
 
     def feed(cx, y0, with_gate):
@@ -715,10 +899,6 @@ def long_horizon_paradigms():
 
     label(ax, 0.5, 0.095, "掩码闸门 = 分阶段输入掩码（phase-aware masking）",
           "#8A5A08", 10, True)
-    label(ax, 0.5, 0.055, "移动段只放行远处的导航线索、遮住近处的操作线索，交互段反过来——",
-          "#666666", 10)
-    label(ax, 0.5, 0.018, "同一个模型，两段各看各的输入，接缝就不必再交给第二个策略。",
-          "#666666", 10)
     save(fig, "lecture13", "fig13-2-long-horizon-paradigms")
 
 
@@ -727,7 +907,6 @@ def long_horizon_paradigms():
 # 不同维度上（时间 / 信息 / 职责）。三格共用同一套视觉语法，让"同一个招式"由图形自己说。
 def one_cut_three_lines():
     fig, ax = canvas(7.8, 3.6)
-    label(ax, 0.5, 0.985, "同一个招式，三处不同的刀口", "#333333", 13, True)
 
     def cut(x0, y0, x1, y1):
         """统一的刀口符号：红色虚线 + 中点一个红菱形。"""
@@ -780,9 +959,6 @@ def one_cut_three_lines():
     label(ax, 0.845, 0.245, "上面不学走路，", "#666666", 10)
     label(ax, 0.845, 0.165, "下面不懂任务", "#666666", 10)
 
-    ax.plot([0.03, 0.975], [0.095, 0.095], color="#DDDDDD", linewidth=1.2)
-    label(ax, 0.5, 0.03, "三刀买到的是同一样东西——两边各自变强、互不拖累；"
-                         "也都付出同一笔钱：接口本身成了新的天花板。", "#555555", 10)
     save(fig, "lecture13", "fig13-4-one-cut-three-lines")
 
 
@@ -810,8 +986,6 @@ def motion_taxonomy():
             plain_box(ax, xbox, y, 0.335, 0.086, color)
             label(ax, xbox + 0.1675, y + 0.043, text, "#444444", 10)
 
-    label(ax, 0.045, 0.150, "每一环都看得见、查得到，", "#4A6A85", 10, ha="left")
-    label(ax, 0.045, 0.065, "但写不出规则的环节就卡住", "#4A6A85", 10, ha="left")
 
     plain_box(ax, 0.535, 0.115, 0.42, 0.175, GREEN, fill="#D8EDE1", lw=2.0)
     label(ax, 0.745, 0.235, "本讲起走这一支", GREEN, 11, True)
@@ -824,17 +998,18 @@ def motion_taxonomy():
 # 所以奖励那条线画成灰色虚线、明写"第14讲才接上"，避免图和自己的走读打架。
 def agent_env_loop_l08():
     fig, ax = canvas(5.8, 2.9)
-    box(ax, 0.28, 0.68, 0.44, 0.22, BLUE,
+    agent = (0.28, 0.68, 0.44, 0.22)
+    env = (0.28, 0.06, 0.44, 0.22)
+    box(ax, *agent, BLUE,
         [("智能体（机器人）", 12, True), ("策略 $\\pi$：看到什么 → 做什么", 10, False)])
-    box(ax, 0.28, 0.06, 0.44, 0.22, GREEN,
-        [("环境", 12, True), ("被动作改变，再给出新画面", 10, False)])
+    box(ax, *env, GREEN, [("环境", 12, True), ("被动作改变，再给出新画面", 10, False)])
 
-    arrow(ax, (0.725, 0.775), (0.725, 0.185), RED, rad=-0.40)
-    label(ax, 0.855, 0.48, "动作 $a_t$", RED, 11, True, bg=True)
-    arrow(ax, (0.275, 0.185), (0.275, 0.775), BLUE, rad=-0.40)
-    label(ax, 0.145, 0.48, "观测 $o_{t+1}$", BLUE, 11, True, bg=True)
+    # 同上：两端接框的边中点，右侧下行送动作，左侧上行回观测。
+    elbow(ax, side(*agent, "right"), side(*env, "right"), RED, via="hvh", detour=0.89)
+    label(ax, 0.89, 0.48, "动作 $a_t$", RED, 11, True, bg=True)
+    elbow(ax, side(*env, "left"), side(*agent, "left"), BLUE, via="hvh", detour=0.11)
+    label(ax, 0.11, 0.48, "观测 $o_{t+1}$", BLUE, 11, True, bg=True)
     label(ax, 0.5, 0.48, "$a=\\pi(o)$，如此循环", "#888888", 10)
-    label(ax, 0.5, 0.0, "奖励那条线要到第14讲讲强化学习时才接上", "#AAAAAA", 10)
     save(fig, "lecture08", "fig08-2-agent-env-loop")
 
 
@@ -843,8 +1018,6 @@ def agent_env_loop_l08():
 # 观测里多进来一样东西，能听懂的指令就宽一层——这条"加法"是文字列举给不出的。
 def policy_spectrum():
     fig, ax = canvas(7.8, 3.4)
-    label(ax, 0.5, 0.965, "策略的谱系：每往右一档，观测里就多进来一样东西",
-          "#333333", 13, True)
 
     stages = [(0.015, BLUE, "状态策略", "state\npolicy", "只有本体数字", "看不见画面", "—"),
               (0.262, GREEN, "视觉运动策略", "visuomotor\npolicy", "＋相机图像", "于是看得见",
@@ -870,7 +1043,6 @@ def policy_spectrum():
 
     ax.plot([0.756, 0.756], [0.075, 0.235], color=RED, linewidth=1.4, linestyle=(0, (3, 2)))
     label(ax, 0.985, 0.100, "第11讲起从这里展开", RED, 11, True, ha="right")
-    label(ax, 0.015, 0.100, "第8–13讲这一整块，讲的就是这条谱系", "#555555", 10, ha="left")
     save(fig, "lecture08", "fig08-2-policy-spectrum")
 
 
@@ -881,7 +1053,7 @@ def train_deploy_roundtrip():
     fig, ax = canvas(7.8, 3.4)
     upper = ["示教数据", "统一动作口径\n（绝对 / 相对）", "归一化\n（各维压到 [-1, 1]）", "网络\n（训练）"]
     lower = ["机器人执行\n（裁剪 / 限位兜底）", "还原动作口径\n（相对口径需累加）",
-             "反归一化\n（乘回 σ、加回 μ）", "网络\n（推理输出）"]
+             "反归一化\n（乘回 $\\sigma$、加回 $\\mu$）", "网络\n（推理输出）"]
 
     label(ax, 0.015, 0.935, "训练时：数据一路进网络", BLUE, 12, True, ha="left")
     label(ax, 0.015, 0.235, "部署时：输出必须原路逆着走回来", RED, 12, True, ha="left")
@@ -906,8 +1078,6 @@ def train_deploy_roundtrip():
         ax.plot([x, x], [0.545, 0.660], color="#888888", linewidth=1.4, linestyle=(0, (4, 3)))
         label(ax, x + 0.012, 0.6025, text, "#666666", 10, ha="left")
 
-    label(ax, 0.015, 0.075, "任何一环两端对不上，机器人就会几乎不动、越走越飘或来回抖，"
-                            "而权重完全正常", "#555555", 10, ha="left")
     save(fig, "lecture08", "fig08-3-train-deploy-roundtrip")
 
 
@@ -930,8 +1100,6 @@ def normalization_ranges():
         axis.tick_params(labelsize=10)
         axis.spines["top"].set_visible(False); axis.spines["right"].set_visible(False)
     left.set_xlim(-20, 275)
-    left.text(120, 1.55, "范围大的维度会主导损失，\n范围小的维度几乎学不动",
-              ha="center", va="center", fontsize=10, color="#555555")
     right.set_xlim(-1.6, 1.6)
     right.set_xticks([-1, 0, 1]); right.set_xticklabels(["-1", "0", "+1"])
     right.axvline(0, color="#CCCCCC", linewidth=1.0, linestyle=":")
@@ -953,16 +1121,14 @@ def scale_error_symptoms():
             track.append(pos)
         return track
 
-    for axis, gain, title, note in (
-            (left, 1.99, "动作被系统性放大", "每步都迈过头、来回过冲：看起来在“抖”"),
-            (right, 0.008, "动作被系统性缩小", "每步只挪一点点、迟迟够不到：看起来“不动”")):
+    for axis, gain, title in ((left, 1.99, "动作被系统性放大"),
+                              (right, 0.008, "动作被系统性缩小")):
         axis.axhline(target, color=GREEN, linewidth=2.0, linestyle="--")
         # 左图那条过冲曲线会从这行字上穿过去，所以给它加白底压住——原来的缺陷是被图例遮住，
         # 只把图例删掉还不够，字仍旧糊在曲线里。
         axis.text(39, target + 0.13, "本该到达的目标", ha="right", fontsize=10, color=GREEN,
                   zorder=5, bbox=dict(facecolor="white", edgecolor="none", pad=1.5))
         axis.plot(range(steps), rollout(gain), color=RED, linewidth=2.0)
-        axis.text(20, 0.06, note, ha="center", fontsize=10, color=RED)
         axis.set_title(title, fontsize=11, color="#444444")
         axis.set_xlabel("时间步", fontsize=10)
         axis.set_ylabel("关节角（rad）", fontsize=10)
@@ -1072,8 +1238,8 @@ def lerobot_layers():
         ax.add_patch(FancyArrowPatch((px, tops[a]), (px, tops[b]),
                                      connectionstyle="arc3,rad=-0.55", arrowstyle="-|>",
                                      mutation_scale=12, linewidth=1.6, color=RED))
-    for i, note in ((0, "① 起于命令"), (4, "② 读主臂动作"), (3, "③ 从臂执行、相机出图"),
-                    (2, "④ 拼成一帧写进数据集")):
+    for i, note in ((0, "(1) 起于命令"), (4, "(2) 读主臂动作"), (3, "(3) 从臂执行、相机出图"),
+                    (2, "(4) 拼成一帧写进数据集")):
         ax.plot([x0 + w + 0.004, px], [tops[i], tops[i]], color=RED, linewidth=1.0,
                 linestyle=(0, (2, 2)))
         label(ax, px + 0.02, tops[i], note, RED, 10, ha="left")
@@ -1087,7 +1253,6 @@ def lerobot_layers():
 # 超期圈把余量吃光、帧间不再等距——"sleep 不是硬实时保证"那句话的证据。
 def record_loop_timing():
     fig, ax = canvas(7.6, 3.4)
-    label(ax, 0.5, 0.965, "lerobot-record 的一圈：30 Hz = 每圈 33.3 ms", "#333333", 13, True)
 
     colors = [BLUE, GREEN, ORANGE, GREY]
     x0, span = 0.055, 0.72          # span = 一圈 33.3 ms 的预算
@@ -1125,10 +1290,6 @@ def record_loop_timing():
                 arrowprops=dict(arrowstyle="<->", color=RED, linewidth=1.2))
     label(ax, (end_ok + end_bad) / 2, 0.170, "这一段就是帧间的抖动", RED, 10)
 
-    label(ax, 0.055, 0.075, "所以记进数据集的是每帧实际的 timestamp，不是 $n/\\mathrm{fps}$——"
-                            "训练时按时间戳对齐，", "#555555", 10, ha="left")
-    label(ax, 0.055, 0.010, "不能假设帧间严格等距。图上各段长度是示意，不是实测值。",
-          "#555555", 10, ha="left")
     save(fig, "lecture09", "fig09-4-record-loop-timing")
 
 
@@ -1138,7 +1299,6 @@ def record_loop_timing():
 # 重画一版同构的数据流，两处标注按 LeRobot 默认改正。
 def act_step3_dataflow():
     fig, ax = canvas(7.8, 3.5)
-    label(ax, 0.5, 0.955, "Transformer 主干：从观测生成一整段动作", "#333333", 13, True)
 
     plain_box(ax, 0.02, 0.30, 0.115, 0.50, GREY, fill="#F6F6F6")
     label(ax, 0.077, 0.72, "四路相机", "#333333", 11, True)
@@ -1176,8 +1336,6 @@ def act_step3_dataflow():
     label(ax, 0.42, 0.315, "关节状态与 $z$ 各过一个线性层，直接投到 512 维",
           "#888888", 10, bg=True)
 
-    label(ax, 0.5, 0.145, "两处按 LeRobot 默认标注：图像特征是 512 维（ResNet18 的输出通道数），"
-                          "decoder 只有 1 层", "#555555", 10)
     label(ax, 0.5, 0.045, "配置项就是 2.5 节那张表里的 $d_{\\mathrm{model}}=512$ 与 "
                           "n_decoder_layers = 1", "#888888", 10)
     save(fig, "lecture10", "fig10-2-act-step3-dataflow")
@@ -1207,7 +1365,6 @@ def chunking_vs_ensemble():
     for s in range(4, 8):
         cell(s, 0.715, BLUE)
     label(ax, x0 + 4 * dx - 0.012, 0.751, "$t=4$ 才重新查询策略", BLUE, 10, ha="right")
-    label(ax, 0.5, 0.640, "同一时刻只有一个预测在起作用，两段在时间轴上不重叠", "#666666", 10)
 
     label(ax, x0 - 0.012, 0.545, "temporal\nensemble", GREEN, 11, True, ha="right")
     for row in range(4):
@@ -1226,10 +1383,198 @@ def chunking_vs_ensemble():
     txt = "、".join(f"{w:.3f}" for w in weights)
     label(ax, 0.5, 0.120, f"执行时把这一列加权平均：$w_i \\propto \\exp(-m\\,i)$，"
                           f"$m=0.01$ 时归一化权重是 {txt}", "#555555", 10)
-    label(ax, 0.5, 0.038, "四个权重几乎相等——temporal ensemble 在默认 $m$ 下基本就是等权平均，"
-                          "不是"
-                          "“越新权重越大”", RED, 10)
     save(fig, "lecture10", "fig10-2-chunking-vs-temporal-ensemble")
+
+
+# ── 第8讲 3.2：误差滚雪球 ────────────────────────────────────────────────
+# 曲线是示意用的合成数据，不是某次真实 rollout：这张图讲的是"走出示教覆盖范围之后
+# 误差加速放大"这个机制。图内只标图元，解读由正文图注给出。
+def error_snowball():
+    fig, ax = plt.subplots(figsize=(7.6, 3.4))
+    t = np.linspace(0, 60, 400)
+    demo = 0.5 + 0.28 * np.sin(t / 9.5)
+    band = 0.27 + 0.02 * np.cos(t / 13.0)
+    ax.fill_between(t, demo - band, demo + band, color=FILL[GREEN], zorder=0,
+                    label="示教数据覆盖的状态范围")
+    ax.plot(t, demo, color="#555555", linewidth=2.0, linestyle="--", label="示教轨迹")
+
+    # 越界之前贴着示教走；越界之后锁住当时的值再指数发散——
+    # 若继续叠 demo 的正弦，下行段会盖过发散项，画出「先回落再上扬」的错觉。
+    leave = 29.0
+    drift = 0.02 * (t / leave) ** 2
+    at_leave = 0.5 + 0.28 * np.sin(leave / 9.5) + 0.02
+    blow = 0.055 * (np.exp((t - leave) / 6.5) - 1.0)
+    policy = np.where(t <= leave, demo + drift, at_leave + blow)
+    keep = policy <= 2.75
+    ax.plot(t[keep], policy[keep], color=RED, linewidth=2.4, label="策略闭环轨迹")
+    ax.axvline(leave, color=RED, linewidth=1.2, linestyle=":", zorder=1)
+    ax.text(leave + 1.2, 2.45, "走出示教覆盖范围", ha="left", va="top",
+            fontsize=10.5, color=RED)
+
+    ax.set_xlabel("时间步", fontsize=11)
+    ax.set_ylabel("状态（如某个关节角，rad）", fontsize=11)
+    ax.set_xlim(0, 62); ax.set_ylim(-0.15, 2.8)
+    ax.tick_params(labelsize=10)
+    ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
+    ax.legend(loc="upper left", fontsize=10.5)
+    fig.tight_layout()
+    save(fig, "lecture08", "832_error-snowball")
+
+
+# ── 第8讲 3.3：绝对口径与相对口径的同一步运动 ───────────────────────────
+# 三个数就是正文那个算例：当前 1.18、下一帧 1.20。
+def abs_vs_delta_axis():
+    fig, ax = canvas(7.4, 2.9)
+    y = 0.50
+    x_now, x_next = 0.34, 0.52          # 1.18 与 1.20 两个刻度的位置
+    ticks = {1.14: 0.10, 1.16: 0.22, 1.18: x_now, 1.20: x_next, 1.22: 0.64, 1.24: 0.76}
+
+    ax.annotate("", xy=(0.94, y), xytext=(0.05, y),
+                arrowprops=dict(arrowstyle="-|>", color="#222222", linewidth=1.6))
+    for value, x in ticks.items():
+        ax.plot([x, x], [y - 0.035, y + 0.035], color="#222222", linewidth=1.4)
+        ax.text(x, y - 0.085, f"{value:.2f}", ha="center", va="top",
+                fontsize=11, color="#333333")
+    ax.text(0.955, y - 0.085, "关节角 (rad)", ha="right", va="top",
+            fontsize=11, color="#333333")
+
+    ax.plot(x_now, y, "o", markersize=11, color=GREY)
+    ax.plot(x_next, y, "o", markersize=11, color=GREEN)
+    # 两个点标签共用一条基线，各自锚在自己的点正下方（刻度数字下面一行）。
+    POINT_LABEL_Y = y - 0.235
+    ax.text(x_now, POINT_LABEL_Y, "当前位置", ha="center", va="top",
+            fontsize=11, color=GREY)
+    ax.text(x_next, POINT_LABEL_Y, "下一帧", ha="center", va="top",
+            fontsize=11, color=GREEN)
+
+    # 两块口径标注共用一条基线，各自锚在自己那根引线的上端。
+    CALLOUT_Y = 0.88
+    ax.annotate("", xy=(x_next - 0.005, y + 0.045), xytext=(x_now + 0.005, y + 0.045),
+                arrowprops=dict(arrowstyle="-|>", color=BLUE, linewidth=2.2,
+                                connectionstyle="arc3,rad=-0.62"))
+    ax.annotate("", xy=((x_now + x_next) / 2, y + 0.175), xytext=((x_now + x_next) / 2, CALLOUT_Y - 0.10),
+                arrowprops=dict(arrowstyle="-|>", color=BLUE, linewidth=1.6))
+    ax.text((x_now + x_next) / 2, CALLOUT_Y, "相对口径：动多少\n动作 = +0.02",
+            ha="center", va="bottom", fontsize=12, color=BLUE,
+            fontweight="bold", linespacing=1.6)
+
+    ax.annotate("", xy=(x_next + 0.018, y + 0.02), xytext=(0.78, CALLOUT_Y - 0.10),
+                arrowprops=dict(arrowstyle="-|>", color=RED, linewidth=1.6))
+    ax.text(0.78, CALLOUT_Y, "绝对口径：去哪儿\n动作 = 1.20",
+            ha="center", va="bottom", fontsize=12, color=RED,
+            fontweight="bold", linespacing=1.6)
+
+    fig.tight_layout()
+    save(fig, "lecture08", "833_abs-vs-delta-axis")
+
+
+# ── 第8讲 3.3：口径错配的两种失败 ───────────────────────────────────────
+# 左右两栏是两个方向的错配，曲线是示意用的合成数据。
+def mismatch_failures():
+    fig, axes = plt.subplots(1, 2, figsize=(7.9, 3.0))
+    t = np.linspace(0, 39, 200)
+
+    ax = axes[0]
+    intended = 1.18 + 0.22 * np.sin(t / 7.0)
+    actual = np.where(t < 5, 1.18 - 1.16 * (t / 5) ** 1.4, 0.02 + 0.012 * np.sin(t))
+    ax.plot(t, intended, color=GREEN, linewidth=2.0, linestyle="--", label="本该执行的轨迹")
+    ax.plot(t, actual, color=RED, linewidth=2.2, label="实际执行")
+    ax.set_title("相对数据 错当 绝对目标（训练侧弄错）", fontsize=11)
+    ax.set_ylim(-0.12, 1.78)
+
+    ax = axes[1]
+    ax.axhspan(-0.3, 3.14, color=FILL[GREEN], zorder=0)
+    ax.plot(t, np.full_like(t, 1.18), color=GREEN, linewidth=2.0, linestyle="--",
+            label="本该执行的轨迹")
+    runaway = 2.36 + 1.18 * t
+    keep = runaway <= 7.0
+    ax.plot(t[keep], runaway[keep], color=RED, linewidth=2.2, label="实际执行")
+    ax.text(38.0, 0.30, "关节可达范围", ha="right", fontsize=10, color=GREEN)
+    ax.set_title("绝对目标 错当 相对增量（部署侧弄错）", fontsize=11)
+    ax.set_ylim(-0.3, 7.6)
+
+    for ax in axes:
+        ax.set_xlabel("时间步", fontsize=11)
+        ax.set_ylabel("关节角 (rad)", fontsize=11)
+        ax.set_xlim(-1, 40)
+        ax.tick_params(labelsize=10)
+        ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
+        ax.legend(loc="upper right", fontsize=10)
+    fig.tight_layout()
+    save(fig, "lecture08", "833_mismatch-failures")
+
+
+# ── 第8讲 3.4：为什么用 q01/q99 而不是 min/max 归一化 ────────────────────
+# 左边直方图是示意用的合成分布（主体高斯 + 几个离群毛刺），右边是映射示意。
+def q99_normalization():
+    rng = np.random.default_rng(8)
+    fig, axes = plt.subplots(1, 2, figsize=(7.6, 3.0),
+                             gridspec_kw={"width_ratios": [1.2, 1.0]})
+
+    ax = axes[0]
+    bulk = rng.normal(0.5, 0.13, 4000)
+    spikes = np.array([2.76, 2.90, 3.05])
+    ax.hist(np.concatenate([bulk, spikes]), bins=70, color="#AEC6E4", edgecolor="none")
+    q01, q99 = np.quantile(bulk, [0.01, 0.99])
+    ax.set_ylim(0, 860)
+
+    # 竖线的标签放线的一侧、不骑在线上；三个标签共用一条基线。
+    LINE_LABEL_Y = 790
+    ax.axvline(q01, color=GREEN, linewidth=2.2)
+    ax.text(q01 + 0.07, LINE_LABEL_Y, "q01", ha="left", va="center",
+            fontsize=10.5, color=GREEN)
+    ax.axvline(q99, color=GREEN, linewidth=2.2)
+    ax.text(q99 + 0.09, LINE_LABEL_Y, "q99", ha="left", va="center",
+            fontsize=10.5, color=GREEN)
+    ax.axvline(spikes.max(), color=RED, linewidth=2.0, linestyle="--")
+    ax.text(spikes.max() - 0.07, LINE_LABEL_Y, "max", ha="right", va="center",
+            fontsize=10.5, color=RED)
+
+    # 离群点标签从左侧横着指过来，避免竖引线跟 max 虚线并排看着像第二条线。
+    ax.plot(spikes, np.full_like(spikes, 20), marker="v", linestyle="none",
+            markersize=9, color=RED)
+    ax.annotate("离群点", xy=(spikes.min() - 0.04, 26), xytext=(1.72, 150),
+                ha="right", va="center", fontsize=10.5, color=RED,
+                arrowprops=dict(arrowstyle="->", color=RED, linewidth=1.1))
+
+    ax.set_xlabel("某一维动作的原始值（rad）", fontsize=11)
+    ax.set_ylabel("样本数", fontsize=11)
+    ax.set_xlim(-0.05, 3.4)
+    ax.tick_params(labelsize=10)
+    ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
+
+    ax = axes[1]
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
+    TOP, BOT = 0.70, 0.26
+    for yy in (TOP, BOT):
+        ax.annotate("", xy=(0.99, yy), xytext=(0.06, yy),
+                    arrowprops=dict(arrowstyle="-|>", color="#222222", linewidth=1.5))
+    ax.text(0.06, TOP + 0.19, "原始值", ha="left", va="center",
+            fontsize=10.5, color="#333333")
+    ax.text(0.06, BOT - 0.19, "归一化后", ha="left", va="center",
+            fontsize=10.5, color="#333333")
+
+    # 三列竖直对齐；毛刺那列往左收，别贴到画布边。
+    for x, top_text, bot_text, color in ((0.26, "q01", "-1", GREEN),
+                                         (0.48, "0.5", "0", GREY),
+                                         (0.70, "q99", "+1", GREEN)):
+        ax.plot(x, TOP, "o", markersize=9, color=color)
+        ax.text(x, TOP + 0.10, top_text, ha="center", va="center",
+                fontsize=10.5, color=color)
+        ax.annotate("", xy=(x, BOT + 0.045), xytext=(x, TOP - 0.045),
+                    arrowprops=dict(arrowstyle="-|>", color=color, linewidth=1.6))
+        ax.text(x, BOT - 0.10, bot_text, ha="center", va="center",
+                fontsize=10.5, color="#333333")
+
+    ax.plot(0.88, TOP, "o", markersize=9, color=RED)
+    ax.text(0.88, TOP + 0.10, "毛刺", ha="center", va="center",
+            fontsize=10.5, color=RED)
+    ax.annotate("", xy=(0.715, BOT + 0.045), xytext=(0.873, TOP - 0.045),
+                arrowprops=dict(arrowstyle="-|>", color=RED, linewidth=1.6,
+                                linestyle="--"))
+
+    fig.tight_layout()
+    save(fig, "lecture08", "834_q99-normalization")
 
 
 # ── 第10讲 3.1：LIBERO 上 eval/pc_success 的三段形状 ─────────────────────
@@ -1273,9 +1618,6 @@ def libero_success_curve():
     ax.set_yticks([0, 20, 40, 60, 80, 100])
     ax.tick_params(labelsize=10)
     ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
-    fig.text(0.5, 0.02, "每次评估只跑 10 个 episode，成功率只能取 0%、10%……100%，"
-                        "所以抖动是采样噪声，不是性能反复",
-             ha="center", fontsize=10, color="#555555")
     fig.tight_layout(rect=(0, 0.075, 1, 1))
     save(fig, "lecture10", "fig10-3-libero-success-curve")
 
@@ -1341,11 +1683,6 @@ def interpolation_paths():
 
     ax.text(0, 2.62, "噪声 $\\mathcal{N}(0, I)$", ha="center", fontsize=10, color=BLUE)
     ax.text(1, 2.62, "数据分布（双峰）", ha="center", fontsize=10, color=GREEN)
-    ax.text(0.5, -2.75, "每个噪声点各自连向一个数据点，这些直线彼此交叉——"
-                        "所以单条条件路径是直的，",
-            ha="center", fontsize=10, color="#555555")
-    ax.text(0.5, -3.15, "把所有条件路径叠起来得到的边际流并不是直的",
-            ha="center", fontsize=10, color="#555555")
     ax.set_xlim(-0.24, 1.24); ax.set_ylim(-3.4, 2.9)
     ax.set_xticks([]); ax.set_yticks([]); ax.axis("off")
     fig.tight_layout()
@@ -1424,7 +1761,6 @@ def action_tokenization():
 # 三个短语根本讲不明白结构上到底差在哪，三张消融表给的又只是成绩。图给的是**结构**。
 def alternating_ca_sa():
     fig, ax = canvas(7.8, 4.6)
-    label(ax, 0.5, 0.968, "三种连接方式：动作 token 怎么拿到 VLM 的信息", "#333333", 13, True)
 
     # 左侧：被冻结的 VLM，只取前 N 层的输出。三个方案共用同一个来源。
     plain_box(ax, 0.010, 0.30, 0.135, 0.53, GREY, fill="#F0F0F0")
@@ -1460,7 +1796,6 @@ def alternating_ca_sa():
         label(ax, x0 + w / 2, 0.272, note, "#666666", 10)
 
     # 因果掩码画成下三角，说明 SA 只往回看。
-    label(ax, 0.5, 0.165, "因果掩码：动作 token 只 attend 到它之前的动作 token", "#555555", 10)
     mx, my, cell = 0.400, 0.025, 0.020
     for i in range(4):
         for j in range(4):
@@ -1522,8 +1857,6 @@ def action_head_map():
     ax.tick_params(labelsize=10)
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
-    fig.text(0.5, 0.02, "Diffusion Policy 那篇没有给统一的模型大小，这里只按量级摆位置",
-             ha="center", fontsize=10, color="#888888")
     fig.tight_layout(rect=(0, 0.065, 1, 1))
     save(fig, "lecture11", "fig11-8-action-head-map")
 
@@ -1566,8 +1899,6 @@ def two_axes_map():
 
     label(ax, 0.5, 0.075, "参数更新范围：越往右，被更新的参数越少", "#555555", 10)
     label(ax, 0.012, 0.905, "训练信号\n↑", "#888888", 10, ha="left")
-    label(ax, 0.5, 0.012, "同一列可以配不同的训练信号，同一行可以配不同的更新范围——两条轴是正交的",
-          "#888888", 10)
     save(fig, "lecture12", "fig12-1-two-axes-map")
 
 
@@ -1580,10 +1911,10 @@ def vram_under_each_strategy():
     # 分片按 N=8 卡，与 4.4.6 表里的 Stage 2 / Stage 3 公式一致。
     n = 8
     plans = [
-        ("①单卡\n基线", 14, 14, 84, 12),
-        ("②省显存\n四件套", 14, 14, 0, 3),
-        ("③DDP\n(8 卡)", 14, 14, 84, 12),
-        ("④ZeRO-2\n(8 卡)", 14, 14 / n, 84 / n, 12),
+        ("(1) 单卡\n基线", 14, 14, 84, 12),
+        ("(2) 省显存\n四件套", 14, 14, 0, 3),
+        ("(3) DDP\n(8 卡)", 14, 14, 84, 12),
+        ("(4) ZeRO-2\n(8 卡)", 14, 14 / n, 84 / n, 12),
         ("⑤ZeRO-3\n(8 卡)", 14 / n, 14 / n, 84 / n, 12),
     ]
     segs = [("参数 fp16", BLUE), ("梯度 fp16", GREEN), ("优化器状态 fp32", ORANGE),
@@ -1620,9 +1951,6 @@ def vram_under_each_strategy():
               bbox_to_anchor=(0.5, 1.13), handletextpad=0.4, columnspacing=1.2)
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
-    fig.text(0.5, 0.015, "斜纹那段是激活值：它随批量与序列长度变，图上只画一个示意高度；"
-                         "其余三段按 16 字节/参数精确折算",
-             ha="center", fontsize=10, color="#888888")
     fig.tight_layout(rect=(0, 0.06, 1, 1))
     save(fig, "lecture12", "fig12-4-vram-under-each-strategy")
 
@@ -1647,6 +1975,10 @@ policy_spectrum()
 train_deploy_roundtrip()
 normalization_ranges()
 scale_error_symptoms()
+error_snowball()
+abs_vs_delta_axis()
+mismatch_failures()
+q99_normalization()
 realtime_three_routes()
 long_horizon_paradigms()
 one_cut_three_lines()

@@ -6,12 +6,15 @@
 """
 
 import json
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-plt.rcParams["font.sans-serif"] = ["Noto Sans CJK SC", "Noto Sans CJK JP", "WenQuanYi Zen Hei"]
-plt.rcParams["axes.unicode_minus"] = False
+# 全书统一字体：西文 Times New Roman、中文宋体。字体路径走环境变量，取不到就报错停下。
+sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "assets" / "figures"))
+import figstyle  # noqa: E402  —— 必须在 sys.path 补好之后再导入
+FONT_NAME = figstyle.apply()
 
 here = Path(__file__).parent
 curves = json.loads((here.parent / "result" / "1_1_g1_walk_rl" / "train-reward-curves.json").read_text())
@@ -62,5 +65,5 @@ ax.set_title(f"G1 行走：三个算法的训练奖励曲线（细线为原始�
 ax.legend(loc="lower right")
 ax.grid(alpha=0.3)
 fig.tight_layout()
-fig.savefig(out_path, dpi=200)
+fig.savefig(out_path, dpi=200, metadata={"Font": FONT_NAME})
 print(f"图已保存到 {out_path}")
