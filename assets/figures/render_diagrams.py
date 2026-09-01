@@ -254,24 +254,6 @@ def save(fig, lecture, name):
                          f"低于 {MIN_PRINT_PT} pt。请收窄画布或加大字号，不要去调排版 width%。")
 
 
-# ── 第14讲 2.1：智能体与环境的交互闭环 ──────────────────────────────────
-# 标签直接压在箭头弧顶上（白底），不再靠两侧留白摆放——留白一放大，字反而更小。
-def agent_env_loop():
-    fig, ax = canvas(6.0, 3.0)
-    agent = (0.30, 0.70, 0.40, 0.22)
-    env = (0.30, 0.06, 0.40, 0.22)
-    box(ax, *agent, BLUE, [("智能体", 13, True), ("策略 $\\pi$：看到什么 → 做什么", 10, False)])
-    box(ax, *env, GREEN, [("环境", 13, True), ("按物理规律推进一步", 10, False)])
-
-    # 闭环走正交折线，两端都接在框的边中点上：右侧下行送动作，左侧上行回状态。
-    elbow(ax, side(*agent, "right"), side(*env, "right"), RED, via="hvh", detour=0.87)
-    label(ax, 0.87, 0.49, "动作 $a_t$", RED, 11, True, bg=True)
-    elbow(ax, side(*env, "left"), side(*agent, "left"), BLUE, via="hvh", detour=0.13)
-    label(ax, 0.13, 0.49, "新状态 $s_{t+1}$\n奖励 $r_{t+1}$", BLUE, 11, True, bg=True)
-    label(ax, 0.5, 0.49, "如此循环，直到回合结束", "#888888", 10)
-    save(fig, "lecture14", "fig141-agent-env-loop")
-
-
 # ── 第14讲 2.2：动作空间分两类 ──────────────────────────────────────────
 def action_space():
     fig, ax = canvas(6.8, 3.2)
@@ -896,46 +878,6 @@ def one_cut_three_lines():
     label(ax, 0.845, 0.165, "下面不懂任务", INK, 10)
 
     save(fig, "lecture13", "fig13-4-one-cut-three-lines")
-
-
-# ── 第8讲 1.1：生成机器人运动的两支 ────────────────────────────────────
-# 原来那张英文截图只是把"分成两支"这件事画了出来，看不出这一讲站在哪一支上。
-# 重画时把走向标出来：右支加粗、底部一条"本讲与第9–13讲全在这一支上"的落点。
-def motion_taxonomy():
-    fig, ax = canvas(7.0, 3.8)
-    root = (0.355, 0.865, 0.29, 0.105)
-    left = (0.045, 0.645, 0.42, 0.145)
-    right = (0.535, 0.645, 0.42, 0.145)
-    box(ax, *root, GREY, [("生成机器人运动", 12, True)])
-    box(ax, *left, BLUE,
-        [("显式建模 explicit modeling", 11, True), ("人写规则一步步算出来", 10, False)])
-    box(ax, *right, GREEN,
-        [("隐式建模 implicit modeling", 11, True), ("从数据里学出来", 10, False)])
-
-    # 分叉走正交：从根框底边中点下来，沿一条横带分左右，再垂直进两个子框顶边。
-    for child in (left, right):
-        connect(ax, root, "bottom", child, "top", EDGE, stub=0.035, lane=0.825)
-
-    # 每组的竖干落在子框外侧的空白里（早先取在框内 0.085，线就贴着框左边缘跑）。
-    for parent, xbox, color, items in (
-            (left, 0.130, BLUE, ["正运动学", "逆运动学", "规划与控制（RRT、MPC）"]),
-            (right, 0.620, GREEN, ["深度强化学习", "从专家示教中学习"])):
-        xline = xbox - 0.055          # 落在子框左侧的空白，不贴任何框边
-        for i, text in enumerate(items):
-            y = 0.500 - i * 0.110
-            child = (xbox, y, 0.335, 0.086)
-            plain_box(ax, *child, color)
-            label(ax, xbox + 0.1675, y + 0.043, text, INK, 10)
-            ax.plot([xline, xline], [parent[1] - 0.030, y + 0.043],
-                    color=EDGE, linewidth=BOX_LW)
-            arrow(ax, (xline, y + 0.043), (xbox - 0.008, y + 0.043), lw=BOX_LW)
-        ax.plot([xline, xline], [parent[1], parent[1] - 0.030], color=EDGE, linewidth=BOX_LW)
-
-
-    plain_box(ax, 0.535, 0.115, 0.42, 0.175, GREEN, fill="#D8EDE1", lw=2.0)
-    label(ax, 0.745, 0.235, "本讲起走这一支", INK, 11, True)
-    label(ax, 0.745, 0.155, "观测直接进、动作直接出", INK, 10)
-    save(fig, "lecture08", "fig08-1-motion-taxonomy")
 
 
 # ── 第8讲 2.3：策略的四档谱系 ──────────────────────────────────────────
@@ -1897,7 +1839,6 @@ interpolation_paths()
 teleop_tradeoff_map()
 lerobot_layers()
 record_loop_timing()
-motion_taxonomy()
 policy_spectrum()
 train_deploy_roundtrip()
 normalization_ranges()
@@ -1908,7 +1849,6 @@ mismatch_failures()
 q99_normalization()
 long_horizon_paradigms()
 one_cut_three_lines()
-agent_env_loop()
 action_space()
 discount_horizon()
 policy_distribution()
