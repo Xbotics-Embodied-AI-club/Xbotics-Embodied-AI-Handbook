@@ -1805,7 +1805,7 @@ def qlora_architecture():
 
 def qlora_memory():
     """基座权重显存：fp16 与 4-bit 的粗略对比。"""
-    fig, ax = plt.subplots(figsize=(7.0, 3.1))
+    fig, ax = plt.subplots(figsize=(6.2, 2.9))
     bars = [("7B\nfp16", 14.0, BLUE), ("7B\n4-bit", 3.5, GREEN),
             ("65B\nfp16", 130.0, BLUE), ("65B\n4-bit", 32.5, GREEN)]
     xs = [0, 0.85, 2.35, 3.2]
@@ -1819,10 +1819,9 @@ def qlora_memory():
     ax.tick_params(labelsize=10)
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
-    ax.text(0.0, -0.30, "实际训练还要加激活值、LoRA 参数、优化器状态和框架开销；"
-                        "QLoRA 的优势是冻结 4-bit 基座，只训练少量 LoRA 参数。",
-            transform=ax.transAxes, fontsize=10, color="#666666", va="center")
-    fig.tight_layout(rect=(0, 0.10, 1, 1))
+    # 「这张只量基座权重」那句交代留在正文（讲义 3.6.4 紧跟的一段），不进图里——
+    # 横排的长注解会把 tight bbox 撑到 8 in 宽，缩放比掉到 0.8，10 pt 印出只剩 8.0 pt 压线。
+    fig.tight_layout()
     save(fig, "lecture12", "fig12-3-qlora-memory")
 
 
