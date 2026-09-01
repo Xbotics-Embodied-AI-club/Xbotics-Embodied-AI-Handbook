@@ -967,24 +967,33 @@ def one_cut_three_lines():
 # 重画时把走向标出来：右支加粗、底部一条"本讲与第9–13讲全在这一支上"的落点。
 def motion_taxonomy():
     fig, ax = canvas(7.0, 3.8)
-    box(ax, 0.355, 0.865, 0.29, 0.105, GREY, [("生成机器人运动", 12, True)])
-    arrow(ax, (0.44, 0.860), (0.255, 0.795), "#888888")
-    arrow(ax, (0.56, 0.860), (0.745, 0.795), "#888888")
-
-    box(ax, 0.045, 0.645, 0.42, 0.145, BLUE,
+    root = (0.355, 0.865, 0.29, 0.105)
+    left = (0.045, 0.645, 0.42, 0.145)
+    right = (0.535, 0.645, 0.42, 0.145)
+    box(ax, *root, GREY, [("生成机器人运动", 12, True)])
+    box(ax, *left, BLUE,
         [("显式建模 explicit modeling", 11, True), ("人写规则一步步算出来", 10, False)])
-    box(ax, 0.535, 0.645, 0.42, 0.145, GREEN,
+    box(ax, *right, GREEN,
         [("隐式建模 implicit modeling", 11, True), ("从数据里学出来", 10, False)])
 
-    for xline, xbox, color, items in (
-            (0.085, 0.130, BLUE, ["正运动学", "逆运动学", "规划与控制（RRT、MPC）"]),
-            (0.575, 0.620, GREEN, ["深度强化学习", "从专家示教中学习"])):
+    # 分叉走正交：从根框底边中点下来，沿一条横带分左右，再垂直进两个子框顶边。
+    for child in (left, right):
+        connect(ax, root, "bottom", child, "top", "#888888", stub=0.035, lane=0.825)
+
+    # 每组的竖干落在子框外侧的空白里（早先取在框内 0.085，线就贴着框左边缘跑）。
+    for parent, xbox, color, items in (
+            (left, 0.130, BLUE, ["正运动学", "逆运动学", "规划与控制（RRT、MPC）"]),
+            (right, 0.620, GREEN, ["深度强化学习", "从专家示教中学习"])):
+        xline = xbox - 0.055          # 落在子框左侧的空白，不贴任何框边
         for i, text in enumerate(items):
             y = 0.500 - i * 0.110
-            ax.plot([xline, xline], [0.640, y + 0.043], color=color, linewidth=1.2)
-            arrow(ax, (xline, y + 0.043), (xbox - 0.005, y + 0.043), color, lw=1.2)
-            plain_box(ax, xbox, y, 0.335, 0.086, color)
+            child = (xbox, y, 0.335, 0.086)
+            plain_box(ax, *child, color)
             label(ax, xbox + 0.1675, y + 0.043, text, "#444444", 10)
+            ax.plot([xline, xline], [parent[1] - 0.030, y + 0.043],
+                    color=color, linewidth=1.2)
+            arrow(ax, (xline, y + 0.043), (xbox - 0.008, y + 0.043), color, lw=1.2)
+        ax.plot([xline, xline], [parent[1], parent[1] - 0.030], color=color, linewidth=1.2)
 
 
     plain_box(ax, 0.535, 0.115, 0.42, 0.175, GREEN, fill="#D8EDE1", lw=2.0)
