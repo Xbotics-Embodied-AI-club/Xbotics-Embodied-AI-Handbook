@@ -1093,9 +1093,9 @@ trainable / frozen：
 \subsection{2.3 实验：在仿真里把 SmolVLA 全量微调到
 SO-101}\label{ux5b9eux9a8cux5728ux4effux771fux91ccux628a-smolvla-ux5168ux91cfux5faeux8c03ux5230-so-101}
 
-数据全部出自我们自己的 SO-101
-仿真器（\texttt{code/vla/5\_vla\_finetune/5\_2\_smolvla\_full\_sft/}）：仿真里跑出来的成功轨迹转成
-LeRobot 数据集，这条生成流程见第16讲 6.3 节。微调从社区预训练权重
+数据全部出自我们自己的 SO-101 仿真器：仿真里跑出来的成功轨迹转成 LeRobot
+数据集，这条生成流程见第16讲 6.3 节。配套代码在
+\texttt{code/vla/5\_vla\_finetune/5\_2\_smolvla\_full\_sft/}。微调从社区预训练权重
 \texttt{lerobot/smolvla\_base}
 出发，全参数更新，不挂任何适配器。三个入口分别是：
 
@@ -1134,8 +1134,7 @@ SO-101 仿真器就位后补齐，届时本节会换上完整的收敛曲线与�
 \subsection{2.4 实物实验：把 SmolVLA 全量微调到 SO-101
 真机}\label{ux5b9eux7269ux5b9eux9a8cux628a-smolvla-ux5168ux91cfux5faeux8c03ux5230-so-101-ux771fux673a}
 
-这一节等我们自己的 SO-101
-真机数据采齐后再写。仿真那条线上的流程原样适用：数据集格式、相机键映射、\texttt{pc\_success}
+真机这条线还没开展，本节先只立题。仿真那条线上的流程在真机上原样适用：数据集格式、相机键映射、\texttt{pc\_success}
 的读法都不变，真机额外多出来的只有两件事：数据来路，以及闭环里误差会一步步累积、开环逐帧比对读不出来的那部分风险。
 
 \subsection{2.5 本节小结}\label{ux672cux8282ux5c0fux7ed3-1}
@@ -2155,8 +2154,8 @@ LoRA 有没有真正生效的最直接证据。
 SO-101
 真机}{3.10 实物实验：给 \textbackslash pi\_0 挂 LoRA 微调到 SO-101 真机}}\label{ux5b9eux7269ux5b9eux9a8cux7ed9-pi_0-ux6302-lora-ux5faeux8c03ux5230-so-101-ux771fux673a}
 
-这一节和 2.4
-节一样，等真机数据采齐后再写。上面那份默认注入名单、\texttt{-\/-peft.*}
+和 2.4
+节一样，真机这条线还没开展，本节先只立题。上面那份默认注入名单、\texttt{-\/-peft.*}
 那几个参数、以及``先确认可训练参数量降下来''这个检查，在真机上都不变；要现场定的是秩取多少、以及动作专家之外还要不要覆盖别的层。
 
 \subsection{3.11 本节小结}\label{ux672cux8282ux5c0fux7ed3-2}
@@ -2203,8 +2202,10 @@ VLA 小数据微调 & LoRA（\(r=16\sim32\)） & 过拟合风险低，也保留�
 第 2、3 节把 VLA 微调到了自己的机器人上。小模型全量微调、或者给大模型挂
 LoRA，单张卡大多还扛得住；可一旦要全量微调 \(\pi_0\) 这种 3B
 量级、甚至更大的
-VLA，单卡立刻开始吃紧：配套代码里那条真机微调脚本默认还是单卡在训
-\(\pi_0\)，代价是权重压到 bf16、批量只敢给
+VLA，单卡立刻开始吃紧：配套代码里那条真机微调脚本（跑的是一批\textbf{公开的}
+SO-101 遥操作数据，我们自己的真机数据见 2.4
+节，还没采齐）默认还是单卡在训 \(\pi_0\)，代价是权重压到
+bf16、批量只敢给
 8；想把批量放大、想再换大一档的模型，或者手上的卡再小一号，就会直接撞墙。这一节把多卡训练从头讲到尾：先算清训练显存被谁吃掉，再依次讲数据并行、省显存四件套、ZeRO/FSDP
 分片、模型并行，最后落到双卡实战。
 
@@ -2355,7 +2356,7 @@ GB）。两个数都对，只是口径不同；本节之后一律用 16 字节/�
 
 关键的反直觉点在于：\textbf{真正撑爆显存的是优化器状态（84
 GB），参数只占 14
-GB}。它一个人就占了大头。这也解释了为什么后面省显存的技术里，``对优化器状态动刀''是收益最大的一类。
+GB}。优化器状态一个人就占了大头。这也解释了为什么后面省显存的技术里，``对优化器状态动刀''是收益最大的一类。
 
 \begin{quote}
 备注：这里用的是混合精度 + Adam 的标准账本。换优化器（如 SGD
@@ -2947,8 +2948,8 @@ GPU 的半精度算力，又快又省。
 \paragraph{（2）AMP
 的三件配合}\label{amp-ux7684ux4e09ux4ef6ux914dux5408}
 
-AMP
-的做法是\textbf{该用低精度的地方用低精度、该保高精度的地方保高精度}，三件事配合起来：
+AMP 并不把一切都换成
+fp16，它\textbf{该用低精度的地方用低精度、该保高精度的地方保高精度}，三件事配合起来：
 
 \begin{itemize}
 \tightlist
@@ -3024,7 +3025,7 @@ accumulation）}，专治一个很具体的窘境：你想用大批量训练（�
 
 \paragraph{（1）显存峰值是被谁顶起来的}\label{ux663eux5b58ux5cf0ux503cux662fux88abux8c01ux9876ux8d77ux6765ux7684}
 
-先看清一件事：训练时的\textbf{显存峰值，主要由一次前向反向里那批数据的激活值顶起来}。批量越大，同时存在显存里的激活就越多，峰值越高。所以``放不下''常常是\textbf{这一批的激活放不下}。
+先看清一件事：训练时的\textbf{显存峰值，主要由一次前向反向里那批数据的激活值顶起来}。批量越大，同时存在显存里的激活就越多，峰值越高。所以``放不下''常常卡在\textbf{这一批的激活}上，而不是参数本身放不下。
 
 梯度累积的洞察是：大批量之所以``等效''，靠的是它在更新参数前\textbf{汇总了足够多样本的梯度}；而样本的梯度是可以\textbf{一笔一笔累加}的：分几次算、把梯度加到一起，和一次性算一大批，得到的总梯度是一样的。
 
@@ -3370,7 +3371,7 @@ all-gather 临时拼回完整参数、用 reduce-scatter
 参数''的顺序，一层层把这套切法用上去。
 
 \subsubsection{4.4.3 ZeRO Stage
-1：先切最大的那块（优化器状态）}\label{zero-stage-1ux5148ux5207ux6700ux5927ux7684ux90a3ux5757ux4f18ux5316ux5668ux72b6ux6001}
+1：先切最大的那块（优化器状态那一块）}\label{zero-stage-1ux5148ux5207ux6700ux5927ux7684ux90a3ux5757ux4f18ux5316ux5668ux72b6ux6001ux90a3ux4e00ux5757}
 
 切谁先切？回到 4.1 节的账本：混合精度 + Adam
 下，\textbf{优化器状态是前三类里最大的一块}。
@@ -4120,7 +4121,7 @@ node = 每台机器，这里就一台）。torchrun
 进程，分别绑到 GPU 0 和 GPU 1 上。
 
 这里最反直觉的一点要先说透：\textbf{这两个进程跑的是一模一样的代码。}
-不是一个进程当``主''、另一个当``从''分别执行不同脚本，而是同一份脚本被原样跑了两遍。那它们怎么做到``各算各的数据子集、只在一处打日志''而不互相打架？靠的是
+同一份脚本被原样跑了两遍，没有一个当``主''、另一个当``从''那样各执行不同脚本。那它们怎么做到``各算各的数据子集、只在一处打日志''而不互相打架？靠的是
 torchrun
 给每个进程注入的一组\textbf{环境变量}，让每个进程知道``我是第几个''。
 
@@ -4258,8 +4259,9 @@ strategy & 它是什么（对应小节） & 什么时候用 \\
 
 前面 torchrun 和 Lightning 讲的是``自己写训练循环时怎么上多卡''。但 VLA
 这门课真正要训的 ACT、\(\pi_0\) 这些策略，跑的是 \textbf{LeRobot}
-这套现成框架。它的多卡入口既不是 torchrun，也不是 Lightning 的
-strategy，而是 Hugging Face 的 \textbf{\texttt{accelerate\ launch}}。
+这套现成框架。它的多卡入口是 Hugging Face 的
+\textbf{\texttt{accelerate\ launch}}，既非 torchrun、也非 Lightning 的
+strategy。
 
 下面的命令与参数名都以 \textbf{LeRobot v0.5.1} 为准（本书
 \texttt{code/pyproject.toml}
@@ -4340,9 +4342,10 @@ lerobot-train 的（控制训什么）：
 
 配套代码里那条真机微调脚本
 \texttt{code/vla/5\_vla\_finetune/5\_4\_so101\_real\_sft/train\_so101\_real.sh}
-里就有这个分支：脚本顶部一个 \texttt{NUM\_GPUS} 变量，填 1 时直接调
-\texttt{lerobot-train}，大于 1 时换成上面这条
-\texttt{accelerate\ launch\ -\/-multi\_gpu}
+里就有这个分支（提醒一句：它用的是公开的 SO-101
+遥操作数据，本讲的实验主线在仿真那一侧，见 2.3 节）：脚本顶部一个
+\texttt{NUM\_GPUS} 变量，填 1 时直接调 \texttt{lerobot-train}，大于 1
+时换成上面这条 \texttt{accelerate\ launch\ -\/-multi\_gpu}
 的写法，训练参数一个字都不用改------单卡与多卡的差别只在最外面那层启动器。
 
 \paragraph{（3）混合精度交给 accelerate

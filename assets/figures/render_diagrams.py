@@ -792,7 +792,10 @@ def long_horizon_paradigms():
 
     cell(0.010, 0.575, "(a) 朴素端到端 VLA", (True, False, False),
          lambda cx, y0: one_policy(cx, y0, with_gate=False))
-    cell(0.515, 0.575, "(b) 两段式：拆成两个策略", (False, True, False),
+    # (b) 的「技能串接」是勾不是叉：串接能力恰恰来自「移动/交互各训一个策略」这件事本身，
+    # 原论文的四范式对照里 (b) 就是「会串接但不统一」。掩码闸门的作用是让 (d) 在收成
+    # 一个模型之后把这份能力**保住**，不是它第一次带来串接。
+    cell(0.515, 0.575, "(b) 两段式：拆成两个策略", (False, True, True),
          lambda cx, y0: two_policies(cx, y0, with_gate=False))
     cell(0.010, 0.160, "(c) 两段式 + 输入级适配", (False, True, True),
          lambda cx, y0: two_policies(cx, y0, with_gate=True))
@@ -1641,7 +1644,8 @@ def two_axes_map():
     for j, name in enumerate(cols):
         label(ax, x0 + (j + 0.5) * cw, 0.905, name, INK, 11, True)
     for i, name in enumerate(rows):
-        label(ax, x0 - 0.018, y0 + (i + 0.5) * ch, name, INK, 11, True, ha="right")
+        # 行标里最长的是「PPO / GRPO」，-0.018 会让它的首字母压到纵轴箭头上。
+        label(ax, x0 - 0.030, y0 + (i + 0.5) * ch, name, INK, 11, True, ha="right")
 
     # 只有真正在本讲（或第15讲）出现过的组合才摆点，不为了填满格子编组合。
     # 格子只有 0.23 宽，长名字一律拆两行——单行写满会顶出框外。
@@ -1748,7 +1752,9 @@ def lora_transformer_targets():
                 bx = x0 + 0.025 + j * cw
                 plain_box(ax, bx, 0.585 - i * 0.115, cw - 0.014, 0.085, color)
                 label(ax, bx + (cw - 0.014) / 2, 0.6275 - i * 0.115, name, INK, 10)
-        label(ax, x0 + w / 2, 0.355, note, color, 10)
+        # 注解必须落在最后一行方框**下面**：y 写死时，三行的那一栏（MLP）第三行
+        # 正好压在注解上，两串字互相叠掉。按行数算才对。
+        label(ax, x0 + w / 2, 0.585 - (len(rows) - 1) * 0.115 - 0.030, note, color, 10)
 
     plain_box(ax, 0.012, 0.505, 0.10, 0.10, GREY, fill="#F6F6F6", lw=1.0)
     label(ax, 0.062, 0.555, "输入 $x$", INK, 10)

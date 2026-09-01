@@ -1119,10 +1119,9 @@ Expert}\label{ux603bux4f53ux7ed3ux6784vlm-ux9aa8ux5e72-action-expert}
 \end{enumerate}
 
 两组权重可以理解为实现于同一个 Transformer 框架中的两套
-expert：它们通过自注意力计算彼此交互，但并不是简单地共享一整套
-attention/MLP
-参数，而是各自保有与自身宽度匹配的参数集。这种设计可以类比为一种
-\textbf{按 token 类型固定路由}
+expert：它们通过自注意力计算彼此交互，但各自保有与自身宽度匹配的参数集，并不共享一整套
+attention/MLP 参数。这种设计可以类比为一种 \textbf{按 token
+类型固定路由}
 的两专家结构，而不是经典的稀疏门控混合专家（Mixture-of-Experts,
 MoE，由一个门控网络按内容动态挑选专家）：视觉-语言 token 固定走 VLM
 骨干，机器人状态与动作 token 固定走 Action Expert。

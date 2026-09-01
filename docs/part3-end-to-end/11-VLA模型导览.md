@@ -455,7 +455,7 @@ $\pi_0$ 的架构可以理解为一个带有两组权重的 Transformer：
 1. **VLM 骨干**（约 3B 参数）：基于 PaliGemma，处理图像和语言 token
 2. **Action Expert**（约 300M 参数）：从头初始化，处理机器人状态和动作 token
 
-两组权重可以理解为实现于同一个 Transformer 框架中的两套 expert：它们通过自注意力计算彼此交互，但并不是简单地共享一整套 attention/MLP 参数，而是各自保有与自身宽度匹配的参数集。这种设计可以类比为一种 **按 token 类型固定路由** 的两专家结构，而不是经典的稀疏门控混合专家（Mixture-of-Experts, MoE，由一个门控网络按内容动态挑选专家）：视觉-语言 token 固定走 VLM 骨干，机器人状态与动作 token 固定走 Action Expert。
+两组权重可以理解为实现于同一个 Transformer 框架中的两套 expert：它们通过自注意力计算彼此交互，但各自保有与自身宽度匹配的参数集，并不共享一整套 attention/MLP 参数。这种设计可以类比为一种 **按 token 类型固定路由** 的两专家结构，而不是经典的稀疏门控混合专家（Mixture-of-Experts, MoE，由一个门控网络按内容动态挑选专家）：视觉-语言 token 固定走 VLM 骨干，机器人状态与动作 token 固定走 Action Expert。
 
 $$
 \text{总参数量} = \underbrace{3\text{B}}_{\text{PaliGemma}} + \underbrace{300\text{M}}_{\text{Action Expert}} = 3.3\text{B}
