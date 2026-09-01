@@ -335,7 +335,7 @@ batch
 多出来的其实只有一样东西------\textbf{中间那个池子}，但正是它让''数据''从消耗品变成了资产。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1707\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4077\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4216\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1837\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4013\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4150\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
  & on-policy（第14讲、第15讲） & off-policy（本讲） \\
 \midrule\noalign{}
@@ -704,7 +704,7 @@ minibatch} 做回归------而这个 batch
 \end{figure}%
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0795\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3572\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1349\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2521\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1761\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0844\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3266\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1469\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2328\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2094\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 版本 & 方法 & 环境步数 & 末 50 回合平均回报 & 其中满分回合 \\
 \midrule\noalign{}
@@ -1557,7 +1557,7 @@ SAC 每 300 次迭代存一档，十档的 reward 依次是
 训练必须存档并逐档评测，不能训完直接取最后一档}------最后一档很可能不是最好那一档。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0633\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1674\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1979\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1113\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1266\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1270\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2066\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0720\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1119\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1554\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1657\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1657\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1814\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1479\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 版本 & 算法 & 最好的一档 reward & 该档摔倒率 & 该档交互量 & 该档墙钟 & 跑满 3000 迭代总墙钟 \\
 \midrule\noalign{}
@@ -1630,8 +1630,8 @@ squint，我们已经能在仿真里从零学会一个操作任务了。但那�
 R
 重来。这一节把这三张''仿真特权卡''全部收走，看看真机上还缺什么，再用一整套工程答案把它补齐。好消息是不用从头造轮子：这套答案叫
 \textbf{HIL-SERL}{[}11{]}，而且已经被 LeRobot{[}12{]} 官方移植到
-SO-100/SO-101------第9讲 4.1
-节采数据用的那套主从臂，现在原封不动就能变成一套真机强化学习装备。所以这一节采取''\textbf{概念一件、操作一件}''的走法：每讲清
+SO-100/SO-101------第9讲 4.1 节采数据用的那套 Leader--Follower
+臂，现在原封不动就能变成一套真机强化学习装备。所以这一节采取''\textbf{概念一件、操作一件}''的走法：每讲清
 HIL-SERL 的一个部件，紧接着就给出它在 LeRobot 里对应的那一步命令。
 
 \subsection{8.1 把 SAC
@@ -2106,7 +2106,7 @@ off-policy 不挑数据来源这一条根性质。
 RL，放进一张表里，差异一目了然：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1281\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2871\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2566\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3281\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1943\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2825\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2318\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2914\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
  & 第14讲 & 第15讲 & 第16讲 \\
 \midrule\noalign{}
@@ -2139,8 +2139,8 @@ critic & 有（GAE 基线） & 无（组内相对优势） & 有（Q 函数，�
   \textbf{第8讲}立了骨架：端到端 policy，观测进、动作出，rollout
   才是唯一的裁判。
 \item
-  \textbf{第9讲}解决原料：遥操作采集、LeRobot
-  数据闭环------今天它的主从臂和数据格式在 RL 里原样复用。
+  \textbf{第9讲}解决原料：遥操作采集、LeRobot 数据闭环------今天它的
+  Leader--Follower 臂和数据格式在 RL 里原样复用。
 \item
   \textbf{第10讲}给了第一批可用的大脑：ACT、Diffusion Policy、Flow
   Matching，模仿学习把示教''学得像''。

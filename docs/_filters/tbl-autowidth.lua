@@ -123,6 +123,15 @@ local function col_fracs(tbl, n)
   scan(tbl.head.rows)
   for _, b in ipairs(tbl.bodies) do scan(b.body) end
 
+  -- 短标签列不参与收缩。中文逐字可断 ⇒ cell_min_width 给的下限是 2（一个汉字），
+  -- 于是「常见表述」「多模态能力」这类 4–5 字的表头列会被长说明列挤到只剩 3 个字宽、
+  -- 逐字折成两三行。判据：整列最宽的单元格本身就不超过 SHORT_LABEL 时，
+  -- 它的下限直接取全宽 —— 一个短标签列宽一点，代价是长说明列窄一点，读起来划算得多。
+  local SHORT_LABEL = 12                    -- 单位：6 个汉字 / 12 个西文字符
+  for i = 1, n do
+    if w[i] <= SHORT_LABEL and w[i] > wmin[i] then wmin[i] = w[i] end
+  end
+
   local d, fl = {}, {}
   local sumd = 0
   for i = 1, n do

@@ -842,7 +842,7 @@ def policy_spectrum():
 # 标签不再竖排，改成写在每一排上方的行首。
 def train_deploy_roundtrip():
     fig, ax = canvas(7.8, 3.4)
-    upper = ["示教数据", "统一动作口径\n（绝对 / 相对）", "归一化\n（各维压到 [-1, 1]）", "网络\n（训练）"]
+    upper = ["示教数据", "统一动作口径\n（绝对 / 相对）", "归一化\n（各维压到 $[-1, 1]$）", "网络\n（训练）"]
     lower = ["机器人执行\n（裁剪 / 限位兜底）", "还原动作口径\n（相对口径需累加）",
              "反归一化\n（乘回 $\\sigma$、加回 $\\mu$）", "网络\n（推理输出）"]
 
@@ -944,7 +944,7 @@ def lerobot_layers():
               ("AI 策略模型层", "policies/：ACT、$\\pi_0$、SmolVLA", False),
               ("数据处理管线", "processor/ + datasets/", True),
               ("实物与仿真抽象层", "robots/、envs/", False),
-              ("遥操作器", "teleoperators/：主臂、手柄", True),
+              ("遥操作器", "teleoperators/：Leader 臂、手柄", True),
               ("基础设施层", "configs/ + utils/ + transport/", False)]
 
     x0, w, h, gap = 0.03, 0.60, 0.105, 0.030
@@ -960,9 +960,9 @@ def lerobot_layers():
         if i:
             arrow(ax, (x0 + 0.10, y + h + gap - 0.003), (x0 + 0.10, y + h + 0.003), EDGE, lw=1.2)
 
-    # lerobot-record 实际穿过的那条路：入口 → 遥操作器读动作 → 实物执行 → 数据管线落盘。
+    # lerobot-record 实际经过的那条路：入口 → 遥操作器读动作 → 实物执行 → 数据管线落盘。
     px = x0 + w + 0.045
-    label(ax, px, 0.955, "lerobot-record 穿过的路", RED, 11, True, ha="left")
+    label(ax, px, 0.955, "lerobot-record 经过哪几层", RED, 11, True, ha="left")
     order = [0, 4, 3, 2]
     # 三段跳各占一条竖带（越靠外的跳得越远），走正交折线。
     # 早先三段同挤在 px 上、又都是大圆弧，四步的先后顺序在图上根本读不出来。
@@ -970,7 +970,7 @@ def lerobot_layers():
         lane = px + 0.030 + k * 0.026
         _polyline(ax, [(px, tops[a]), (lane, tops[a]), (lane, tops[b]), (px, tops[b])],
                   RED, 1.4, 0.012)
-    for i, note in ((0, "(1) 起于命令"), (4, "(2) 读主臂动作"), (3, "(3) 从臂执行、相机出图"),
+    for i, note in ((0, "(1) 起于命令"), (4, "(2) 读 Leader 臂动作"), (3, "(3) Follower 臂执行、相机出图"),
                     (2, "(4) 拼成一帧写进数据集")):
         ax.plot([x0 + w + 0.004, px], [tops[i], tops[i]], color=RED, linewidth=1.0,
                 linestyle=(0, (2, 2)))
@@ -1250,12 +1250,14 @@ def q99_normalization():
     ax.set_ylim(0, 860)
 
     # 竖线的标签放线的一侧、不骑在线上；三个标签共用一条基线。
+    # 分位数符号走 mathtext（figstyle 已把 mathtext.fontset 设成 stix），和正文的
+    # $q_{01}$ / $q_{99}$ 是同一套写法——图里图外不能一个是数学体、一个是正文体。
     LINE_LABEL_Y = 790
     ax.axvline(q01, color=GREEN, linewidth=2.2)
-    ax.text(q01 + 0.07, LINE_LABEL_Y, "q01", ha="left", va="center",
+    ax.text(q01 + 0.07, LINE_LABEL_Y, "$q_{01}$", ha="left", va="center",
             fontsize=10.5, color=GREEN)
     ax.axvline(q99, color=GREEN, linewidth=2.2)
-    ax.text(q99 + 0.09, LINE_LABEL_Y, "q99", ha="left", va="center",
+    ax.text(q99 + 0.09, LINE_LABEL_Y, "$q_{99}$", ha="left", va="center",
             fontsize=10.5, color=GREEN)
     ax.axvline(spikes.max(), color=RED, linewidth=2.0, linestyle="--")
     ax.text(spikes.max() - 0.07, LINE_LABEL_Y, "max", ha="right", va="center",
@@ -1286,9 +1288,9 @@ def q99_normalization():
             fontsize=10.5, color="#333333")
 
     # 三列竖直对齐；毛刺那列往左收，别贴到画布边。
-    for x, top_text, bot_text, color in ((0.26, "q01", "-1", GREEN),
+    for x, top_text, bot_text, color in ((0.26, "$q_{01}$", "-1", GREEN),
                                          (0.48, "0.5", "0", GREY),
-                                         (0.70, "q99", "+1", GREEN)):
+                                         (0.70, "$q_{99}$", "+1", GREEN)):
         ax.plot(x, TOP, "o", markersize=9, color=color)
         ax.text(x, TOP + 0.10, top_text, ha="center", va="center",
                 fontsize=10.5, color=color)
@@ -1389,16 +1391,25 @@ def interpolation_paths():
     fig, ax = plt.subplots(figsize=(6.8, 3.3))
 
     # 端点手工摆开，不用随机种子——要的是"配对是乱的、所以连线交叉"这件事看得清楚。
-    # 左列是噪声样本，右列是数据样本（双峰），同一下标的两个点配成一条条件路径。
-    noise = [1.55, 0.85, 0.25, -0.40, -1.05, -1.60, 0.55]
-    data = [-1.30, 1.75, -1.60, 1.30, 2.00, -1.85, 1.55]
+    # 左列是噪声样本，右列是数据样本（双峰），同一编号的两个点配成一条条件路径。
+    #
+    # 原来画 7 对、端点不编号，读者看到的是一团交叉线，看不出"哪个点跟哪个点是一对"
+    # （用户批注：这个图很难理解）。现在只画 4 对，并把编号写在每个端点旁边——
+    # "同一编号配成一条"这句话在图上直接读得出来，交叉是编号乱序的结果，不是随手画的。
+    noise = [1.55, 0.55, -0.45, -1.55]
+    data = [-1.35, 1.85, -1.75, 1.35]
 
     for i, (a, b) in enumerate(zip(noise, data)):
         if i == 0:
             continue
         ax.plot([0, 1], [a, b], color=GREY, linewidth=1.3, alpha=0.85, zorder=2)
-    ax.scatter([0] * 7, noise, s=44, facecolor=FILL[BLUE], edgecolor=BLUE, linewidth=1.6, zorder=4)
-    ax.scatter([1] * 7, data, s=44, facecolor=FILL[GREEN], edgecolor=GREEN, linewidth=1.6, zorder=4)
+    n = len(noise)
+    ax.scatter([0] * n, noise, s=52, facecolor=FILL[BLUE], edgecolor=BLUE, linewidth=1.6, zorder=4)
+    ax.scatter([1] * n, data, s=52, facecolor=FILL[GREEN], edgecolor=GREEN, linewidth=1.6, zorder=4)
+    for i, (a, b) in enumerate(zip(noise, data), 1):
+        c = RED if i == 1 else "#666666"
+        ax.text(-0.055, a, str(i), ha="right", va="center", fontsize=10, color=c, zorder=7)
+        ax.text(1.055, b, str(i), ha="left", va="center", fontsize=10, color=c, zorder=7)
 
     # 高亮其中一对，把 z_0 / z_t / z_1 三个记号安在同一条路径上。
     a, b = noise[0], data[0]
@@ -1406,15 +1417,17 @@ def interpolation_paths():
     ax.scatter([0, 1], [a, b], s=58, facecolor=FILL[RED], edgecolor=RED, linewidth=2.2, zorder=6)
     t = 0.55
     ax.scatter([t], [(1 - t) * a + t * b], s=58, color=RED, zorder=6)
-    ax.text(-0.04, a, "$z_0$", ha="right", va="center", fontsize=11, color=INK)
-    ax.text(1.04, b, "$z_1$", ha="left", va="center", fontsize=11, color=INK)
+    ax.text(-0.135, a, "$z_0$", ha="right", va="center", fontsize=11, color=RED)
+    ax.text(1.135, b, "$z_1$", ha="left", va="center", fontsize=11, color=RED)
     ax.text(t - 0.02, (1 - t) * a + t * b + 0.34, "$z_t=(1-t)\\,z_0+t\\,z_1$",
             ha="center", fontsize=10, color=RED, zorder=7,
             bbox=dict(facecolor="white", edgecolor="none", pad=1.5))
 
-    ax.text(0, 2.62, "噪声 $\\mathcal{N}(0, I)$", ha="center", fontsize=10, color=INK)
-    ax.text(1, 2.62, "数据分布（双峰）", ha="center", fontsize=10, color=INK)
-    ax.set_xlim(-0.24, 1.24); ax.set_ylim(-3.4, 2.9)
+    ax.text(0, 2.62, "$t=0$：噪声 $\\mathcal{N}(0, I)$", ha="center", fontsize=10, color=INK)
+    ax.text(1, 2.62, "$t=1$：数据分布（双峰）", ha="center", fontsize=10, color=INK)
+    ax.text(0.5, -2.62, "同一编号的两个端点配成一条路径；编号是乱序的，所以直线彼此交叉",
+            ha="center", fontsize=10, color="#666666")
+    ax.set_xlim(-0.30, 1.30); ax.set_ylim(-3.1, 2.9)
     ax.set_xticks([]); ax.set_yticks([]); ax.axis("off")
     fig.tight_layout()
     save(fig, "lecture10", "fig10-5-linear-interpolation-path")
@@ -1544,57 +1557,70 @@ def alternating_ca_sa():
 # 8.1 白纸黑字承诺了"一张地图"却整节零图。两段 bullet 已经说了谁属于哪一路，
 # 图必须多给**位置关系与演进方向**，尤其是 π0.5 横跨两侧这件文字最难说清的事。
 def action_head_map():
+    """动作表示是**类别**，不是刻度 —— 所以横向只放两列，不放坐标轴。
+
+    原来这张图把动作表示画成一条连续横轴（离散端到连续端），六个模型按手摆的
+    x 值（0.10 / 0.16 / 0.86 / 0.94……）落位。用户批注「这张表格的横轴容易被质疑吧」，
+    这个质疑成立：**离散与连续是两个类别，中间没有可度量的距离**，那些 x 值不对应
+    任何真实量。最能说明问题的是 π0.5 —— 它在那根轴上取不到一个点，只能画成一个
+    横跨中间的框；六个点里有一个取不到坐标，就说明这个坐标本身不存在。
+
+    改法：横向只留两个类别列，中间一道分隔线；纵轴仍是参数量（真实数、有出处）。
+    演进方向靠列内的箭头给，π0.5 落在两列之间并向两侧各连一条虚线 —— 它跨两类这件
+    事，正是「两列」这种画法能说清而「一根轴」说不清的。
+    """
     fig, ax = plt.subplots(figsize=(7.5, 4.3))
+    X_DISC, X_CONT = 0.30, 0.74      # 两个类别列的位置，纯排版用，不是坐标
 
-    # (x=动作表示, y=参数量 B, 名字, 标签方向)
+    ax.plot([0.52, 0.52], [0.055, 13], color="#DDDDDD", linewidth=1.2,
+            linestyle=(0, (5, 4)), zorder=1)
+    label(ax, X_DISC, 11.2, "离散 token · 自回归", BLUE, 11, True)
+    label(ax, X_CONT, 11.2, "连续量 · 流匹配 / 扩散", GREEN, 11, True)
+
     # 纵坐标一律取正文 3.6.1 那张对照表里的数，不自己估：
-    # OpenVLA 7B、pi0-FAST 3.3B、VLA-0 3B（Qwen2.5-VL-3B）、pi0 3.3B、SmolVLA 0.45B、
-    # ACT ~80M（论文自报数量级）。
-    points = [
-        (0.10, 7.0, "OpenVLA", BLUE, "right"),
-        (0.16, 3.3, "$\\pi_0$-FAST", BLUE, "left"),
-        (0.30, 3.0, "VLA-0", BLUE, "right"),
-        (0.86, 3.3, "$\\pi_0$", GREEN, "right"),
-        (0.90, 0.45, "SmolVLA", GREEN, "right"),
-        (0.94, 0.08, "ACT（参照）", GREY, "left"),
-    ]
+    # OpenVLA 7B、pi0-FAST 3.3B、pi0 3.3B、SmolVLA 0.45B、ACT ~80M（论文自报数量级）。
+    points = [(X_DISC, 7.0, "OpenVLA", BLUE, "left"),
+              (X_DISC, 3.3, "$\\pi_0$-FAST", BLUE, "left"),
+              (X_CONT, 3.3, "$\\pi_0$", GREEN, "right"),
+              (X_CONT, 0.45, "SmolVLA", GREEN, "right"),
+              (X_CONT, 0.08, "ACT（参照）", GREY, "left")]
     for x, y, name, color, side in points:
-        ax.scatter([x], [y], s=70, facecolor=FILL[color], edgecolor=color, linewidth=2.0, zorder=4)
-        ax.annotate(name, (x, y), xytext=(9 if side == "right" else -9, 0),
+        ax.scatter([x], [y], s=76, facecolor=FILL[color], edgecolor=color, linewidth=2.0, zorder=4)
+        ax.annotate(name, (x, y), xytext=(-11 if side == "left" else 11, 0),
                     textcoords="offset points", fontsize=10, color=color,
-                    ha="left" if side == "right" else "right", va="center", zorder=5)
+                    ha="right" if side == "left" else "left", va="center", zorder=5)
 
-    # π0.5 横跨两侧：预训练用离散 FAST，后训练换连续 flow。这是文字最难说清的一件事。
-    ax.add_patch(FancyBboxPatch((0.42, 2.75), 0.38, 1.05,
-                                boxstyle="round,pad=0.0,rounding_size=0.04",
-                                linewidth=2.0, edgecolor=ORANGE, facecolor=FILL[ORANGE],
-                                zorder=3, mutation_aspect=0.32))
-    ax.text(0.61, 3.28, "$\\pi_{0.5}$：预训练离散、后训练连续", ha="center", va="center",
-            fontsize=10, color=ORANGE, zorder=5)
-
-    # Diffusion Policy：正文 3.6.1 明说"那篇没有给一个统一的模型大小，这一格写不出一个数"，
-    # 所以它没有纵坐标，只在横轴一侧标出它的动作表示是连续量。
-    ax.text(0.02, 0.055, "Diffusion Policy（参照）：论文未给统一模型大小，故不在纵轴上取位",
-            ha="left", va="center", fontsize=9.5, color=GREY, zorder=5,
-            transform=ax.transAxes)
-
-    for (xa, ya), (xb, yb), color in (((0.10, 7.0), (0.16, 3.3), BLUE),
-                                      ((0.16, 3.3), (0.30, 3.0), BLUE),
-                                      ((0.86, 3.3), (0.90, 0.45), GREEN)):
-        ax.annotate("", xy=(xb, yb), xytext=(xa, ya), zorder=2,
+    # 列内的箭头就是"演进方向"：两条链都朝参数量更小的方向走。
+    for x, ya, yb, color, note in ((X_DISC, 7.0, 3.3, BLUE, "7B → 3.3B"),
+                                   (X_CONT, 3.3, 0.45, GREEN, "3.3B → 0.45B")):
+        ax.annotate("", xy=(x, yb), xytext=(x, ya), zorder=2,
                     arrowprops=dict(arrowstyle="-|>", color=color, linewidth=1.8,
-                                    shrinkA=9, shrinkB=9, connectionstyle="arc3,rad=0.18"))
-    ax.text(0.185, 5.0, "离散一路", fontsize=10, color=BLUE, ha="left")
-    ax.text(0.845, 1.15, "连续一路", fontsize=10, color=GREEN, ha="right")
+                                    shrinkA=10, shrinkB=10))
+        ax.text(x + 0.022, (ya * yb) ** 0.5, note, fontsize=10, color=color,
+                ha="left", va="center", zorder=5)
+
+    # π0.5 落在两列之间：它的动作表示在训练的两个阶段里不同，取不到单一类别。
+    ax.scatter([0.52], [3.3], s=88, marker="s", facecolor=FILL[ORANGE], edgecolor=ORANGE,
+               linewidth=2.0, zorder=4)
+    ax.text(0.52, 2.05, "$\\pi_{0.5}$：预训练用离散 FAST token\n后训练换连续 flow",
+            ha="center", va="center", fontsize=10, color=ORANGE, zorder=5,
+            bbox=dict(facecolor="white", edgecolor="none", pad=1.6))
+    for xb in (X_DISC + 0.055, X_CONT - 0.055):
+        ax.plot([0.52, xb], [3.3, 3.3], color=ORANGE, linewidth=1.3,
+                linestyle=(0, (3, 2)), zorder=2)
+
+    # Diffusion Policy：正文 3.6.1 明说"那篇没有给一个统一的模型大小"，所以它没有纵坐标，
+    # 只能记在图外 —— 这一点两列画法和原来的一根轴一样诚实。
+    ax.text(0.02, -0.045, "Diffusion Policy（参照）也走连续一路，论文未给统一模型大小，故不在纵轴取位",
+            ha="left", va="center", fontsize=10, color=GREY, zorder=5, transform=ax.transAxes)
 
     ax.set_yscale("log")
-    ax.set_xlabel("动作表示：离散 token　←→　连续量", fontsize=10)
     ax.set_ylabel("参数量（B，对数轴）", fontsize=10)
-    ax.set_xlim(-0.02, 1.12); ax.set_ylim(0.05, 13)
+    ax.set_xlim(0.06, 1.0); ax.set_ylim(0.055, 13)
     ax.set_xticks([]); ax.set_yticks([0.1, 0.45, 1, 3.3, 7])
     ax.set_yticklabels(["0.1", "0.45", "1", "3.3", "7"])
     ax.tick_params(labelsize=10)
-    for side in ("top", "right"):
+    for side in ("top", "right", "bottom"):
         ax.spines[side].set_visible(False)
     fig.tight_layout(rect=(0, 0.065, 1, 1))
     save(fig, "lecture11", "fig11-8-action-head-map")
@@ -1701,7 +1727,109 @@ def vram_under_each_strategy():
     save(fig, "lecture12", "fig12-4-vram-under-each-strategy")
 
 
+# ── 第12讲 3.x：LoRA / QLoRA 三张图，从旧课程仓的 SVG 重画进自绘源 ──────────
+# 用户批注「图片当中不要标题」「同理不要标题，还需要 latex」「图片同理」。
+# 原来这三张是旧课程仓导出的 200dpi PNG，图内自带标题（与图注说的是同一件事），
+# 而且 W0 / α/r·BAx 这些符号是纯文本、不是数学体。图源（SVG）当年没跟着迁进来，
+# 所以按全书自绘规范重画：**不画图内标题**，符号一律走 mathtext。
+# 几何与文字照 vla_class/7_2_lora微调原理/files/*.svg 的坐标搬，不自己估位置。
+
+def lora_transformer_targets():
+    """一个 Transformer 层里哪些线性层可以挂 LoRA。"""
+    fig, ax = canvas(7.6, 3.9)
+
+    def group(x0, w, title, rows, note, color):
+        plain_box(ax, x0, 0.30, w, 0.52, GREY, fill="#FCFCFC", lw=1.0)
+        label(ax, x0 + w / 2, 0.775, title, "#333333", 11, True)
+        for i, row in enumerate(rows):
+            n = len(row)
+            cw = (w - 0.05) / n
+            for j, name in enumerate(row):
+                bx = x0 + 0.025 + j * cw
+                plain_box(ax, bx, 0.585 - i * 0.115, cw - 0.014, 0.085, color)
+                label(ax, bx + (cw - 0.014) / 2, 0.6275 - i * 0.115, name, INK, 10)
+        label(ax, x0 + w / 2, 0.355, note, color, 10)
+
+    plain_box(ax, 0.012, 0.505, 0.10, 0.10, GREY, fill="#F6F6F6", lw=1.0)
+    label(ax, 0.062, 0.555, "输入 $x$", INK, 10)
+    group(0.155, 0.315, "Self-Attention",
+          [["q_proj", "k_proj"], ["v_proj", "o_proj"]], "这些线性层可加 LoRA", BLUE)
+    plain_box(ax, 0.508, 0.505, 0.085, 0.10, GREY, fill="#F6F6F6", lw=1.0)
+    label(ax, 0.5505, 0.555, "残差", INK, 10)
+    group(0.635, 0.28, "MLP / FFN",
+          [["gate_proj"], ["up_proj"], ["down_proj"]], "全线性层 LoRA 常用", GREEN)
+    label(ax, 0.958, 0.555, "输出", INK, 10)
+
+    for a, b in ((0.112, 0.155), (0.470, 0.508), (0.593, 0.635), (0.915, 0.945)):
+        arrow(ax, (a, 0.555), (b, 0.555), EDGE)
+    label(ax, 0.5, 0.10,
+          "实践中可只选 Q/V，也可覆盖 Q/K/V/O + MLP；覆盖更多线性层通常容量更高、显存也更多。",
+          "#666666", 10)
+    save(fig, "lecture12", "fig12-3-lora-injection-targets")
+
+
+def qlora_architecture():
+    """QLoRA：4-bit 冻结基座 + 高精度 LoRA 旁路。"""
+    fig, ax = canvas(7.6, 3.4)
+
+    plain_box(ax, 0.015, 0.42, 0.135, 0.17, GREY, fill="#F6F6F6", lw=1.0)
+    label(ax, 0.0825, 0.535, "输入 $x$", INK, 11)
+    label(ax, 0.0825, 0.468, "tokens / 图像特征", INK, 10)
+
+    plain_box(ax, 0.275, 0.66, 0.30, 0.22, BLUE)
+    label(ax, 0.425, 0.825, "冻结基座 $W_0$", INK, 11, True)
+    label(ax, 0.425, 0.762, "NF4 / 4-bit 存储", INK, 10)
+    label(ax, 0.425, 0.706, "计算时反量化到 BF16", INK, 10)
+
+    plain_box(ax, 0.275, 0.13, 0.30, 0.22, ORANGE)
+    label(ax, 0.425, 0.295, "LoRA 旁路", INK, 11, True)
+    label(ax, 0.425, 0.232, "BF16/FP16 的 $A$、$B$ 矩阵", INK, 10)
+    label(ax, 0.425, 0.176, "只有这里接收梯度", INK, 10)
+
+    label(ax, 0.665, 0.505, "$+$", INK, 15, True)
+    plain_box(ax, 0.735, 0.42, 0.245, 0.17, GREY, fill="#F6F6F6", lw=1.0)
+    label(ax, 0.8575, 0.535, "输出 $h$", INK, 11)
+    label(ax, 0.8575, 0.468, r"$W_0 x + \frac{\alpha}{r} BAx$", INK, 11)
+
+    for y in (0.77, 0.24):
+        _polyline(ax, [(0.150, 0.505), (0.215, 0.505), (0.215, y), (0.270, y)], EDGE, 1.2, 0.010)
+        _polyline(ax, [(0.575, y), (0.630, y), (0.630, 0.505), (0.648, 0.505)], EDGE, 1.2, 0.010)
+    arrow(ax, (0.688, 0.505), (0.731, 0.505), EDGE)
+
+    plain_box(ax, 0.735, 0.10, 0.245, 0.15, RED, fill=FILL[RED])
+    label(ax, 0.8575, 0.205, "Paged Optimizer", "#8E3226", 11, True)
+    label(ax, 0.8575, 0.145, "显存峰值时 CPU 分页", "#8E3226", 10)
+    ax.plot([0.735, 0.578], [0.175, 0.21], color=RED, linewidth=1.3, linestyle=(0, (3, 2)))
+    save(fig, "lecture12", "fig12-3-qlora-architecture")
+
+
+def qlora_memory():
+    """基座权重显存：fp16 与 4-bit 的粗略对比。"""
+    fig, ax = plt.subplots(figsize=(7.0, 3.1))
+    bars = [("7B\nfp16", 14.0, BLUE), ("7B\n4-bit", 3.5, GREEN),
+            ("65B\nfp16", 130.0, BLUE), ("65B\n4-bit", 32.5, GREEN)]
+    xs = [0, 0.85, 2.35, 3.2]
+    for x, (name, v, color) in zip(xs, bars):
+        ax.bar(x, v, width=0.62, color=FILL[color], edgecolor=color, linewidth=2.0)
+        ax.text(x, v * 1.09, f"约 {v:g} GB", ha="center", fontsize=10, color=color)
+    ax.set_xticks(xs); ax.set_xticklabels([b[0] for b in bars], fontsize=10)
+    ax.set_ylabel("基座权重显存（GB，对数轴）", fontsize=10)
+    ax.set_yscale("log"); ax.set_ylim(2, 320)
+    ax.set_yticks([3.5, 14, 32.5, 130]); ax.set_yticklabels(["3.5", "14", "32.5", "130"])
+    ax.tick_params(labelsize=10)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    ax.text(0.0, -0.30, "实际训练还要加激活值、LoRA 参数、优化器状态和框架开销；"
+                        "QLoRA 的优势是冻结 4-bit 基座，只训练少量 LoRA 参数。",
+            transform=ax.transAxes, fontsize=10, color="#666666", va="center")
+    fig.tight_layout(rect=(0, 0.10, 1, 1))
+    save(fig, "lecture12", "fig12-3-qlora-memory")
+
+
 print("渲染示意图：")
+lora_transformer_targets()
+qlora_architecture()
+qlora_memory()
 two_axes_map()
 vram_under_each_strategy()
 action_tokenization()

@@ -155,8 +155,10 @@
  
 
 
-\usepackage{fvextra}
-\DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,commandchars=\\\{\}}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.75}
 \makeatletter
 \@ifpackageloaded{caption}{}{\usepackage{caption}}
 \AtBeginDocument{%
@@ -227,8 +229,6 @@
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
-\listoffigures
-\listoftables
 
 \section{1
 朴素行为克隆撞墙：为什么需要生成式策略}\label{ux6734ux7d20ux884cux4e3aux514bux9686ux649eux5899ux4e3aux4ec0ux4e48ux9700ux8981ux751fux6210ux5f0fux7b56ux7565}
@@ -253,7 +253,7 @@ a_t = \pi_\theta(o_t)
 各变量含义：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0777\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5887\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3336\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0855\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5833\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3312\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 符号 & 含义 & 典型维度 \\
 \midrule\noalign{}
@@ -301,7 +301,7 @@ OOD）区域------也就是训练集里压根没出现过的那类观测。模�
 \text{小误差} \;\to\; \text{偏离专家轨迹} \;\to\; \text{进入 OOD 状态} \;\to\; \text{更大误差} \;\to\; \text{任务失败}
 \]
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.5\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/ref/bc_covariate_shift.jpg}
 
@@ -311,9 +311,9 @@ OOD）区域------也就是训练集里压根没出现过的那类观测。模�
 
 \end{figure}%
 
-图里深色那条是专家示教的腕部滚转指令，浅色那条是训练好的单步策略在闭环里实际发出的指令。两条线的\textbf{走势}是贴合的------说明网络确实学到了任务；但浅色线在每一步上都在深色线附近高频抖动，因为它是一步一步独立预测的，相邻两步之间没有任何约束。这些抖动本身就是上面那条链的起点：每一次微小的偏差都会把机器人推到一个略微不同的状态，而下一步的预测又建立在这个已经偏了的状态上。第
+图里深色那条是专家示教的腕部滚转指令，浅色那条是训练好的单步策略在闭环里实际发出的指令。两条线的\textbf{走势}是贴合的，说明网络确实学到了任务；但浅色线在每一步上都在深色线附近高频抖动，因为它是一步一步独立预测的，相邻两步之间没有任何约束。这些抖动本身就是上面那条链的起点：每一次微小的偏差都会把机器人推到一个略微不同的状态，而下一步的预测又建立在这个已经偏了的状态上。第
 2
-节的动作分块正是冲着这个''逐步''来的------一次预测一整段，段内的连贯性由网络自己保证。
+节的动作分块正是冲着这个``逐步''来的------一次预测一整段，段内的连贯性由网络自己保证。
 
 \subsection{1.3
 死穴二：多模态动作分布（Multimodality）}\label{ux6b7bux7a74ux4e8cux591aux6a21ux6001ux52a8ux4f5cux5206ux5e03multimodality}
@@ -340,9 +340,9 @@ OOD）区域------也就是训练集里压根没出现过的那类观测。模�
 \end{tabular}
 \end{center}
 
-这个''平均动作''往往不属于任何一个合理模式------两边都不像，最后谁也做不好。
+这个``平均动作''往往不属于任何一个合理模式------两边都不像，最后谁也做不好。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.5\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/ref/bc_multimodal.jpg}
 
@@ -355,7 +355,7 @@ OOD）区域------也就是训练集里压根没出现过的那类观测。模�
 \end{figure}%
 
 \subsection{1.4
-要学的不是一个动作，而是一个分布}\label{ux8981ux5b66ux7684ux4e0dux662fux4e00ux4e2aux52a8ux4f5cux800cux662fux4e00ux4e2aux5206ux5e03}
+要学的是一个分布，不是一个动作}\label{ux8981ux5b66ux7684ux662fux4e00ux4e2aux5206ux5e03ux4e0dux662fux4e00ux4e2aux52a8ux4f5c}
 
 从这两个死穴可以看出，关键转变是：策略不应该再学一个确定性的点映射
 \(a = f(o)\)，而要去建模整个\textbf{条件分布} \(a \sim p(a \mid o)\)。
@@ -365,19 +365,19 @@ OOD）区域------也就是训练集里压根没出现过的那类观测。模�
 \begin{itemize}
 \tightlist
 \item
-  用隐变量（latent variable）表达''高层意图 / 风格 / 轨迹模式''；
+  用隐变量（latent variable）表达``高层意图 / 风格 / 轨迹模式''；
 \item
-  用迭代去噪（iterative denoising）表达''逐步把噪声变成动作''；
+  用迭代去噪（iterative denoising）表达``逐步把噪声变成动作''；
 \item
-  用连续流（continuous flow）表达''把简单分布运输到动作分布''。
+  用连续流（continuous flow）表达``把简单分布运输到动作分布''。
 \end{itemize}
 
-在机器人模仿学习里，生成模型扮演的角色首先是一个''动作分布建模器''：它要做的不是生成一张好看的图片，而是把多个峰都表达出来，让''从左绕''和''从右绕''各自保留成一个模式，而不是被平均成中间那个谁也做不到的动作。这就是生成模型进入机器人策略学习的入口。
+在机器人模仿学习里，生成模型扮演的角色首先是一个``动作分布建模器''：它要做的是把多个峰都表达出来，让``从左绕''和``从右绕''各自保留成一个模式，而不是被平均成中间那个谁也做不到的动作，也不是生成一张好看的图片。这就是生成模型进入机器人策略学习的入口。
 
 \subsection{1.5 三条生成式主线地图：CVAE / Diffusion / Flow
 Matching}\label{ux4e09ux6761ux751fux6210ux5f0fux4e3bux7ebfux5730ux56fecvae-diffusion-flow-matching}
 
-接下来这一讲，会沿三条生成式主线把''如何建模 \(p(a \mid o)\)``讲透：
+接下来这一讲，会沿三条生成式主线把``如何建模 \(p(a \mid o)\)''讲透：
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1762\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2211\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1714\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4313\linewidth - 2\tabcolsep\relax}@{}}
@@ -408,7 +408,7 @@ Matching），分别就是这三条线在机器人里的代表实现。
 ACT 用两个机制分别对付第 1 节提出的两个问题：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1490\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2425\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6084\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1787\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2393\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5820\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 问题 & ACT 的解法 & 核心思想 \\
 \midrule\noalign{}
@@ -422,10 +422,10 @@ ACT 用两个机制分别对付第 1 节提出的两个问题：
 备注：Action Chunking
 是\textbf{缓解}误差累积，不是消除\textbf{协变量偏移}（covariate
 shift，第8讲 3.2
-节给过定义：策略自己走出来的状态分布和示教数据的状态分布对不上）。它把''每步都重新决策''换成''每
+节给过定义：策略自己走出来的状态分布和示教数据的状态分布对不上）。它把``每步都重新决策''换成``每
 \(k\)
 步决策一次''，减少了自回归式的逐步偏移，但策略一旦走进示教没覆盖的状态，照样没有恢复机制。而且
-chunk 越长，对新观测的反应就越慢------这是一个要按任务权衡的旋钮，2.6.2
+chunk 越长，对新观测的反应就越慢，这是一个要按任务权衡的旋钮，2.6.2
 会讲执行策略怎么在两者之间取平衡。
 \end{quote}
 
@@ -453,7 +453,7 @@ o_t \;\longrightarrow\; \hat{\mathbf{a}}_{t:t+k} = (\hat{a}_t,\; \hat{a}_{t+1},\
 
 在 \textbf{LeRobot 默认配置} 下，模型在 \(t\) 时刻一次性预测一个长度为
 \(k\) 的 chunk，并默认把这 \(k\) 步全部放入 action queue
-依次执行，然后再重新查询策略。这样闭环频率从''每步一次''降到了''每 \(k\)
+依次执行，然后再重新查询策略。这样闭环频率从``每步一次''降到了``每 \(k\)
 步一次''，误差只在重新规划时才有机会继续累积。
 
 \begin{quote}
@@ -463,13 +463,13 @@ ensembling}。下面的主线按 LeRobot
 2.6.2.2 节作为对照。
 \end{quote}
 
-ACT 不是简单的回归器，而是一个\textbf{条件变分自编码器（CVAE）}。在讲
-ACT 的具体结构之前，先把 CVAE 的来龙去脉讲清楚。
+ACT 是一个\textbf{条件变分自编码器（CVAE）}，不是简单的回归器。在讲 ACT
+的具体结构之前，先把 CVAE 的来龙去脉讲清楚。
 
 \subsection{2.3 从 AE 到 VAE 到
 CVAE}\label{ux4ece-ae-ux5230-vae-ux5230-cvae}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture10/ref/01_cvae.png}}
 
@@ -506,7 +506,7 @@ z = f_{\text{enc}}(x), \quad \hat{x} = f_{\text{dec}}(z)
 \end{center}
 
 AE 的问题：\(z\)
-是确定性的，隐空间没有结构。你没法在隐空间里''采样''来生成新数据。
+是确定性的，隐空间没有结构。你没法在隐空间里``采样''来生成新数据。
 
 \subsubsection{2.3.2 Variational
 Auto-Encoder（VAE）：给隐空间加上概率结构}\label{variational-auto-encodervaeux7ed9ux9690ux7a7aux95f4ux52a0ux4e0aux6982ux7387ux7ed3ux6784}
@@ -570,14 +570,14 @@ z = \mu + \sigma \odot \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, I)
 \end{itemize}
 
 如果没有 KL
-约束，编码器可以把不同数据映射到隐空间里任意位置------比如把''从左绕''映射到
-\(z=100\)，把''从右绕''映射到
-\(z=-200\)。隐空间会变得七零八落，中间大片区域是''空白''，推理时随便采一个
+约束，编码器可以把不同数据映射到隐空间里任意位置------比如把``从左绕''映射到
+\(z=100\)，把``从右绕''映射到
+\(z=-200\)。隐空间会变得七零八落，中间大片区域是``空白''，推理时随便采一个
 \(z\) 大概率落在空白区，解码器生成的就是垃圾。
 
 但如果 KL 约束太强，把后验完全压成标准正态，\(z\)
-就不携带任何信息了------所有数据的 \(z\)
-都变成同一个分布，解码器分不出''从左绕''还是''从右绕''，\(z\)
+就不携带任何信息了，所有数据的 \(z\)
+都变成同一个分布，解码器分不出``从左绕''还是``从右绕''，\(z\)
 等于白加了。
 
 所以最终 \(z\)
@@ -604,13 +604,13 @@ CVAE 在 VAE 的基础上引入\textbf{条件变量 \(c\)}，让生成过程受�
 \]
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0601\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1969\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.7431\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0766\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1934\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.7300\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 符号 & 含义 & 在 ACT 中对应 \\
 \midrule\noalign{}
 \(c\) & 条件变量 & \textbf{对 policy decoder 而言}是当前观测 \(o_t\)；\textbf{对 LeRobot 的 CVAE encoder 而言}实际输入只用机器人状态 \(s_t\) \\
 \(x\) & 要建模的目标数据 & 动作块 \(\mathbf{a}_{t:t+k}\) \\
-\(z\) & 隐变量，表达''风格/模式'' & 动作模式（从左绕 vs 从右绕） \\
+\(z\) & 隐变量，表达``风格/模式'' & 动作模式（从左绕 vs 从右绕） \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -637,8 +637,8 @@ p(\mathbf{a}_{t:t+k} \mid o_t) = \int p(\mathbf{a}_{t:t+k} \mid o_t, z) \; p(z) 
 备注：上面是 \textbf{CVAE 的概念层表达}。如果落到 LeRobot
 的具体实现，训练时的 VAE encoder 并不读取图像，只用
 \((s_t, \mathbf{a}_{t:t+k})\) 去近似后验；图像只进 policy decoder
-那一侧（2.4 节的结构图里就是右半边）。这是一个很容易和''概念上的条件变量
-\(o_t\)``混淆的点。
+那一侧（2.4 节的结构图里就是右半边）。这是一个很容易和``概念上的条件变量
+\(o_t\)''混淆的点。
 \end{quote}
 
 不同的 \(z\) 对应不同的动作模式。多模态分布被分解成：先采样
@@ -647,7 +647,7 @@ p(\mathbf{a}_{t:t+k} \mid o_t) = \int p(\mathbf{a}_{t:t+k} \mid o_t, z) \; p(z) 
 \subsection{2.4 ACT
 的整体架构与数据流}\label{act-ux7684ux6574ux4f53ux67b6ux6784ux4e0eux6570ux636eux6d41}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture10/ref/fig10-2-act-architecture_arxiv-2304.13705.png}}
 
@@ -682,7 +682,7 @@ Step 1 / 2」图是同一套素材里连着的两张，它把 VAE Encoder
 \subsubsection{2.4.1 Step 1 --- VAE
 Encoder：从真实动作中推断隐变量}\label{step-1-vae-encoderux4eceux771fux5b9eux52a8ux4f5cux4e2dux63a8ux65adux9690ux53d8ux91cf}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture10/ref/02_training1.png}}
 
@@ -694,7 +694,7 @@ Encoder：从真实动作中推断隐变量}\label{step-1-vae-encoderux4eceux771
 
 VAE Encoder 的任务：看到机器人当前状态 \(s_t\) 和接下来真实执行的 \(k\)
 步动作
-\(\mathbf{a}_{t:t+k}\)，推断出''这段动作属于哪种风格/模式''，输出隐变量
+\(\mathbf{a}_{t:t+k}\)，推断出``这段动作属于哪种风格/模式''，输出隐变量
 \(z\) 的后验分布参数：
 
 \[
@@ -706,7 +706,7 @@ VAE Encoder 是一个 BERT 风格的 Transformer Encoder。它的输入是一串
 就是一个 512 维向量，可能来自一个状态、也可能来自一步动作）：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0792\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3229\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1367\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3604\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1008\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1316\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2696\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.0967\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3391\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1629\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 位置索引 & Token 来源 & 原始维度 & 投影方式 & 投影后维度 \\
 \midrule\noalign{}
@@ -724,7 +724,7 @@ VAE Encoder 是一个 BERT 风格的 Transformer Encoder。它的输入是一串
 \text{input} = [\text{CLS};\; W_s s_t;\; W_a a_t;\; W_a a_{t+1};\; \ldots;\; W_a a_{t+k-1}] + \text{PE}
 \]
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture10/ref/02_training2.png}}
 
@@ -755,7 +755,7 @@ Encoder}（\texttt{n\_vae\_encoder\_layers\ =\ 4}，8 头注意力，FFN
 z = \mu + \sigma \odot \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, I), \quad \sigma = \exp(\log\sigma^2 / 2)
 \]
 
-这个 trick 的意义：直接''从分布里采样''没法算梯度，但把随机性挪到固定的
+这个 trick 的意义：直接``从分布里采样''没法算梯度，但把随机性挪到固定的
 \(\varepsilon\) 上后，\(z\) 对 \(\mu\) 和 \(\sigma\) 就可微了。
 
 \begin{quote}
@@ -766,7 +766,7 @@ VAE Encoder \textbf{仅在训练时使用}。推理时没有真实动作可看�
 \subsubsection{2.4.2 Step 2 --- Transformer
 主干：从观测生成动作块}\label{step-2-transformer-ux4e3bux5e72ux4eceux89c2ux6d4bux751fux6210ux52a8ux4f5cux5757}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/ref/fig10-2-act-step3-dataflow.png}
 
@@ -777,8 +777,7 @@ ResNet18，每路拿到 \(15\times20\times512\) 的特征图，展平成 300 个
 维 token 并加上位置编码；机器人关节状态与 \(z\) 不走
 ResNet，各过一个线性层直接投到 512 维。所有 token 一起进 Transformer
 Encoder（4 层自注意力），再由 Transformer Decoder（1 层交叉注意力）吐出
-\(k\) 步动作块。两处标注按 LeRobot 默认写：特征通道数 512、decoder 1
-层（本书自绘）}
+\(k\) 步动作块。两处标注按 LeRobot 默认写：特征通道数 512、decoder 1 层}
 
 \end{figure}%
 
@@ -803,7 +802,7 @@ I^{(c)} \in \mathbb{R}^{3 \times H \times W} \;\xrightarrow{\text{ResNet18}}\; F
 将以下 token 拼接成一个序列送入 Transformer Encoder：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3917\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1526\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2903\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1653\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3873\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1544\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2884\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1700\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 Token 类型 & 数量 & 投影方式 & 位置编码 \\
 \midrule\noalign{}
@@ -832,7 +831,7 @@ Decoder Layer 包含三个子层：
   步动作时，能参考其他时间步的查询状态，从而保持动作序列的时序连贯性；
 \item
   \textbf{Cross-Attention}：查询 cross-attend 到 Encoder
-  输出------这是动作生成的核心：每个时间步的查询从图像特征、机器人状态、隐变量中提取所需信息；
+  输出，这是动作生成的核心：每个时间步的查询从图像特征、机器人状态、隐变量中提取所需信息；
 \item
   \textbf{FFN}：两层线性 + ReLU。
 \end{enumerate}
@@ -844,8 +843,8 @@ blocks}------两个数字都没写错：原始 ACT 的配置文件确实写了 7
 层，可公开出来的那份实现里只有第 1 层的输出真正被取用，后面 6
 层白算了。LeRobot 索性把默认值直接设成
 1，好让复现出来的行为和原实现一致。同理，那些材料上把图像特征的通道数标成
-728、再线性投影到 512，与本节按 ResNet18 讲的 512 也对不上------ResNet18
-的 \texttt{layer4} 输出就是 512 通道，所以图上直接标
+728、再线性投影到 512，与本节按 ResNet18 讲的 512 也对不上，ResNet18 的
+\texttt{layer4} 输出就是 512 通道，所以图上直接标
 512。\textbf{跑起来的层数与维度以代码为准}，这也是上面那张图重画的原因。
 
 Decoder 输出经过线性 action head 投影到动作空间：
@@ -870,7 +869,7 @@ ACT 的训练损失是标准的 CVAE 形式------重建损失 + KL 正则：
 \(\mathcal{L}_{\text{L1}}\)}{2.5.1 重建损失 \textbackslash mathcal\{L\}\_\{\textbackslash text\{L1\}\}}}\label{ux91cdux5efaux635fux5931-mathcall_textl1}
 
 逐元素
-L1，先把补位（padding）的位置屏蔽掉再取均值------直觉上就是''预测的每一步每一个关节，和真实值的绝对误差''：
+L1，先把补位（padding）的位置屏蔽掉再取均值------直觉上就是``预测的每一步每一个关节，和真实值的绝对误差''：
 
 \[
 \mathcal{L}_{\text{L1}} = \operatorname{mean}\!\left(\,|\mathbf{a} - \hat{\mathbf{a}}| \odot \mathbf{1}_{\text{not pad}}\right)
@@ -894,7 +893,7 @@ D_{\text{KL}} = -\frac{1}{2} \sum_{i=1}^{d_z} \left( 1 + \log\sigma_i^2 - \mu_i^
 \subsubsection{\texorpdfstring{2.5.3 为什么 \(\beta = 10\)
 这么大}{2.5.3 为什么 \textbackslash beta = 10 这么大}}\label{ux4e3aux4ec0ux4e48-beta-10-ux8fd9ux4e48ux5927}
 
-\(\beta\) 控制''隐空间规整度''和''重建精度''之间的权衡。\(\beta\)
+\(\beta\) 控制``隐空间规整度''和``重建精度''之间的权衡。\(\beta\)
 越大，隐空间越被压向 \(\mathcal{N}(0, I)\)，推理时用 \(z=0\)
 就越可靠；代价是重建可能略粗糙。LeRobot 默认
 \texttt{kl\_weight\ =\ 10.0}，偏向让推理时的 \(z=0\) 更稳定。
@@ -929,18 +928,18 @@ Encoder，怎么得到 \(z\)？
 \end{enumerate}
 
 说得更准确些：这是原 ACT
-实现为了拿到\textbf{确定性输出}做的工程选择，和它的训练正则配套成立，而不是''密度最高所以最有代表性''这种数学必然。顺带破一个常见直觉：在高维标准高斯里，概率\textbf{质量}集中在半径约
+实现为了拿到\textbf{确定性输出}做的工程选择，和它的训练正则配套成立，而不是``密度最高所以最有代表性''这种数学必然。顺带破一个常见直觉：在高维标准高斯里，概率\textbf{质量}集中在半径约
 \(\sqrt{d}\)
 的一层壳上，原点虽然是密度众数，却并不是一个典型样本。所以真要在部署时采多个模式（用非零
 \(z\)），得自己在任务上验证可靠性，不能想当然。
 
 \textbf{代价}：放弃了多模态采样能力。推理时 ACT
-总是走同一个模式，不会随机选择''从左绕''还是''从右绕''。这换来了更稳定、可复现的部署行为。
+总是走同一个模式，不会随机选择``从左绕''还是``从右绕''。这换来了更稳定、可复现的部署行为。
 
 \subsubsection{2.6.2 Action Chunking
 的执行策略}\label{action-chunking-ux7684ux6267ux884cux7b56ux7565}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/ref/fig10-2-chunking-vs-temporal-ensemble.png}
 
@@ -950,7 +949,7 @@ Encoder，怎么得到 \(z\)？
 预测的一段依次执行完，\(t=4\) 才重新查询策略，两段不重叠；下半是
 temporal ensemble，\(t=0,1,2,3\) 每一步都重新预测一整段，于是第 3
 步那一列（橙色框）被四段预测同时覆盖。底下两行标出这四个权重按
-\(w_i \propto \exp(-mi)\) 在 \(m=0.01\) 时的真实取值（本书自绘）}
+\(w_i \propto \exp(-mi)\) 在 \(m=0.01\) 时的真实取值}
 
 \end{figure}%
 
@@ -1012,7 +1011,7 @@ action chunking 的平滑性。
 \texttt{n\_action\_steps\ ==\ 1}，一旦
 \texttt{temporal\_ensemble\_coeff} 不是 \texttt{None} 而
 \texttt{n\_action\_steps} 还留着默认的
-100，构造配置时就直接抛异常。道理也很直白------既然每一步都要重新规划、再和历史预测加权，就不能同时又让队列一口气吐
+100，构造配置时就直接抛异常。道理也很直白，既然每一步都要重新规划、再和历史预测加权，就不能同时又让队列一口气吐
 100 步。这两个旋钮是互斥的，不是可以叠加的。
 
 \subsubsection{2.6.3
@@ -1077,7 +1076,7 @@ Temporal Ensembling 执行。
 
 \subsection{2.7 本节小结}\label{ux672cux8282ux5c0fux7ed3}
 
-\textbf{核心创新}：ACT 把策略从''点预测器''变成''条件生成器''------用
+\textbf{核心创新}：ACT 把策略从``点预测器''变成``条件生成器''------用
 CVAE 建模 \(p(\mathbf{a} \mid o)\) 捕捉示教的多模态，用 action chunking
 把单步动作回归改成短时规划，缓解误差累积（闭环重规划频率、chunk
 执行长度、以及走出分布之后怎么恢复，仍要单独设计）。它给后续方法立下了两个范式：\textbf{动作按
@@ -1102,7 +1101,7 @@ ACT}\label{ux5b9eux9a8cux8badux7ec3ux90e8ux7f72ux5e76ux89e3ux6790-act}
 
 先用 LeRobot 的 ACT 在 LIBERO
 数据集上训练一个抓取策略：\texttt{libero\_goal}
-套件里''把碗放到盘子上''（task 8）这条任务。训练脚本是
+套件里``把碗放到盘子上''（task 8）这条任务。训练脚本是
 \texttt{code/vla/3\_imitation\_learning/3\_1\_act/train\_act\_libero.py}，训完之后用
 \texttt{code/vla/3\_imitation\_learning/3\_1\_act/infer\_act\_libero.py}
 加载 checkpoint 做闭环推理并录像。流程是标准三步：
@@ -1124,28 +1123,28 @@ ACT}\label{ux5b9eux9a8cux8badux7ec3ux90e8ux7f72ux5e76ux89e3ux6790-act}
   \texttt{eval/video} 里策略一边看、一边按 chunk 出动作的执行过程。
 \end{enumerate}
 
-关键在于：\textbf{loss 下降不等于任务成功}（第8讲 3.1
+\textbf{loss 下降不等于任务成功}（第8讲 3.1
 节已经强调过），所以必须靠仿真器内的闭环 rollout
 来真正判断策略好不好。LIBERO
 这类带成功判定的仿真环境，正好提供了这条闭环验证的标尺。
 
 跑完之后，真正要盯的是 \texttt{eval/pc\_success}
 这条曲线，它的形状本身就在说事。开头一段会长时间贴着
-0------这不是训练坏了，而是这个任务要求''抓起碗、移过去、放到盘子上''三步全对才算成功，前面若干次评估里策略往往只做对了前两步，成功率是离散的
+0，这是因为这个任务要求``抓起碗、移过去、放到盘子上''三步全对才算成功，前面若干次评估里策略往往只做对了前两步，成功率是离散的
 0/1 统计，中间没有部分分。等它第一次离开
 0，通常会在很短的训练区间里迅速抬起来，然后进入一个上下大幅震荡的高位平台：因为每次评估只跑
 10 个 episode，成功率天然只有 0\%、10\%\ldots\ldots100\% 这 11
-个取值，抖动是采样噪声不是性能反复。判断''训好了没有''要看这个平台的\textbf{中位水平}，不能看某一次评估的峰值------正好一次
+个取值，抖动是采样噪声不是性能反复。判断``训好了没有''要看这个平台的\textbf{中位水平}，不能看某一次评估的峰值------正好一次
 100\% 就宣布收敛，是这一步最常见的自欺。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/ref/fig10-3-libero-success-curve.png}
 
 }
 
-\caption{这条曲线来自本仓库真跑过的一次 LIBERO ACT
-训练：三段背景色对应上面说的三个阶段。灰色段一直贴在 0，到约第 184
+\caption{这条曲线出自本课自己跑的一次 LIBERO ACT
+训练，三段背景色对应上面说的三个阶段：灰色段一直贴在 0，到约第 184
 步才第一次离开；橙色段在两百多步的区间里迅速抬起；绿色段进入高位平台，此后一直在
 40\% 与 100\% 之间大幅震荡，红色虚线是平台期的中位水平
 83\%。平台里任何一次 100\% 的峰值都不能单独拿来当结论（数据出自
@@ -1161,17 +1160,17 @@ ACT}\label{ux5b9eux9a8cux8badux7ec3ux90e8ux7f72ux5e76ux89e3ux6790-act}
 60\% 和 100\% 两个结果。真正能比的是中位线：这次 run 的 83\%
 才是它的成绩。
 
-\subsection{3.2 在 SO-101 主从臂上训练
-ACT（无真机用仿真器替代）}\label{ux5728-so-101-ux4e3bux4eceux81c2ux4e0aux8badux7ec3-actux65e0ux771fux673aux7528ux4effux771fux5668ux66ffux4ee3}
+\subsection{3.2 在 SO-101 Leader--Follower 臂上训练
+ACT（无真机用仿真器替代）}\label{ux5728-so-101-leaderfollower-ux81c2ux4e0aux8badux7ec3-actux65e0ux771fux673aux7528ux4effux771fux5668ux66ffux4ee3}
 
 把同一套 ACT 搬到真机几乎不用改算法，只换数据来源：
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{有真机}：用第9讲 4 节采的 SO-101
-  主从臂遥操作数据（例如''抓方块放盘子''），同样用
-  \texttt{lerobot-train} 训 ACT，训练命令封在
+  \textbf{有真机}：用第9讲 4 节采的 SO-101 Leader--Follower
+  臂遥操作数据（例如``抓方块放盘子''），同样用 \texttt{lerobot-train} 训
+  ACT，训练命令封在
   \texttt{code/vla/3\_imitation\_learning/3\_1\_act/train\_act\_cuboid.sh}
   里；训完把策略部署回 SO-101 做闭环执行，动作维度 \(d_a\)、状态维度
   \(d_s\)、相机路数都会由数据集自动对上，超参沿用默认；
@@ -1187,13 +1186,13 @@ ACT（无真机用仿真器替代）}\label{ux5728-so-101-ux4e3bux4eceux81c2ux4e
 \subsection{3.3 代码解析：LeRobot
 源码逐层拆解}\label{ux4ee3ux7801ux89e3ux6790lerobot-ux6e90ux7801ux9010ux5c42ux62c6ux89e3}
 
-第 2 节讲''为什么这么设计''，这里讲''代码里到底怎么实现的''。下面把 ACT
+第 2 节讲``为什么这么设计''，这里讲``代码里到底怎么实现的''。下面把 ACT
 在 LeRobot{[}2{]} 里的实现按数据流逐层拆开，训练脚本以 3.1 节的 LIBERO
 训练为例、使用默认 \texttt{ACTConfig}。
 
 引用的源码来自 \textbf{LeRobot v0.5.1}，也就是本书
 \texttt{code/pyproject.toml}
-钉住的那个版本。这个项目迭代很快，读到后面的版本时，类名和默认值可能已经变了------所以下面每处贴出的行，都写清了它在上游仓库里的路径，方便你回自己那份源码里对照。
+钉住的那个版本。这个项目迭代很快，读到后面的版本时，类名和默认值可能已经变了，所以下面每处贴出的行，都写清了它在上游仓库里的路径，方便你回自己那份源码里对照。
 
 \subsubsection{3.3.1
 从训练脚本入手}\label{ux4eceux8badux7ec3ux811aux672cux5165ux624b}
@@ -1299,7 +1298,7 @@ ACT（无真机用仿真器替代）}\label{ux5728-so-101-ux4e3bux4eceux81c2ux4e
 \end{center}
 
 \texttt{eval\_freq} 和 \texttt{save\_freq}
-取同一个值，是为了让曲线上任何一个点都能回去复现------每次评估都留一份
+取同一个值，是为了让曲线上任何一个点都能回去复现，每次评估都留一份
 checkpoint。
 
 \texttt{train()} 内部自动处理：
@@ -1338,7 +1337,7 @@ checkpoint。
 首先要注意：\textbf{ACT 的动作块监督是 dataset
 层生成的，不是模型内部现拼出来的。}
 也就是说，这段训练脚本虽然短，但背后接起的是一整条以 action chunk
-为中心的数据流，而不是''把单步 BC
+为中心的数据流，而不是``把单步 BC
 模型输出改大一点''这么简单。后续源码可以按下面这条顺序理解：
 
 \begin{enumerate}
@@ -1388,7 +1387,7 @@ checkpoint。
 \end{Shaded}
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2612\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3940\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1166\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2282\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2600\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3915\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1215\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2270\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 参数 & 含义 & 默认值 & 训练脚本中的值 \\
 \midrule\noalign{}
@@ -1464,7 +1463,7 @@ chunk。一个容易混淆的点是：\texttt{chunk\_size}
 \end{tabular}
 \end{center}
 
-这三项决定了 ACT 不是单纯的监督回归，而是一个带 KL 正则的 CVAE。
+这三项决定了 ACT 是一个带 KL 正则的 CVAE，不是单纯的监督回归。
 
 \paragraph{\texorpdfstring{3.3.2.4 \texttt{action\_delta\_indices}
 属性}{3.3.2.4 action\_delta\_indices 属性}}\label{action_delta_indices-ux5c5eux6027}
@@ -1524,7 +1523,7 @@ ACT 来说只有中间那条分支会生效。
 \texttt{list(range(100))}，数据集 FPS = 10，所以：
 
 \[
-\texttt{delta\_timestamps["action"]} = \left[\frac{0}{10},\; \frac{1}{10},\; \frac{2}{10},\; \ldots,\; \frac{99}{10}\right] = [0.0,\; 0.1,\; 0.2,\; \ldots,\; 9.9]
+\texttt{delta\_timestamps[“action”]} = \left[\frac{0}{10},\; \frac{1}{10},\; \frac{2}{10},\; \ldots,\; \frac{99}{10}\right] = [0.0,\; 0.1,\; 0.2,\; \ldots,\; 9.9]
 \]
 
 这意味着 dataset 在取一个样本时，会把当前时刻之后连续 100 个 action
@@ -1582,7 +1581,7 @@ action 拼进来，同时生成补位掩码
 \end{center}
 
 如果没有 \texttt{action\_is\_pad}，episode
-尾部那批样本的监督就会被越界部分污染。也就是说，补位掩码不是边角细节，而是动作块监督能正常工作的必要条件。
+尾部那批样本的监督就会被越界部分污染。补位掩码是动作块监督能正常工作的必要条件，不是边角细节。
 
 \texttt{lerobot/libero} 的 dataset metadata 里，和 ACT
 直接对接的是一组已经扁平化好的 feature：
@@ -1628,9 +1627,8 @@ FPS & 10 \\
   直接读到的是扁平的 \texttt{observation.state:\ (8,)}
 \item
   \textbf{LIBERO 环境原始观测} 在
-  \texttt{obs\_type="pixels\_agent\_pos"}
-  下并不是这个扁平结构，而是嵌套的
-  \texttt{robot\_state/eef/...}、\texttt{robot\_state/gripper/...}
+  \texttt{obs\_type="pixels\_agent\_pos"} 下是嵌套的
+  \texttt{robot\_state/eef/...}、\texttt{robot\_state/gripper/...}，不是这个扁平结构
 \item
   评估时，环境侧的 \texttt{LiberoProcessorStep} 会把原始
   \texttt{robot\_state} 再压平成 policy 需要的
@@ -1834,7 +1832,7 @@ pipeline}\label{ux9884ux5904ux7406ux5c42ux5f52ux4e00ux5316-pipeline}
 动作队列用 \texttt{deque({[}{]},\ maxlen=n\_action\_steps)}
 实现。\texttt{select\_action()} 和 \texttt{predict\_action\_chunk()}
 的语义不同：前者是控制接口，每次真正返回一步动作；后者是模型接口，直接返回完整的动作块。因此更准确的说法是：\textbf{ACT
-在推理时会''分块预测、逐步消费''，而不是''100
+在推理时会``分块预测、逐步消费''，而不是``100
 步期间完全不重新观测环境''。}
 它会持续接收新观测，只是在队列没耗尽前不会利用这些新观测重新规划。
 
@@ -1862,7 +1860,7 @@ pipeline}\label{ux9884ux5904ux7406ux5c42ux5f52ux4e00ux5316-pipeline}
 \((B, k, d_a) = (B, 100, 7)\)。两处细节值得留意：它和上一节的
 \texttt{select\_action()} 一样带着
 \texttt{@torch.no\_grad()}，所以整条推理路径上都不会建计算图；\texttt{batch{[}OBS\_IMAGES{]}}
-被整理成了一个 list 而不是保留原始的多个键------底层 \texttt{ACT}
+被整理成了一个 list 而不是保留原始的多个键，底层 \texttt{ACT}
 模型期待的是图像列表，不是分散的键，而 \texttt{dict(batch)}
 这一层浅拷贝保证了改键名不会污染调用方传进来的那个 batch。
 
@@ -1896,15 +1894,15 @@ pipeline}\label{ux9884ux5904ux7406ux5c42ux5f52ux4e00ux5316-pipeline}
 \end{Highlighting}
 \end{Shaded}
 
-投影层的输入维度不是写死的常数，而是从数据集的 feature
-描述里读出来的：状态那一路取
+投影层的输入维度是从数据集的 feature
+描述里读出来的，不是写死的常数：状态那一路取
 \texttt{config.robot\_state\_feature.shape{[}0{]}}，动作那一路取
 \texttt{config.action\_feature.shape{[}0{]}}。 这就是 3.2
-节说的''换机器人不用改算法''------维度由数据集说了算。在 LIBERO
-这份数据上 它们分别是 8 和 7。
+节说的``换机器人不用改算法''，维度由数据集说了算。在 LIBERO 这份数据上
+它们分别是 8 和 7。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.4139\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1255\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1358\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3248\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3977\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1449\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1449\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3125\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 组件 & 输入维度 & 输出维度 & 含义 \\
 \midrule\noalign{}
@@ -1986,14 +1984,13 @@ I^{(c)} \in \mathbb{R}^{3 \times 256 \times 256} \;\xrightarrow{\text{ResNet18 l
 
 \texttt{S} 就是 \texttt{chunk\_size}，取 100 时序列长度是
 \(100 + 2 = 102\)。两处 \texttt{if\ self.config.robot\_state\_feature}
-是因为 ACT
-也支持没有本体状态、只有图像的数据集------那种情况下序列里少一个
+是因为 ACT 也支持没有本体状态、只有图像的数据集，那种情况下序列里少一个
 token，长度变成 \(S+1\)。
 
 输入序列的构成：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1513\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5007\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1669\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1811\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1539\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4913\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1696\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1852\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 位置索引 & Token 来源 & 原始维度 & 投影后维度 \\
 \midrule\noalign{}
@@ -2034,7 +2031,7 @@ variance），再用 reparameterization trick 采样
 根本跑不起来，所以代码里直接把 latent
 填成零张量。这一步为什么站得住脚、代价是什么，2.6.1
 节已经辨析过（它是配着 \(\beta = 10\) 的强 KL
-约束才成立的工程选择，不是''原点密度最高所以最有代表性''）。这里只需要认一件事：\textbf{整份
+约束才成立的工程选择，不是``原点密度最高所以最有代表性''）。这里只需要认一件事：\textbf{整份
 VAE encoder 的权重，在推理路径上一次都不会被调用。}
 
 \emph{Step 2：构造 Transformer Encoder 输入。} latent token + robot
@@ -2077,7 +2074,7 @@ N_{\text{enc}} = \underbrace{1}_{\text{latent}} + \underbrace{1}_{\text{state}} 
 \]
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3464\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2892\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1569\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2074\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3423\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2866\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1655\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2056\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 Token 类型 & 来源 & 数量 & 投影方式 \\
 \midrule\noalign{}
@@ -2120,7 +2117,7 @@ Encoder 输出：
 \texttt{decoder\_in} 全是零，形状 \((100, B, 512)\)------100
 个查询彼此完全相同。真正把它们区分开的是
 \texttt{decoder\_pos\_embed}，也就是那份可学习的位置编码：第 \(i\)
-个查询靠位置编码知道''我负责第 \(i\) 步''。 这也是为什么 2.4.2
+个查询靠位置编码知道``我负责第 \(i\) 步''。 这也是为什么 2.4.2
 节说它们像 DETR 的 object queries。
 
 \emph{Step 5：动作回归。} 线性 action head 投影到动作空间：
@@ -2191,7 +2188,7 @@ chunk。
 关键超参数一览：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3241\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1371\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1179\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4210\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3229\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1368\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1212\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4190\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 超参数 & 符号 & 默认值 & 含义 \\
 \midrule\noalign{}
@@ -2260,11 +2257,11 @@ Policy：把去噪过程搬进动作生成}\label{diffusion-policyux628aux53bbux
 第 2 节中，ACT 用 CVAE 迈出了第一步------用隐变量 \(z\)
 建模多模态动作分布，一次生成 action chunk。但 CVAE
 有一个结构性限制：\textbf{它只用一个隐变量 \(z\)
-来编码所有的''风格/模式''信息}，对于复杂的多峰分布，单个 \(z\)
+来编码所有的``风格/模式''信息}，对于复杂的多峰分布，单个 \(z\)
 的表达能力可能不够。
 
 Diffusion
-的思路完全不同：\textbf{不用一个隐变量，而是用一串逐步变化的隐变量}，通过多步迭代把噪声''雕刻''成动作。
+的思路完全不同：\textbf{不用一个隐变量，而是用一串逐步变化的隐变量}，通过多步迭代把噪声``雕刻''成动作。
 
 \[
 \underbrace{\text{ACT（CVAE）}}_{\text{一个 } z \text{，一次解码}} \quad\longrightarrow\quad \underbrace{\text{Diffusion}}_{\text{一串 } z_T, z_{T-1}, \ldots, z_0 \text{，逐步去噪}}
@@ -2310,7 +2307,7 @@ p(z_0) = \int p(z_T) \prod_{t=1}^{T} p(z_{t-1} \mid z_t) \, dz_{1:T}
 \subsection{4.2
 前向加噪与反向去噪}\label{ux524dux5411ux52a0ux566aux4e0eux53cdux5411ux53bbux566a}
 
-前向过程是\textbf{固定的、不需要学习的}------它是一个纯粹的数学过程，不涉及任何神经网络。可以把它想象成往一张清晰的照片上反复撒雪花：每次只撒一点点，撒了上千次之后，照片就变成了一片纯白噪点。我们只需要按照预设的噪声调度
+前向过程是\textbf{固定的、不需要学习的}，它是一个纯粹的数学过程，不涉及任何神经网络。可以把它想象成往一张清晰的照片上反复撒雪花：每次只撒一点点，撒了上千次之后，照片就变成了一片纯白噪点。我们只需要按照预设的噪声调度
 \(\{\beta_t\}_{t=1}^T\) 执行这个过程：
 
 \[
@@ -2323,8 +2320,8 @@ q(z_t \mid z_{t-1}) = \mathcal{N}\!\left(z_t;\; \sqrt{1 - \beta_t}\, z_{t-1},\; 
 z_t = \underbrace{\sqrt{1-\beta_t}\, z_{t-1}}_{\text{保留一大部分旧信号}} + \underbrace{\text{少量新的高斯噪声}}_{\text{强度由 } \beta_t \text{ 控制}}
 \]
 
-也就是说，第 \(t\) 步的数据并不是''完全重画一遍''，而是在第 \(t-1\)
-步的基础上做一个很小的扰动：先把原有信号稍微缩小一点，再叠加一小份随机噪声。
+第 \(t\) 步的数据是在第 \(t-1\)
+步的基础上做一个很小的扰动，不是``完全重画一遍''：先把原有信号稍微缩小一点，再叠加一小份随机噪声。
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1021\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3433\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5546\linewidth - 2\tabcolsep\relax}@{}}
@@ -2344,11 +2341,11 @@ z_t = \underbrace{\sqrt{1-\beta_t}\, z_{t-1}}_{\text{保留一大部分旧信号
 \tightlist
 \item
   \(\sqrt{1-\beta_t}\)
-  决定''上一时刻的内容还能剩下多少''。因为它通常非常接近
+  决定``上一时刻的内容还能剩下多少''。因为它通常非常接近
   1，所以每一步都只丢失一点点信息。
 \item
   \(\beta_t \mathbf{I}\)
-  决定''这一时刻新注入多少随机性''。前期噪声弱，后期噪声更强，因此样本会逐渐从''还能认出内容''走向''几乎纯噪点''。
+  决定``这一时刻新注入多少随机性''。前期噪声弱，后期噪声更强，因此样本会逐渐从``还能认出内容''走向``几乎纯噪点''。
 \end{itemize}
 
 每一步都在做同一件事：\textbf{把信号缩小一点，加一点噪声}。经过 \(T\)
@@ -2387,7 +2384,7 @@ q(z_t \mid z_0) = \mathcal{N}\!\left(z_t;\; \sqrt{\bar{\alpha}_t}\, z_0,\; (1 - 
 z_t = \sqrt{\bar{\alpha}_t}\, z_0 + \sqrt{1 - \bar{\alpha}_t}\, \epsilon, \quad \epsilon \sim \mathcal{N}(0, \mathbf{I})
 \]
 
-这个性质对训练至关重要------训练时不需要逐步模拟前向过程，直接采样一个随机的
+这个性质对训练至关重要，训练时不需要逐步模拟前向过程，直接采样一个随机的
 \(t\)，一步算出 \(z_t\)。
 
 \subsubsection{4.2.2
@@ -2395,7 +2392,7 @@ z_t = \sqrt{\bar{\alpha}_t}\, z_0 + \sqrt{1 - \bar{\alpha}_t}\, \epsilon, \quad 
 
 反向去噪过程是 Diffusion
 模型真正要学习的部分。目标是学一个神经网络，估计如何从当前的带噪样本
-\(z_t\) 走向更干净的 \(z_{t-1}\)。在数学上，当 \(\beta_t\)
+\(z_t\) 走向更干净的 \(z_{t-1}\)。在数学上，\(\beta_t\)
 足够小时，反向过程也是高斯的：
 
 \[
@@ -2434,8 +2431,6 @@ t \sim \mathcal{U}(\{1, \ldots, T\}), \quad z_0 \sim \mathcal{D}, \quad \epsilon
 \end{tabular}
 \end{center}
 
-训练过程用一句话概括：
-
 \begin{quote}
 \textbf{随机选一个时间步
 \(t\)，给真实数据加对应强度的噪声，让网络预测加了多少噪声。}
@@ -2460,7 +2455,7 @@ z_{t-1} = \frac{1}{\sqrt{\alpha_t}}\left(z_t - \frac{\beta_t}{\sqrt{1 - \bar{\al
   在第 \(t\) 步，用网络 \(\epsilon_\theta(z_t, t)\)
   预测当前样本中的噪声成分。
 \item
-  根据预测结果计算 \(z_{t-1}\)，让样本比当前更''干净''一点。
+  根据预测结果计算 \(z_{t-1}\)，让样本比当前更``干净''一点。
 \item
   重复这个过程，从 \(t = T\) 一直迭代到 \(t = 1\)。
 \item
@@ -2479,8 +2474,8 @@ z_{t-1} = \frac{1}{\sqrt{\alpha_t}}\left(z_t - \frac{\beta_t}{\sqrt{1 - \bar{\al
 z_0 = \frac{z_t - \sqrt{1 - \bar{\alpha}_t}\, \epsilon}{\sqrt{\bar{\alpha}_t}}
 \]
 
-问题在于：\textbf{推理时我们并不知道真正的 \(\epsilon\)
-是多少}。\(\epsilon\) 必须由神经网络预测（即
+\textbf{推理时我们并不知道真正的 \(\epsilon\) 是多少}。\(\epsilon\)
+必须由神经网络预测（即
 \(\epsilon_\theta(z_t, t)\)），而这个预测是有误差的。这里要明确区分两个场景：
 
 \begin{itemize}
@@ -2491,23 +2486,23 @@ z_0 = \frac{z_t - \sqrt{1 - \bar{\alpha}_t}\, \epsilon}{\sqrt{\bar{\alpha}_t}}
   \(z_0\) 算到任意时刻的 \(z_t\)。
 \item
   \textbf{逆向生成时}：我们只有当前的带噪样本
-  \(z_t\)，并不知道把它''污染成现在这样''的真实 \(\epsilon\)
+  \(z_t\)，并不知道把它``污染成现在这样''的真实 \(\epsilon\)
   是什么，必须依赖网络去估计。
 \end{itemize}
 
-所以，公式本身没有问题；真正困难的地方在于，推理阶段代入的是\textbf{网络预测的噪声}，不是''上帝视角下的真实噪声''。
+所以，公式本身没有问题；真正困难的地方在于，推理阶段代入的是\textbf{网络预测的噪声}，不是``上帝视角下的真实噪声''。
 
 \textbf{预测误差在不同 \(t\) 下的表现完全不同：}
 
 \begin{itemize}
 \tightlist
 \item
-  当 \(t\) 很小（图像几乎清晰）时，网络能比较准确地预测噪声，直接反推
+  \(t\) 很小（图像几乎清晰）时，网络能比较准确地预测噪声，直接反推
   \(z_0\) 效果尚可。
 \item
-  当 \(t\)
+  \(t\)
   很大（满屏噪点）时，信息几乎全丢了，网络只能给出一个非常粗糙的估计。此时强行用这个估计代入公式反推
-  \(z_0\)，只会得到一个\textbf{极度模糊、细节全无的''平均''结果}（沿用图像生成里''平均脸''的直觉：所有可能动作被糊成一个没有细节的折中）。
+  \(z_0\)，只会得到一个\textbf{极度模糊、细节全无的``平均''结果}（沿用图像生成里``平均脸''的直觉：所有可能动作被糊成一个没有细节的折中）。
 \end{itemize}
 
 逐步去噪之所以有效，有三个层面的原因：
@@ -2524,20 +2519,20 @@ z_0 = \frac{z_t - \sqrt{1 - \bar{\alpha}_t}\, \epsilon}{\sqrt{\bar{\alpha}_t}}
 
 \textbf{纠错层面：每步都在修正自己的估计。}
 每走一小步，就得到一个稍微清晰的中间状态
-\(z_{t-1}\)，网络基于这个更好的状态做下一次预测。多步采样因此比一步到位更稳------一步到位像''盲狙''，预测偏了没有任何修正机会。但要说清边界：这里的''反馈''是模型对自己中间估计的迭代修正，\textbf{不是}来自环境的反馈；而且有限步的神经网络采样\textbf{没有逐样本的收敛保证}------模型误差、离散化误差、条件给错、步数太少，都可能产出低质量样本。
+\(z_{t-1}\)，网络基于这个更好的状态做下一次预测。多步采样因此比一步到位更稳------一步到位像``盲狙''，预测偏了没有任何修正机会。但要说清边界：这里的``反馈''是模型对自己中间估计的迭代修正，\textbf{不是}来自环境的反馈；而且有限步的神经网络采样\textbf{没有逐样本的收敛保证}------模型误差、离散化误差、条件给错、步数太少，都可能产出低质量样本。
 
 \begin{quote}
 \textbf{类比：大雾中寻路。}
-被随机扔在山里（\(z_T\)），要走到山脚的村庄（\(z_0\)）。一步到位相当于在完全看不见的情况下猜出村庄的绝对坐标------几乎不可能。分步去噪相当于每次只看清脚下一米的路，每走一步都根据周围地形调整方向。走了
+被随机扔在山里（\(z_T\)），要走到山脚的村庄（\(z_0\)）。一步到位相当于在完全看不见的情况下猜出村庄的绝对坐标，几乎不可能。分步去噪相当于每次只看清脚下一米的路，每走一步都根据周围地形调整方向。走了
 1000
 步，但每步的决策都简单，因此更容易走对------当然，雾里认错方向也是可能的，所以生成质量还是要靠采样质量和任务成功率去验证。
 \end{quote}
 
-需要注意的是，DDPM 在每一步内部确实会利用公式''偷偷''估算一下 \(z_0\)
+需要注意的是，DDPM 在每一步内部确实会利用公式``偷偷''估算一下 \(z_0\)
 应该长什么样（用来计算去噪均值
-\(\mu_\theta\)），但它\textbf{不信任}这个一次性估算的结果，只朝着那个方向迈一小步。这正是''预测噪声
+\(\mu_\theta\)），但它\textbf{不信任}这个一次性估算的结果，只朝着那个方向迈一小步。这正是``预测噪声
 \(\epsilon_\theta\) 比直接预测 \(z_0\)
-更稳定''的实践原因。公式给出的是一条数学上的''捷径''，而扩散模型真正学到的是：在预测存在误差的现实条件下，怎样沿着这条捷径\textbf{稳扎稳打地一点点往回走}。
+更稳定''的实践原因。公式给出的是一条数学上的``捷径''，而扩散模型真正学到的是：在预测存在误差的现实条件下，怎样沿着这条捷径\textbf{稳扎稳打地一点点往回走}。
 
 \subsection{4.4 为什么 Diffusion 比 ACT
 更擅长多模态}\label{ux4e3aux4ec0ux4e48-diffusion-ux6bd4-act-ux66f4ux64c5ux957fux591aux6a21ux6001}
@@ -2546,13 +2541,13 @@ z_0 = \frac{z_t - \sqrt{1 - \bar{\alpha}_t}\, \epsilon}{\sqrt{\bar{\alpha}_t}}
 在某些场景下会比 ACT 更有优势：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1190\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2488\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6322\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1725\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2332\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5943\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
  & VAE / CVAE（ACT） & Diffusion（Diffusion Policy） \\
 \midrule\noalign{}
 隐变量 & 一个 \(z\)，低维（如 32 维） & 一串 \(z_T, z_{T-1}, \ldots, z_0\)，与数据同维 \\
 生成方式 & 采样 \(z\) → 一次解码 & 从噪声开始 → 多步迭代去噪 \\
-多模态能力 & 靠 \(z\) 的不同取值区分模式 & 靠迭代过程自然''选择''模式 \\
+多模态能力 & 靠 \(z\) 的不同取值区分模式 & 靠迭代过程自然``选择''模式 \\
 推理速度 & 快（一次前向） & 慢（多步迭代，经典设定要上千步；换采样器可以压下来，见 4.5 节） \\
 训练稳定性 & KL 坍缩等问题 & 通常更稳定 \\
 \bottomrule\noalign{}
@@ -2566,7 +2561,7 @@ Chi 等人提出的 Diffusion Policy{[}4{]} 把 DDPM
 的框架直接搬到了机器人策略学习中。核心改动是：\textbf{不建模完整的联合分布
 \(p(o, a)\)，而是建模条件分布 \(p(a \mid o)\)。}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture10/ref/fig10-4-diffusion-policy-arch_arxiv-2303.04137.jpg}}
 
@@ -2587,7 +2582,7 @@ denoising steps，意思是整个中间部分要重复跑 \(T\)
 
 看图时注意符号：图里用 \(H_a\) 记要生成的动作段长度、\(H_o\)
 记观测窗口长度，而下面正文沿用论文表格里的 \(T_p\) 和
-\(T_o\)。同一个东西两套字母，是因为论文正文和后来的实现各用了一套------本讲
+\(T_o\)。同一个东西两套字母，是因为论文正文和后来的实现各用了一套，本讲
 5.5.2 节讲 Flow Matching Policy 时会切回 \(H\) 那一套。
 
 具体做法：让噪声预测网络 \(\epsilon_\theta\)
@@ -2600,7 +2595,7 @@ denoising steps，意思是整个中间部分要重复跑 \(T\)
 \]
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1679\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.7131\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1190\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1678\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.7112\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1209\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 符号 & 含义 & 典型值 \\
 \midrule\noalign{}
@@ -2636,7 +2631,7 @@ denoising steps，意思是整个中间部分要重复跑 \(T\)
 
 回顾 ACT 的推理：\(z = 0\)，直接解码。这意味着\textbf{原 ACT
 实现}在推理时用的是固定 latent
-的确定性生成，不再显式采样不同的隐变量模式------注意这是那份实现的部署选择，不是
+的确定性生成，不再显式采样不同的隐变量模式，注意这是那份实现的部署选择，不是
 CVAE 这一类模型没法采多模态。而 Diffusion Policy
 的推理从随机噪声开始，\textbf{每次采样都可能走向不同的模式}：迭代去噪在多个模式之间做选择，而不是把它们平均掉。
 
@@ -2649,19 +2644,19 @@ Diffusion Policy 的代价是推理速度。标准 DDPM
 
 缓解的办法之一是换一个采样器。\textbf{DDIM}（Denoising Diffusion
 Implicit
-Models，去噪扩散隐式模型）{[}5{]}用一条确定性的更新规则，允许在去噪链上跳步，把步数从上千压到十步量级。但这只是把常数降下来：每一步仍然要跑一遍完整的网络前向，多步就是多次前向。想在这一点上再进一步，就要换掉''逐步去噪''这个框架本身------那就是第
+Models，去噪扩散隐式模型）{[}5{]}用一条确定性的更新规则，允许在去噪链上跳步，把步数从上千压到十步量级。但这只是把常数降下来：每一步仍然要跑一遍完整的网络前向，多步就是多次前向。想在这一点上再进一步，就要换掉``逐步去噪''这个框架本身，那就是第
 5 节的 Flow Matching。
 
 \subsection{4.6 本节小结}\label{ux672cux8282ux5c0fux7ed3-1}
 
 \textbf{核心创新}：Diffusion 把生成式策略从 CVAE
-的''单隐变量一次解码''推进到''多步迭代去噪''，提供了更灵活的条件分布建模与随机采样机制：从随机噪声出发，在多个动作模式之间做选择而不是取平均。和采用
+的``单隐变量一次解码''推进到``多步迭代去噪''，提供了更灵活的条件分布建模与随机采样机制：从随机噪声出发，在多个动作模式之间做选择而不是取平均。和采用
 \(z = 0\) 确定性推理的 ACT
 实现相比，它更容易在部署时显式采出不同模式。Diffusion Policy
-也验证了这套框架在真实机器人任务上的有效性。至于两者谁''更强''，要在同一套协议下比较才有意义------架构、训练配方、采样器和数据都会影响结论。
+也验证了这套框架在真实机器人任务上的有效性。至于两者谁``更强''，要在同一套协议下比较才有意义------架构、训练配方、采样器和数据都会影响结论。
 
 \textbf{局限性}：标准 DDPM 需要多步去噪，推理明显慢于 ACT
-的单次前向，在实时控制下是真正的瓶颈------这正是第 5 节 Flow Matching
+的单次前向，在实时控制下是真正的瓶颈，这正是第 5 节 Flow Matching
 要解决的问题。
 
 \section{5 Flow
@@ -2696,9 +2691,9 @@ Diffusion Policy（DDIM 加速） & 十步量级 & 跳步、确定性去噪 \\
 \end{center}
 
 即使用 DDIM 加速，Diffusion
-仍然需要多步迭代。在实时机器人控制中，每一步都要跑一次完整的神经网络前向传播，这是一个实际瓶颈。上表是各实现里的常见量级，具体值取决于采样器与误差容限，不宜当成固定结论------5.4.3
+仍然需要多步迭代。在实时机器人控制中，每一步都要跑一次完整的神经网络前向传播，这是一个实际瓶颈。上表是各实现里的常见量级，具体值取决于采样器与误差容限，不宜当成固定结论，5.4.3
 节会换成 \textbf{NFE}（number of function
-evaluations，网络前向次数）这个更公平的口径重新对比，因为''一步''在不同求解器下的开销并不一样。
+evaluations，网络前向次数）这个更公平的口径重新对比，因为``一步''在不同求解器下的开销并不一样。
 
 \textbf{为什么 Diffusion 往往需要这么多步？} 一个重要原因在于 Diffusion
 的前向过程带有随机性，导致常见采样轨迹更像是逐步修正、逐步去噪的过程。步数过少时，离散化误差和建模误差都更容易显著暴露出来。
@@ -2763,7 +2758,7 @@ Flow Matching{[}6{]}
 是标准正态噪声，最右边 \(t=1\)
 是数据分布本身，中间三格是它们之间的过渡：一团各向同性的高斯先被收拢，再裂成几块，最后长成清晰的棋盘格：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/ref/fig10-5-flow-matching-path.png}
 
@@ -2772,12 +2767,12 @@ Flow Matching{[}6{]}
 \caption{五格从左到右是 \(t=0\)、0.25、0.5、0.75、1。\(t=0\)
 是标准正态噪声，\(t=1\) 是棋盘格数据分布，中间三格是
 \(z_t=(1-t)z_0+tz_1\)
-的边际分布------注意结构不是最后一步突然出现的，\(t=0.75\)
-时格子的轮廓已经显形（本书自绘：直接按插值式采样画出解析的概率路径，未训练模型）}
+的边际分布，注意结构不是最后一步突然出现的，\(t=0.75\)
+时格子的轮廓已经显形（直接按插值式采样画出解析的概率路径，未训练模型）}
 
 \end{figure}%
 
-要说清楚这五格画的到底是什么：它们不是某个训练好的模型跑出来的采样轨迹，而是\textbf{概率路径本身}------按
+要说清楚这五格画的到底是什么：它们是\textbf{概率路径本身}，不是某个训练好的模型跑出来的采样轨迹------按
 \(z_0 \sim \mathcal{N}(0, I)\)、\(z_1 \sim p_{\text{数据}}\)
 各自独立采样、再按插值式算出 \(z_t\)，把每个 \(t\)
 上得到的那一堆点画出来。Flow Matching
@@ -2795,7 +2790,7 @@ Field）}\label{ux5411ux91cfux573avector-field}
 
 流的运动由一个\textbf{向量场}
 \(v: [0, 1] \times \mathbb{R}^d \to \mathbb{R}^d\)
-驱动。向量场告诉每个点在每个时刻的''速度''：
+驱动。向量场告诉每个点在每个时刻的``速度''：
 
 \[
 \frac{d}{dt} \psi(t, z) = v(t, \psi(t, z))
@@ -2822,7 +2817,7 @@ Field）}\label{ux5411ux91cfux573avector-field}
 
 两者最常见的采样形态可以这样对照：经典 DDPM 走的是随机的反向链，而 Flow
 Matching 直接学习驱动\textbf{连续归一化流}（continuous normalizing flow,
-CNF------把简单分布沿着一个连续的速度场''流''成复杂分布的模型）的向量场，通常用
+CNF------把简单分布沿着一个连续的速度场``流''成复杂分布的模型）的向量场，通常用
 ODE 求解器采样。
 
 \[
@@ -2880,39 +2875,38 @@ z_t = (1 - t)\, z_0 + t\, z_1
 时是真实数据，中间是两者的线性混合。
 
 \begin{quote}
-备注：这条直线路径常被误称为''Optimal Transport 路径''。这里的 \(z_0\)
+备注：这条直线路径常被误称为``Optimal Transport 路径''。这里的 \(z_0\)
 与 \(z_1\)
 是\textbf{各自独立采样}配成的一对，这样连出来的直线并不构成两个分布之间的最优传输耦合。只有当端点是通过
 OT（或近似 OT）\textbf{耦合}配对、或使用相应的 OT
-条件路径时，才配得上''OT 路径''这个名字------那是 OT Flow Matching
-的做法。
+条件路径时，才配得上``OT 路径''这个名字，那是 OT Flow Matching 的做法。
 \end{quote}
 
 把这条路径画在一维上，就是下面这根线段：左端点是采到的噪声
 \(z_0\)，右端点是数据集里的样本 \(z_1\)，\(t\) 从 0 走到 1
 的过程就是沿着这根线段从左滑到右，滑到哪儿，\(z_t\) 就是哪儿。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/ref/fig10-5-linear-interpolation-path.png}
 
 }
 
-\caption{左列是采到的噪声样本，右列是数据集里的样本（画成双峰）。同一下标的两个点配成一条\textbf{条件路径}，图里画了
-7
-条：每个噪声点各自连向一个数据点，端点是独立采样再配对的，所以这些直线彼此交叉。红色那条被高亮出来，标出
-\(z_0\)、\(z_1\) 与它们之间的插值点 \(z_t\)（本书自绘）}
+\caption{左列是从噪声里采到的 4 个样本，右列是数据集里的 4
+个样本（画成双峰）。\textbf{编号相同的两个端点配成一条条件路径}，一共 4
+条：每个噪声点各自连向一个数据点。编号是乱序的，所以这些直线彼此交叉，交叉正是「端点各自独立采样、随机配对」的后果。红色那条（编号
+1）被高亮出来，标出 \(z_0\)、\(z_1\) 与它们之间的插值点 \(z_t\)}
 
 \end{figure}%
 
 图里要看的是\textbf{多对端点}，这正是上面那个公式给不了的东西：公式只描述一条路径，而实际的训练数据是成千上万对这样的
 \((z_0, z_1)\)，每一对连出一条自己的直线，彼此交叉。单看红色那条，路径确实是直的、速度确实是常数；可把所有条件路径叠在一起，同一个位置在同一时刻会有好几条路径穿过、各自朝不同方向走，平均下来得到的\textbf{边际}流场就不再是直的了。5.3.2
-节末尾会把这件事拆成三句话，其中''学出来的\textbf{边际}流不必是直的''，说的就是图上这些交叉。
+节末尾会把这件事拆成三句话，其中``学出来的\textbf{边际}流不必是直的''，说的就是图上这些交叉。
 
 \subsubsection{5.3.2
 目标向量场：两个公式就够了}\label{ux76eeux6807ux5411ux91cfux573aux4e24ux4e2aux516cux5f0fux5c31ux591fux4e86}
 
-沿着线性插值路径，每个点的''速度''是常数：
+沿着线性插值路径，每个点的``速度''是常数：
 
 \[
 \frac{d}{dt} z_t = z_1 - z_0
@@ -2923,17 +2917,17 @@ OT（或近似 OT）\textbf{耦合}配对、或使用相应的 OT
 的核心思想，归结到底就是两个公式：
 
 \[
-\boxed{z_t = (1-t)\,z_0 + t\,z_1} \qquad \boxed{\frac{d}{dt}z_t = z_1 - z_0}
+z_t = (1-t)\,z_0 + t\,z_1 \qquad\qquad \frac{d}{dt}z_t = z_1 - z_0
 \]
 
 第一个公式定义了从噪声到数据的路径（线性插值），第二个公式是这条路径的导数（速度）。神经网络要学的就是这个速度------一个从
 \(z_0\) 指向 \(z_1\) 的向量。给定当前位置
-\(z_t\)，模型预测''往哪走、走多快''，就能把噪声推向数据。更完整的理论推导会把这个直觉放到条件概率路径和边际向量场的框架下，但对线性插值这个最常见的入门情形来说，最终训练目标确实可以落到这样一个非常简单的速度回归问题上。
+\(z_t\)，模型预测``往哪走、走多快''，就能把噪声推向数据。更完整的理论推导会把这个直觉放到条件概率路径和边际向量场的框架下，但对线性插值这个最常见的入门情形来说，最终训练目标确实可以落到这样一个非常简单的速度回归问题上。
 
 与 Diffusion 对比一下：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1883\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4227\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3889\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2118\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4115\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3767\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
  & Diffusion（预测噪声） & Flow Matching（预测速度） \\
 \midrule\noalign{}
@@ -2948,7 +2942,7 @@ OT（或近似 OT）\textbf{耦合}配对、或使用相应的 OT
 线性\textbf{条件}路径让训练目标变得非常简单，这是很多 Flow Matching
 实现高效的一个重要原因。但要把三件事分开：单条\textbf{条件}路径（给定一对端点）是直线；学出来的\textbf{边际}流不必是直的；实际数值采样\textbf{轨迹}也可能弯。反过来，扩散概率流
 ODE
-的轨迹也不能简单等同于''布朗式曲线''。所以比较两者时，应当报告向量场、端点耦合方式和求解器设置，而不是笼统地说一个直、一个弯。
+的轨迹也不能简单等同于``布朗式曲线''。所以比较两者时，应当报告向量场、端点耦合方式和求解器设置，而不是笼统地说一个直、一个弯。
 
 \subsubsection{5.3.3 训练目标}\label{ux8badux7ec3ux76eeux6807}
 
@@ -2976,8 +2970,6 @@ t \sim \mathcal{U}([0, 1]), \quad z_0 \sim \mathcal{N}(0, I), \quad z_1 \sim \ma
 \end{tabular}
 \end{center}
 
-训练过程用一句话概括：
-
 \begin{quote}
 \textbf{随机选一个时刻 \(t\)，在噪声和数据之间做线性插值得到
 \(z_t\)，让网络预测从噪声指向数据的速度。}
@@ -3001,12 +2993,11 @@ t \sim \mathcal{U}([0, 1]), \quad z_0 \sim \mathcal{N}(0, I), \quad z_1 \sim \ma
 
 在这种教学版线性插值设定里，训练不需要像经典离散 diffusion
 那样显式设计一套 \(\beta\)
-调度表，实现和调参都更直接。但别把它读成''Flow Matching
+调度表，实现和调参都更直接。但别把它读成``Flow Matching
 训练一定更简单''：概率路径怎么选、时间 \(t\)
 怎么采样、端点怎么耦合、端点分布与参数化怎么定、ODE
-求解设置怎么配，这些旋钮都还在------有些 Flow Matching
-变体反而比一个标准 DDPM
-实现更复杂。工程复杂度要按具体实现比，不按方法名比。
+求解设置怎么配，这些旋钮都还在，有些 Flow Matching 变体反而比一个标准
+DDPM 实现更复杂。工程复杂度要按具体实现比，不按方法名比。
 
 \subsection{5.4 采样：少步 ODE 积分（Euler /
 Midpoint）}\label{ux91c7ux6837ux5c11ux6b65-ode-ux79efux5206euler-midpoint}
@@ -3052,10 +3043,10 @@ Midpoint 方法每步需要两次网络前向，但精度更高，总步数可�
 那种逐步修正的采样流程对步长敏感得多，步子一粗，离散化误差立刻显现在样本质量上。
 
 明白了机制，再看数字时就要注意一件事：\textbf{该比的量是 NFE
-和端到端时延，不是''步数''}------每步的代价并不相同。下表是各家论文与实现里常见的量级，属示例范围、不是通用结论：
+和端到端时延，不是``步数''}，每步的代价并不相同。下表是各家论文与实现里常见的量级，属示例范围、不是通用结论：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3904\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2064\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4032\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3859\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2156\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3984\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 方法 & 常见步数量级 & 每步网络前向 \\
 \midrule\noalign{}
@@ -3067,7 +3058,7 @@ Flow Matching（Midpoint） & 5\textasciitilde10 & 2（所以 NFE 是步数的�
 \end{tabular}
 \end{center}
 
-注意 Midpoint 每步两次前向，5 步就是 10 次 NFE------单看''5
+注意 Midpoint 每步两次前向，5 步就是 10 次 NFE，单看``5
 步''会低估它的开销。而 DDIM、概率流 ODE
 同样能少步采样，蒸馏/一致性方法能把 NFE
 压得更低。最终快慢还取决于模型大小、求解器、误差容限和硬件，所以要下结论就得在\textbf{同一模型、同一硬件}上实测
@@ -3082,7 +3073,7 @@ NFE、时延和任务成功率。
 把前面的要点汇总成一张表：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1144\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4081\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4775\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1700\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3812\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4488\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
  & Diffusion（以 DDPM 为例） & Flow Matching（线性条件路径） \\
 \midrule\noalign{}
@@ -3100,11 +3091,11 @@ NFE、时延和任务成功率。
 \end{tabular}
 \end{center}
 
-核心区别用一句话概括：
+核心区别是这样的：
 
 \begin{quote}
 \textbf{Diffusion 的经典表述是逐步去噪，Flow Matching
-是沿连续向量场做积分。在常见设定下，后者往往能用更少的网络前向完成采样------快多少要按
+是沿连续向量场做积分。在常见设定下，后者往往能用更少的网络前向完成采样，快多少要按
 5.4.3 节那套口径实测。}
 \end{quote}
 
@@ -3119,10 +3110,10 @@ Matching 常被看作比经典 Diffusion 表述更一般的一类框架。
 也可以条件化到观测上，用于生成机器人动作。\textbf{核心改动：让速度场网络额外接收观测作为条件。}
 这里动作块用 \(H_a\)、观测窗口用 \(H_o\) 记，对应的就是第 4 节 Diffusion
 Policy 里的 \(T_p\) 与 \(T_o\)，只是换了字母。另外把\textbf{流的时间记成
-\(\tau\)}：一旦条件化到观测上，下标里的 \(t\) 已经被''机器人的第 \(t\)
-个控制时刻''占住了，再用 \(t\) 兼指流的时间就会撞车------第 4
-节把扩散步记成 \(i\)
-是出于同一个理由。下面写的是一个教学版、最常见的条件化 Flow Matching
+\(\tau\)}：一旦条件化到观测上，下标里的 \(t\) 已经被``机器人的第 \(t\)
+个控制时刻''占住了，再用 \(t\) 兼指流的时间就会撞车，第 4 节把扩散步记成
+\(i\) 是出于同一个理由。下面写的是一个教学版、最常见的条件化 Flow
+Matching
 目标；具体系统在时间采样分布、时间区间、网络结构和噪声参数化上，往往还会做额外改动。训练目标变为：
 
 \[
@@ -3168,7 +3159,7 @@ Policy 里的 \(T_p\) 与 \(T_o\)，只是换了字母。另外把\textbf{流的
 与 Diffusion Policy 的推理对比：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1460\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5371\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3169\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1771\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5156\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3073\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
  & Diffusion Policy & Flow Matching Policy \\
 \midrule\noalign{}
@@ -3192,7 +3183,7 @@ ODE
 ODE
 积分采样------条件路径是端点间的直线，训练目标简化成一个速度回归。它在保留多模态表达力的同时，通常能用更少的网络前向次数完成采样（常见个位数到十几步）。
 
-\textbf{局限性}：作为动作生成头，它解决的仍只是''给定观测怎么生成一段连续动作''，本身并不带来''听懂语言、泛化到没见过的任务''的能力；要做到这一点，需要把它接到一个视觉-语言大模型骨干上，这就引出了下一讲的
+\textbf{局限性}：作为动作生成头，它解决的仍只是``给定观测怎么生成一段连续动作''，本身并不带来``听懂语言、泛化到没见过的任务''的能力；要做到这一点，需要把它接到一个视觉-语言大模型骨干上，这就引出了下一讲的
 \(\pi_0\) 家族。
 
 \section{6 本讲小结}\label{ux672cux8bb2ux5c0fux7ed3}
@@ -3208,7 +3199,7 @@ ODE
 \underbrace{\text{ACT（CVAE）}}_{\text{第 2 节}} \quad\cdot\quad \underbrace{\text{Diffusion Policy}}_{\text{第 4 节}} \quad\cdot\quad \underbrace{\text{Flow Matching}}_{\text{第 5 节}} \quad\longrightarrow\quad \underbrace{\text{$\pi_0$ 等连续动作 VLA}}_{\text{下一讲}}
 \]
 
-看这三个方法，最好别按''第一代、第二代、第三代''来记------它们不是一条互相替代的世代链，而是在\textbf{两个正交的维度}上各做了选择：
+看这三个方法，最好别按``第一代、第二代、第三代''来记，它们是在\textbf{两个正交的维度}上各做了选择，不是一条互相替代的世代链：
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1562\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.7344\linewidth - 2\tabcolsep\relax}@{}}
@@ -3224,10 +3215,10 @@ ODE
 ACT 选的是「动作块 × CVAE」，还额外带上了 Transformer 架构与 temporal
 ensembling；Diffusion Policy 是「动作块 + 滚动重规划 × Diffusion」；Flow
 Matching 作为动作头是「动作块 ×
-连续流」。三者的网络结构和训练目标也可以互换搭配，所以实际优劣要看任务、时延预算和数据，而不是看它''属于第几代''。
+连续流」。三者的网络结构和训练目标也可以互换搭配，所以实际优劣要看任务、时延预算和数据，而不是看它``属于第几代''。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1201\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2985\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2887\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2928\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2004\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2656\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2693\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2647\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
  & ACT（第 2 节） & Diffusion Policy（第 4 节） & Flow Matching（第 5 节） \\
 \midrule\noalign{}
@@ -3248,7 +3239,7 @@ Matching 作为动作头是「动作块 ×
 \subsection{6.2 一句话总结}\label{ux4e00ux53e5ux8bddux603bux7ed3}
 
 \begin{quote}
-模仿学习从''看图回归一个动作''走向''看图生成一段动作分布''------ACT 用
+模仿学习从``看图回归一个动作''走向``看图生成一段动作分布''------ACT 用
 CVAE 建模多模态、用 action chunking 做短时规划，Diffusion
 用多步去噪换更强的多模态，Flow Matching
 用确定性连续流换更少的推理步数；三者是同一个问题
@@ -3259,13 +3250,13 @@ CVAE 建模多模态、用 action chunking 做短时规划，Diffusion
 \(\pi_0\)
 家族）}{6.3 下一讲：从动作头到完整 VLA（OpenVLA → \textbackslash pi\_0 家族）}}\label{ux4e0bux4e00ux8bb2ux4eceux52a8ux4f5cux5934ux5230ux5b8cux6574-vlaopenvla-pi_0-ux5bb6ux65cf}
 
-本讲的三条主线都是''单任务 /
-少任务''的生成式策略：它们解决的是''给定观测，怎么生成一段连续动作''。但真正的通用机器人还要能听懂语言、泛化到没见过的任务------这就要把这些动作建模能力，接到一个视觉-语言大模型的骨干上。
+本讲的三条主线都是``单任务 /
+少任务''的生成式策略：它们解决的是``给定观测，怎么生成一段连续动作''。但真正的通用机器人还要能听懂语言、泛化到没见过的任务------这就要把这些动作建模能力，接到一个视觉-语言大模型的骨干上。
 
 下一讲（第11讲）就从 OpenVLA 讲起，看 VLA
 如何把图像、语言、机器人状态统一进一个大模型，再看 \(\pi_0\)
 家族怎么把本讲这套 Flow Matching
-装成它的动作头------动作是怎么被''流''出来的。
+装成它的动作头，动作是怎么被``流''出来的。
 
 \section{参考文献}\label{ux53c2ux8003ux6587ux732e}
 
@@ -3296,10 +3287,6 @@ https://arxiv.org/abs/2210.02747.
 {[}7{]} BLACK K, BROWN N, DRIESS D, et al.~\(\pi_0\): a
 vision-language-action flow model for general robot control{[}EB/OL{]}.
 (2024-10-31){[}2026-06-26{]}. https://arxiv.org/abs/2410.24164.
-
-\begin{quote}
-第 5 节的二维棋盘格流动过程图由本书的 Flow Matching 示例脚本渲染得到。
-\end{quote}
 
 
 

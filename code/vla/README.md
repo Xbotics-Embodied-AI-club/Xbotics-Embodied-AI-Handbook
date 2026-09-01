@@ -9,10 +9,10 @@ VLA（视觉-语言-动作）课程段的演示代码。按**主题组**组织�
 vla/
 ├── 1_policy_rollout/          # 组1 端到端策略闭环
 │   ├── 1_1_libero_env/        #   LIBERO 环境入门
-│   └── 1_2_pi0_libero_rollout/#   π0 当黑盒跑通第一个闭环（+白噪声对照）
+│   └── 1_2_pi0_libero_rollout/#   π0 当黑盒跑通第一个闭环
 ├── 2_data_collection/         # 组2 操作数据闭环
 │   ├── 2_2_so101_setup/       #   SO-101 串口/相机绑定
-│   ├── 2_3_teleop_record/     #   主从臂遥操作 + 数据录制
+│   ├── 2_3_teleop_record/     #   Leader–Follower 臂遥操作 + 数据录制
 │   └── 2_4_lerobot_dataset/   #   LeRobot 数据集格式走读
 └── 3_imitation_learning/      # 组3 模仿学习
     ├── 3_1_act/               #   ACT：训练 / 本地推理 / server-client 异步推理
@@ -27,7 +27,7 @@ vla/
 | 组 / 模块 | 内容 | 课程对应 | 旧 vla_class 模块号 |
 |---|---|---|---|
 | `1_policy_rollout/1_1_libero_env` | LIBERO 环境入门 | 讲8 | 3_4_libero |
-| `1_policy_rollout/1_2_pi0_libero_rollout` | π0 第一个策略闭环 + 白噪声对照 | 讲8（讲11 π0 推理复用） | 6_3_pi0 |
+| `1_policy_rollout/1_2_pi0_libero_rollout` | π0 第一个策略闭环 | 讲8（讲11 π0 推理复用） | 6_3_pi0 |
 | `2_data_collection/2_2_so101_setup` | SO-101 硬件绑定脚本 | 讲9 | 3_5_SO101 |
 | `2_data_collection/2_3_teleop_record` | 遥操作与录制 | 讲9 | 4_3_tele_so101 |
 | `2_data_collection/2_4_lerobot_dataset` | 数据集格式走读 | 讲9 | 4_2_lerobot_dataset |

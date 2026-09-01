@@ -155,8 +155,10 @@
  
 
 
-\usepackage{fvextra}
-\DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,commandchars=\\\{\}}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.75}
 \usepackage{changepage}
 \usepackage{xcolor}
 \usepackage{dirtree}
@@ -232,20 +234,18 @@
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
-\listoffigures
-\listoftables
 
 \section{1 为什么数据决定 VLA
 的上限}\label{ux4e3aux4ec0ux4e48ux6570ux636eux51b3ux5b9a-vla-ux7684ux4e0aux9650}
 
-第8讲把视线放在策略模型本身。但在真正动手训练之前，还有一件更靠前、也更容易被低估的事：\textbf{数据}。策略能做到多好，几乎在采数据的那一刻就被锁死了------同一个模型，喂不同的数据，上限天差地别。这一讲就从''怎么采到一份能把策略喂好的数据''讲起。
+第8讲把视线放在策略模型本身。但在真正动手训练之前，还有一件更靠前、也更容易被低估的事：\textbf{数据}。策略能做到多好，几乎在采数据的那一刻就被锁死了。同一个模型，喂不同的数据，上限天差地别。这一讲就从``怎么采到一份能把策略喂好的数据''讲起。
 
 \subsection{1.1
 立论：瓶颈是数据，不是算力}\label{ux7acbux8bbaux74f6ux9888ux662fux6570ux636eux4e0dux662fux7b97ux529b}
 
 人们很容易以为机器人学不好是因为模型不够大、算力不够多。但在操作领域，最紧的那一环往往是\textbf{高质量、与本体动作对齐的配对观测---动作数据}。语言和图像可以从互联网上海量爬取，机器人的每一条
 \((o_t, a_t)\)
-都得和某个具体本体的动作口径对上，来源比文本图像窄得多------真机示教、部署日志、仿真、脚本与合成扰动、人类视频重定向都能出数据（本讲
+都得和某个具体本体的动作口径对上，来源比文本图像窄得多，真机示教、部署日志、仿真、脚本与合成扰动、人类视频重定向都能出数据（本讲
 4.5 节就会用仿真采一份），但它们的\textbf{可执行性}和
 Sim2Real（仿真里训出来的东西迁到真机，见第5讲第 6
 节）风险各不相同，不能简单当成等价供给。
@@ -256,35 +256,34 @@ Sim2Real（仿真里训出来的东西迁到真机，见第5讲第 6
 维度 & 算力 & 硬件本体 & 数据 \\
 \midrule\noalign{}
 是否当前主要瓶颈 & 通常不是，相对充足 & 通常不是，平台已够用 & 常常是最紧的一环 \\
-能否靠''买''或''堆''解决 & 能 & 部分能 & 不能，得逐条采或逐条生成 \\
+能否靠``买''或``堆''解决 & 能 & 部分能 & 不能，得逐条采或逐条生成 \\
 现实判断 & 算力少有成为操作任务的瓶颈 & 平台已足够 & 高质量、可执行、与本体对齐的示教数据最稀缺 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
 \begin{quote}
-备注：瓶颈到底在哪一环，随任务和规模变化------数据、算力、硬件、系统工程都可能成为主瓶颈。本讲取的是''当前多数桌面操作任务上，数据是最紧那环''这个口径。
+备注：瓶颈到底在哪一环，随任务和规模变化，数据、算力、硬件、系统工程都可能成为主瓶颈。本讲取的是``当前多数桌面操作任务上，数据是最紧那环''这个口径。
 \end{quote}
 
-把''瓶颈在数据''这件事立住之后，后面几节用经验证据回答三个递进的问题：加数据有没有用、加什么样的数据最有用、好坏怎么界定；末了再追一句，``多样''到底该往哪个方向铺。
+把``瓶颈在数据''这件事立住之后，后面几节用经验证据回答三个递进的问题：加数据有没有用、加什么样的数据最有用、好坏怎么界定；末了再追一句，``多样''到底该往哪个方向铺。
 
 \subsection{1.2 加数据有用吗：模仿学习的数据 scaling
 law}\label{ux52a0ux6570ux636eux6709ux7528ux5417ux6a21ux4effux5b66ux4e60ux7684ux6570ux636e-scaling-law}
 
-第一个证据来自一项专门研究''示教数量''的工作------《模仿学习中的数据规模律》（Data
+第一个证据来自一项专门研究``示教数量''的工作------《模仿学习中的数据规模律》（Data
 Scaling Laws in Imitation
 Learning）{[}1{]}。研究者跨大量环境与物体采了四万多条示教、跑了一万五千多次真机闭环，测的就是泛化能力如何随训练环境数、物体数、示教数变化。
 
-结论很干净：泛化性能随环境数和物体数大致呈\textbf{幂律}上升；而且当每个环境/物体的示教数到达一定阈值后，再往上堆示教收益就很小了。\textbf{多样性比绝对数量更重要}------同样的采集预算，铺到更多环境和物体上，比在少数几个场景里反复堆示教要划算得多。沿着这个规律，四个人采一下午数据，就足以让两个任务在全新环境、未见物体上做到约九成成功率。
+泛化性能随环境数和物体数大致呈\textbf{幂律}上升；而且当每个环境/物体的示教数到达一定阈值后，再往上堆示教收益就很小了。\textbf{多样性比绝对数量更重要}，同样的采集预算，铺到更多环境和物体上，比在少数几个场景里反复堆示教要划算得多。沿着这个规律，四个人采一下午数据，就足以让两个任务在全新环境、未见物体上做到约九成成功率。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig91-data-scaling-law_arxiv-2410.18647.png}}
 
 }
 
-\caption{模仿学习的数据规模律：归一化得分随示教数上升，覆盖更多环境---物体组合的策略整体更高（图片出自参考文献
-1）}
+\caption{模仿学习的数据规模律：归一化得分随示教数上升，覆盖更多环境---物体组合的策略整体更高}
 
 \end{figure}%
 
@@ -295,32 +294,30 @@ Learning）{[}1{]}。研究者跨大量环境与物体采了四万多条示教�
 这项联合多家机构的工作：把二十多种不同机器人、几百种技能的数据汇聚成一个大池子，用同一个模型（RT-X
 系列）一起训，会发生什么？
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig91-oxe-dataset-montage_arxiv-2310.08864.jpg}}
 
 }
 
-\caption{把二十多种机器人本体、上百万条轨迹、数百种技能汇聚成一个统一数据池（图片出自参考文献
-2）}
+\caption{把二十多种机器人本体、上百万条轨迹、数百种技能汇聚成一个统一数据池}
 
 \end{figure}%
 
 OXE 在它覆盖的 22 种本体、RT-X
 那套设置下，报告的结果是\textbf{总体正迁移}：一个机器人能从其它机器人的经验里获益。在同样的网络结构下，用这个混合大池子训练，比只用单机自己的数据训练，成功率有明显抬升；更大容量的模型甚至能在分布外技能上把泛化能力提升约三倍，并涌现出原本训练集里根本没有的新行为。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig91-rtx-positive-transfer_arxiv-2310.08864.png}}
 
 }
 
-\caption{跨本体共训（RT-1-X）对比单机训练，六组柱子分别是五个数据域与总均值（图片出自参考文献
-2）}
+\caption{跨本体共训（RT-1-X）对比单机训练，六组柱子分别是五个数据域与总均值}
 
 \end{figure}%
 
-这张图是本节最值得记住的一张：\textbf{在合适的模型与配比下，加更多、更杂的数据能把能力上限往上顶}。它把''数据决定上限''从一句口号变成了可量化的对照实验。但''总体正迁移''不等于''任意混任意数据都受益''：跨本体的收益取决于模型容量、动作表示、各数据源的采样权重和你关心的目标域------容量不够或配比失衡时，负迁移是真实存在的。所以混数据之后不能只看一个总平均分，要\textbf{把每个数据来源（每个''域''）的成绩分开报}------本体
+这张图是本节最值得记住的一张：\textbf{在合适的模型与配比下，加更多、更杂的数据能把能力上限往上顶}。它把``数据决定上限''从一句口号变成了可量化的对照实验。但``总体正迁移''不等于``任意混任意数据都受益''：跨本体的收益取决于模型容量、动作表示、各数据源的采样权重和你关心的目标域。容量不够或配比失衡时，负迁移是真实存在的。所以混数据之后不能只看一个总平均分，要\textbf{把每个数据来源（每个``域''）的成绩分开报}------本体
 A 的任务、本体 B
 的任务、仿真的、真机的，各自算各自的成功率，再摆在一起看。总分涨了、某一个域却掉了，是混数据最常见的翻车方式；只报总分会把它盖住。上面那张图里就摆着一个现成的例子：均值从
 41 / 44 抬到了 63，可 Autolab UR5 那一列反而从 53 掉到 45。
@@ -328,55 +325,53 @@ A 的任务、本体 B
 \subsection{1.4
 好坏怎么界定：质量比数量更关键}\label{ux597dux574fux600eux4e48ux754cux5b9aux8d28ux91cfux6bd4ux6570ux91cfux66f4ux5173ux952e}
 
-数据不是越多越好，\textbf{质量}同样决定上限。一项对六种离线学习算法、八个任务做的系统消融{[}3{]}发现：策略性能强烈依赖示教的质量；当数据由多人采集、质量参差不齐时，同一个算法的成功率会明显下降。算法选择固然重要，但喂进去的数据干不干净，往往是更靠前的决定因素。
+数据不是越多越好，\textbf{质量}同样决定上限。一项对六种离线学习算法、八个任务做的系统消融研究{[}3{]}发现：策略性能强烈依赖示教的质量；数据由多人采集、质量参差不齐时，同一个算法的成功率会明显下降。算法选择固然重要，但喂进去的数据干不干净，往往是更靠前的决定因素。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3608\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3333\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3059\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3511\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3244\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3244\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 数据情形 & 现象 & 启示 \\
 \midrule\noalign{}
 单一熟练操作者、动作干净 & 同一算法成功率高 & 质量先于数量 \\
 多人混采、质量参差 & 同一算法成功率明显下降 & 采集要控质量、要会筛 \\
-盲目加量但不控质量 & 收益递减甚至变差 & ``采得多''不等于''采得好'' \\
+盲目加量但不控质量 & 收益递减甚至变差 & ``采得多''不等于``采得好'' \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
 正因为如此，2025 年的 \textbf{CUPID}{[}4{]}
-把''质量''做成了可度量、可筛选的东西：用影响函数估计单条示教对策略闭环表现的因果贡献，再据此挑出真正有用的数据、剔除拖后腿的轨迹。这把''好数据''从一种感觉，变成了可以打分排序的工程量。
+把``质量''做成了可度量、可筛选的东西：用影响函数估计单条示教对策略闭环表现的因果贡献，再据此挑出真正有用的数据、剔除拖后腿的轨迹。这把``好数据''从一种感觉，变成了可以打分排序的工程量。
 
 \subsection{1.5
-多样性的''轴''：往哪个方向多样，就往哪个方向泛化}\label{ux591aux6837ux6027ux7684ux8f74ux5f80ux54eaux4e2aux65b9ux5411ux591aux6837ux5c31ux5f80ux54eaux4e2aux65b9ux5411ux6cdbux5316}
+多样性的``轴''：往哪个方向多样，就往哪个方向泛化}\label{ux591aux6837ux6027ux7684ux8f74ux5f80ux54eaux4e2aux65b9ux5411ux591aux6837ux5c31ux5f80ux54eaux4e2aux65b9ux5411ux6cdbux5316}
 
-既然多样性比数量更重要，那''多样''又该往哪些方向铺？两份大规模真实数据集给了很直接的答案。
+既然多样性比数量更重要，那``多样''又该往哪些方向铺？两份大规模真实数据集给了很直接的答案。
 
 第一份是
 \textbf{DROID}{[}5{]}------一份跨七万多条轨迹、五百多个场景、几十个真实地点、采了整整一年的数据集。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig91-droid-diversity_arxiv-2403.12945.png}}
+{\centering \includegraphics[width=0.94\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig91-droid-diversity_arxiv-2403.12945.png}
 
 }
 
-\caption{跨大量真实场景、视角与任务采集的大规模操作数据（图片出自参考文献
-5）}
+\caption{跨大量真实场景、视角与任务采集的大规模操作数据}
 
 \end{figure}%
 
-它显示：不同的多样性轴各自驱动\textbf{不同方向}的泛化------场景多样带来换场景的泛化，视角多样带来换相机的泛化，而物体与任务铺得开，换个物体、换句指令才做得下来。这意味着采数据前要先想清楚''我要它在什么维度上泛化''，再决定在哪个轴上铺开。
+它显示：不同的多样性轴各自驱动\textbf{不同方向}的泛化，场景多样带来换场景的泛化，视角多样带来换相机的泛化，而物体与任务铺得开，换个物体、换句指令才做得下来。这意味着采数据前要先想清楚``我要它在什么维度上泛化''，再决定在哪个轴上铺开。
 
 第二份是 \textbf{BridgeData
 V2}{[}6{]}------一份在低成本机器人上采集的大规模多任务、多环境数据集。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig91-bridgedata-v2_arxiv-2308.12952.png}}
+{\centering \includegraphics[width=0.94\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig91-bridgedata-v2_arxiv-2308.12952.png}
 
 }
 
-\caption{在低成本机器人上采集的大规模多任务、多环境数据集（图片出自参考文献
-6）}
+\caption{在低成本机器人上采集的大规模多任务、多环境数据集}
 
 \end{figure}%
 
@@ -387,7 +382,7 @@ V2}{[}6{]}------一份在低成本机器人上采集的大规模多任务、多�
 \subsection{1.6
 小结：数据决定上限}\label{ux5c0fux7ed3ux6570ux636eux51b3ux5b9aux4e0aux9650}
 
-把这一节收一下，``数据决定上限''不是口号，而是一串互相印证的证据：
+把这一节收一下。``数据决定上限''是一串互相印证的证据，不是口号：
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2188\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.7500\linewidth - 2\tabcolsep\relax}@{}}
@@ -396,32 +391,32 @@ V2}{[}6{]}------一份在低成本机器人上采集的大规模多任务、多�
 \midrule\noalign{}
 数据规模律 & 加数据，泛化大致按幂律上升 \\
 跨本体正迁移 & 加更杂的数据，能力直接抬升、涌现新技能 \\
-质量消融 & 同一算法，好数据远胜坏数据 \\
-多样性轴 & 在覆盖范围内，往哪个方向多样，就往哪个方向泛化 \\
+数据质量 & 同一算法，好数据远胜坏数据 \\
+数据多样性 & 在覆盖范围内，往哪个方向多样，就往哪个方向泛化 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
-当然，数据也不是万能钥匙------光有数据和大模型仍不够，怎么把海量无结构的人类行为高效转成机器人能用的监督信号，本身就是一个开放问题{[}7{]}。所以下一节的问题就很自然：既然好数据这么关键，\textbf{到底怎么把它采出来}。
+当然，数据也不是万能钥匙，光有数据和大模型仍不够，怎么把海量无结构的人类行为高效转成机器人能用的监督信号，本身就是一个开放问题{[}7{]}。所以下一节的问题就很自然：既然好数据这么关键，\textbf{到底怎么把它采出来}。
 
 \section{2
 遥操作采集方法概述}\label{ux9065ux64cdux4f5cux91c7ux96c6ux65b9ux6cd5ux6982ux8ff0}
 
-要采到能训练的操作数据，核心动作是\textbf{遥操作}：让人去''驱动''机器人完成任务，同时把每一帧的观测和动作记录下来。问题是，``让人驱动机器人''有非常多种做法，成本、便携性、数据质量各不相同。这一节先把它们铺成一张分类地图。
+要采到能训练的操作数据，核心动作是\textbf{遥操作}：让人去``驱动''机器人完成任务，同时把每一帧的观测和动作记录下来。问题是，``让人驱动机器人''有非常多种做法，成本、便携性、数据质量各不相同。这一节先把它们铺成一张分类地图。
 
 \subsection{2.1
 一张分类地图：四大类与一条权衡轴}\label{ux4e00ux5f20ux5206ux7c7bux5730ux56feux56dbux5927ux7c7bux4e0eux4e00ux6761ux6743ux8861ux8f74}
 
-按''机器人和人体在数据回路里占多少''，可以把采集方法从重到轻分成四大类：真机数据、人类代理数据、通用接口遥操作、无机器人数据。
+按``机器人和人体在数据回路里占多少''，可以把采集方法从重到轻分成四大类：真机数据、人类代理数据、通用接口遥操作、无机器人数据。
 
 一条权衡贯穿整张地图：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1356\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1952\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1207\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1431\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1803\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2251\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1033\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1445\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1978\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1085\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1342\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3116\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 大类 & 机器人是否在回路 & 轨迹可执行性 & 便携 / 可规模化 & 是否需重定向或后处理 & 典型代表 \\
 \midrule\noalign{}
-真机数据 & 在回路 & 高，物理可行 & 低 & 否 & 主从臂、原机示教 \\
+真机数据 & 在回路 & 高，物理可行 & 低 & 否 & Leader--Follower 臂、原机示教 \\
 人类代理数据 & 不在回路，人戴或持设备 & 中 & 高 & 是 & 手持夹爪、数据手套 \\
 通用接口遥操作 & 在回路，靠接口驱动 & 中高 & 中 & 部分 & 手柄、VR/AR \\
 无机器人数据 & 完全不在回路 & 低，需转化 & 极高 & 是，强转化 & 第一视角视频、世界模型生成 \\
@@ -429,15 +424,15 @@ V2}{[}6{]}------一份在低成本机器人上采集的大规模多任务、多�
 \end{tabular}
 \end{center}
 
-简单说：\textbf{机器人越在回路里，采到的轨迹越能直接执行，但越贵越不便携；机器人越不在回路，采集越轻便越能规模化，但越需要后处理或重定向才能变成机器人能用的动作}。这里的重定向（retargeting）指的是把人手或异构设备记下来的动作，换算成目标机器人关节或末端真能执行的动作。
+\textbf{机器人越在回路里，采到的轨迹越能直接执行，但越贵越不便携；机器人越不在回路，采集越轻便越能规模化，但越需要后处理或重定向才能变成机器人能用的动作}。这里的重定向（retargeting）指的是把人手或异构设备记下来的动作，换算成目标机器人关节或末端真能执行的动作。
 
-这条权衡是一条\textbf{连续的带子}，不是四个互不相干的格子：从''机器人全程在回路''一端走到''完全不在回路''一端，轨迹的可执行性一路下降，便携与可规模化一路上升。本节
+这条权衡是一条\textbf{连续的带子}，不是四个互不相干的格子：从``机器人全程在回路''一端走到``完全不在回路''一端，轨迹的可执行性一路下降，便携与可规模化一路上升。本节
 2.2--2.5 就按这条带子从重到轻依次展开，2.6
 再把各类的代表方法放进同一张表横向比。
 
-表里没有哪一行是''在回路''与''极高便携''同时占住的------这两列在四行里始终一升一降，这正是选型的实质：不是挑''最好的那个''，而是按预算与场地在这条带子上挑一个付得起的位置。本课选了
-SO-101
-主从臂（真机、同构），它是这一类里成本最低的入口，轨迹直接可用，代价是采集规模上不去。下面逐类展开。
+表里没有哪一行是``在回路''与``极高便携''同时占住的，这两列在四行里始终一升一降，这正是选型的实质：按预算与场地在这条带子上挑一个付得起的位置，而不是挑``最好的那个''。本课选了
+SO-101 Leader--Follower
+臂（真机、同构），它是这一类里成本最低的入口，轨迹直接可用，代价是采集规模上不去。下面逐类展开。
 
 \subsection{2.2
 真机数据：机器人在回路}\label{ux771fux673aux6570ux636eux673aux5668ux4ebaux5728ux56deux8def}
@@ -447,115 +442,134 @@ SO-101
 最直接的做法是人手把手地拖动真机或灵巧手完成任务，让传感器把轨迹记录下来。它的天然优势是采集时就带上了真实的接触与触觉信息，\textbf{KineDex}{[}9{]}
 就是这么采的。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-kinedex_arxiv-2505.01974.png}}
 
 }
 
-\caption{人手把手带动灵巧手做示教，采集带触觉与接触信息的高保真示教（图片出自参考文献
-9）}
+\caption{人手把手带动灵巧手做示教，采集带触觉与接触信息的高保真示教}
 
 \end{figure}%
 
 面向柔顺的软体手时，这种拖动示教更显自然，柔顺性本身反而成了示教的便利，\textbf{KineSoft}{[}10{]}
 走的就是这条路。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-kinesoft_arxiv-2503.01078.png}}
 
 }
 
-\caption{面向软体手的拖动示教，把柔顺性当作示教的便利（图片出自参考文献
-10）}
+\caption{面向软体手的拖动示教，把柔顺性当作示教的便利}
 
 \end{figure}%
 
-\subsubsection{2.2.2
-主从臂（同构）}\label{ux4e3bux4eceux81c2ux540cux6784}
+\subsubsection{2.2.2 Leader--Follower
+臂（同构）}\label{leaderfollower-ux81c2ux540cux6784}
 
-更常见的是主从臂：操作者驱动一只''主臂''，机器人''从臂''实时跟随。当主臂与从臂机械结构相同（同构）时，关节映射变得很简单------省掉了跨本体重定向那一层，采到的轨迹落在从臂自己的可达空间里，对模仿学习最友好。但''结构相同''不等于''数值可以直接搬''：关节顺序、正方向、零位、量程、减速比、限位、安装姿态都得先对齐，标定没做准，映射就是错的；从臂还有跟踪误差、碰撞和接触约束，主臂摆到的姿态它未必真到得了。\textbf{SO-101}{[}12{]}
+更常见的是 Leader--Follower 臂：操作者驱动一只``Leader
+臂''，机器人``Follower 臂''实时跟随。Leader 臂与 Follower
+臂机械结构相同（同构），关节映射就变得很简单，省掉了跨本体重定向那一层，采到的轨迹落在
+Follower
+臂自己的可达空间里，对模仿学习最友好。但``结构相同''不等于``数值可以直接搬''：关节顺序、正方向、零位、量程、减速比、限位、安装姿态都得先对齐，标定没做准，映射就是错的；Follower
+臂还有跟踪误差、碰撞和接触约束，Leader
+臂摆到的姿态它未必真到得了。\textbf{SO-101}{[}12{]}
 就是这一类里最便宜的入口，也是本课实物实验要用的平台。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-so101-leader-follower.png}}
+{\centering \includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-so101-leader-follower.png}
 
 }
 
-\caption{SO-101
-主从臂，本课实物实验采集平台：左为主臂（带握把）、右为从臂（带夹爪）（SO-101
-开源项目公开产品图，见参考文献 12）}
+\caption{SO-101 Leader--Follower 臂，本课实物实验采集平台：左为 Leader
+臂（带握把）、右为 Follower 臂（带夹爪）（SO-101 开源项目公开产品图）}
 
 \end{figure}%
 
-把主从臂装上移动底座，就能采''边走边操作''的全身数据；\textbf{Mobile
+把 Leader--Follower
+臂装上移动底座，就能采``边走边操作''的全身数据；\textbf{Mobile
 ALOHA}{[}13{]}
 走的就是这条路线，只用几十条示教就能学会相当长的家务任务。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-mobile-aloha_arxiv-2401.02117.png}}
+{\centering \includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-mobile-aloha_arxiv-2401.02117.png}
 
 }
 
-\caption{在双臂主从基础上加移动底座，采集全身移动操作数据（图片出自参考文献
-13）}
+\caption{在双臂 Leader--Follower
+臂的基础上加移动底座，采集全身移动操作数据}
 
 \end{figure}%
 
-主从跟随还有一个容易被忽略的约定：从臂\textbf{怎么}跟随主臂。一种是\textbf{绝对跟踪}------从臂直接去主臂当前的绝对姿态，主臂摆成什么姿势、从臂就到达同一个姿势，跟从臂开机时停在哪无关，前提是主从标定的零点对齐。另一种是\textbf{相对（锚定）跟踪}------接通的第一帧记下''从臂当前姿态减主臂姿态''这个差，之后每帧的从臂目标就是''主臂姿态加上这个差''，相当于从臂从自己此刻的位置出发，复现主臂的\textbf{位移}。
+跟随这件事还有一个容易被忽略的约定：Follower 臂\textbf{怎么}跟随 Leader
+臂。一种是\textbf{绝对跟踪}------Follower 臂直接去 Leader
+臂当前的绝对姿态，Leader 臂摆成什么姿势、Follower 臂就到达同一个姿势，跟
+Follower 臂开机时停在哪无关，前提是 Leader--Follower
+标定的零点对齐。另一种是\textbf{相对（锚定）跟踪}------接通的第一帧记下``Follower
+臂当前姿态减 Leader 臂姿态''这个差，之后每帧的 Follower
+臂目标就是``Leader 臂姿态加上这个差''，相当于 Follower
+臂从自己此刻的位置出发，复现 Leader 臂的\textbf{位移}。
 
-两种口径都能用，锚定跟踪本身不是错------它不要求零点严格对齐、接通瞬间从臂也不会突然跳过去，用起来省事。真正会出问题的是\textbf{口径没被固定、偏置没被记下来}：锚定量每次开机都不同，如果不存下来，同一份数据集里不同
+两种口径都能用，锚定跟踪本身不是错，它不要求零点严格对齐、接通瞬间
+Follower
+臂也不会突然跳过去，用起来省事。真正会出问题的是\textbf{口径没被固定、偏置没被记下来}：锚定量每次开机都不同，如果不存下来，同一份数据集里不同
 episode
-的动作标签其实对应着不同的偏置，训练出的模型部署时就容易和环境''说的不是同一种话''（第8讲
+的动作标签其实对应着不同的偏置，训练出的模型部署时就容易和环境``说的不是同一种话''（第8讲
 3.3 节的口径坑）。所以规矩是：口径（absolute 还是
 anchored）写死在采集配置里、标定与锚点一起存进数据集、训练端和部署端用同一套解释。拿到一份别人采的数据、不知道它是哪种口径时，办法是逐关节量
 \texttt{action} 与 \texttt{observation.state}
 的平均差：差值都在噪声量级，就是绝对口径；某个关节冒出一个固定偏移，就说明录制时开了锚定。\texttt{code/vla/2\_data\_collection/2\_6\_public\_so101\_dataset/audit\_dataset.py}
 做的就是这件事，开训之前先跑它。
 
-还有一个概念要分清：\textbf{主臂读数、下发给从臂的目标，都是''命令''（动作标签）；从臂真实到达的姿态得从它自己的编码器读}。跟踪误差、负载、接触都会让两者不等。所以采集时最好三样分开记：\texttt{leader\ command}（主臂读数）、\texttt{follower\ target}（下发目标）、\texttt{follower\ measured\ state}（从臂实测状态）。把命令当成实际轨迹，是数据侧一个很隐蔽的错。
+还有一个概念要分清：\textbf{Leader 臂读数、下发给 Follower
+臂的目标，都是``命令''（动作标签）；Follower
+臂真实到达的姿态得从它自己的编码器读}。跟踪误差、负载、接触都会让两者不等。所以采集时最好三样分开记：\texttt{leader\ command}（Leader
+臂读数）、\texttt{follower\ target}（下发目标）、\texttt{follower\ measured\ state}（Follower
+臂实测状态）。把命令当成实际轨迹，是数据侧一个很隐蔽的错。
 
-\subsubsection{2.2.3
-主从臂（异构）}\label{ux4e3bux4eceux81c2ux5f02ux6784}
+\subsubsection{2.2.3 Leader--Follower
+臂（异构）}\label{leaderfollower-ux81c2ux5f02ux6784}
 
-如果主臂和从臂结构不同（异构），就不能直接映射，需要标定、滤波、插值这一串处理把主臂指令对齐到目标机械臂。它的价值在于通用：一套低成本主端可以适配各种商用机械臂，\textbf{U-Arm}{[}14{]}
+如果 Leader 臂和 Follower
+臂结构不同（异构），就不能直接映射，需要标定、滤波、插值这一串处理把
+Leader 臂指令对齐到目标机械臂。它的价值在于通用：一套低成本 Leader
+端可以适配各种商用机械臂，\textbf{U-Arm}{[}14{]}
 这套超低成本通用遥操接口就是例子。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-uarm-hetero_arxiv-2509.02437.png}}
 
 }
 
-\caption{异构主从采集，经标定、滤波、插值适配各种商用机械臂（图片出自参考文献
-14）}
+\caption{异构 Leader--Follower
+采集，经标定、滤波、插值适配各种商用机械臂}
 
 \end{figure}%
 
 \subsubsection{2.2.4
 移动操作整机遥操}\label{ux79fbux52a8ux64cdux4f5cux6574ux673aux9065ux64cd}
 
-当目标是一台带底盘、带双臂的移动操作整机时，往往需要一个能统一多种输入的遥操作接口，把相机、VR、键鼠、手柄等任意组合起来同时驱动底盘和手臂，模块化遥操系统
+目标是一台带底盘、带双臂的移动操作整机，往往就需要一个能统一多种输入的遥操作接口，把相机、VR、键鼠、手柄等任意组合起来同时驱动底盘和手臂，模块化遥操系统
 \textbf{TeleMoMa}{[}15{]} 就是为这件事设计的。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-telemoma_arxiv-2403.07869.png}}
+{\centering \includegraphics[width=0.93\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-telemoma_arxiv-2403.07869.png}
 
 }
 
-\caption{模块化的移动操作整机遥操，统一多种人机输入（图片出自参考文献
-15）}
+\caption{模块化的移动操作整机遥操，统一多种人机输入}
 
 \end{figure}%
 
 \subsection{2.3
 人类代理数据：人戴或持设备}\label{ux4ebaux7c7bux4ee3ux7406ux6570ux636eux4ebaux6234ux6216ux6301ux8bbeux5907}
 
-这一类不让机器人进回路，而是让人戴上或拿起一个''代理设备''去做任务，事后再把人的动作重定向到机器人。好处是轻、快、能在真实场景里大规模采，代价是采到的轨迹可能撞上机器人的运动学奇异位形（机构摆到某些姿态时会丢掉可控自由度）、超出工作空间或精度不足，需要后处理。
+这一类不让机器人进回路，而是让人戴上或拿起一个``代理设备''去做任务，事后再把人的动作重定向到机器人。好处是轻、快、能在真实场景里大规模采，代价是采到的轨迹可能撞上机器人的运动学奇异位形（机构摆到某些姿态时会丢掉可控自由度）、超出工作空间或精度不足，需要后处理。
 
 \subsubsection{2.3.1
 末端执行器代理（手持）}\label{ux672bux7aefux6267ux884cux5668ux4ee3ux7406ux624bux6301}
@@ -563,56 +577,42 @@ anchored）写死在采集配置里、标定与锚点一起存进数据集、训
 最典型的是
 \textbf{UMI}{[}16{]}------手持一个夹爪加广角相机，直接记录末端执行器的运动轨迹；整套装置与机器人解耦，可以带到任何场景里采。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-umi_arxiv-2402.10329.png}}
 
 }
 
-\caption{手持平行夹爪加广角相机，记录末端轨迹并做运动学过滤（图片出自参考文献
-16）}
+\caption{手持平行夹爪加广角相机，记录末端轨迹并做运动学过滤}
 
 \end{figure}%
 
-把其中复杂的视觉惯性里程计换成现成的跟踪模块，可以在保住精度的同时大幅降低部署复杂度------这是
+把其中复杂的视觉惯性里程计换成现成的跟踪模块，可以在保住精度的同时大幅降低部署复杂度，这是
 \textbf{FastUMI}{[}17{]} 的思路。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-fastumi_arxiv-2409.19499.png}}
 
 }
 
-\caption{用现成跟踪模块替换复杂视觉惯性里程计，降低部署门槛（图片出自参考文献
-17）}
+\caption{用现成跟踪模块替换复杂视觉惯性里程计，降低部署门槛}
 
 \end{figure}%
 
 这条路线也已经有商用成品，不必自己攒装置：松灵 \textbf{PIKA}{[}11{]}
 把三样东西打包成一套------手持的采集器、装到机械臂上的同款夹爪、外加一个定位基站；采集端和执行端用的是同一副夹爪，人手持采集器录下来的末端轨迹，装到臂上就能复现。
 
-\begin{figure}[H]
-
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-pika.png}}
-
-}
-
-\caption{松灵 PIKA 成品采集方案的现场使用（图片出处待核，项目见参考文献
-11）}
-
-\end{figure}%
-
 视觉式的方案还能进一步做到跨机械臂、跨灵巧手、跨相机配置的通用遥操，\textbf{AnyTeleop}{[}18{]}
-就把这三种''跨''一起覆盖了。
+就把这三种``跨''一起覆盖了。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-anyteleop_arxiv-2307.04577.png}}
+{\centering \includegraphics[width=0.9\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-anyteleop_arxiv-2307.04577.png}
 
 }
 
-\caption{跨臂、跨手、跨相机配置的通用视觉式灵巧遥操（图片出自参考文献
-18）}
+\caption{跨臂、跨手、跨相机配置的通用视觉式灵巧遥操}
 
 \end{figure}%
 
@@ -621,14 +621,13 @@ anchored）写死在采集配置里、标定与锚点一起存进数据集、训
 
 手持代理的一个痛点是：人采得很顺，机器人却未必执行得了。一个改进思路（\textbf{ARCap}{[}19{]}）是在采集时给操作者叠加实时的增强现实提示------把机器人的可达范围、工作空间、虚拟手臂预览实时显示出来，引导人把示教约束在机器人能执行的范围内，从源头提高数据可用率。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-arcap_arxiv-2410.08464.png}}
 
 }
 
-\caption{在增强现实反馈下采集高质量、可被机器人执行的人类示教（图片出自参考文献
-19）}
+\caption{在增强现实反馈下采集高质量、可被机器人执行的人类示教}
 
 \end{figure}%
 
@@ -637,23 +636,23 @@ anchored）写死在采集配置里、标定与锚点一起存进数据集、训
 
 把代理设备做成可穿戴的数据手套、外骨骼或背负式装置，就能在采动作的同时采到力与触觉反馈。低成本开源数据手套
 \textbf{DOGlove}{[}20{]} 与背负式人形双臂遥操设备 \textbf{U-Arm
-Humanoid} 是这一路的两个代表------后者与 2.2.3
-那套异构主从接口同名，但形态已经从''放在桌上的主臂''变成了''背在身上的外骨骼''。
+Humanoid} 是这一路的两个代表。后者与 2.2.3 那套异构 Leader--Follower
+接口同名，但形态已经从``放在桌上的 Leader
+臂''变成了``背在身上的外骨骼''。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-doglove_arxiv-2502.07730.png}}
+{\centering \includegraphics[width=0.94\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-doglove_arxiv-2502.07730.png}
 
 }
 
-\caption{低成本开源数据手套，同时采集多自由度动作与力 /
-触觉反馈（图片出自参考文献 20）}
+\caption{低成本开源数据手套，同时采集多自由度动作与力 / 触觉反馈}
 
 \end{figure}%
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-uarm-humanoid.png}}
+{\centering \includegraphics[width=0.97\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-uarm-humanoid.png}
 
 }
 
@@ -662,17 +661,16 @@ Humanoid} 是这一路的两个代表------后者与 2.2.3
 
 \end{figure}%
 
-更进一步，让人形机器人实时''影随''人的全身动作，就能在做任务的同时把全身的示教数据录下来，这是
+更进一步，让人形机器人实时``影随''人的全身动作，就能在做任务的同时把全身的示教数据录下来，这是
 \textbf{HumanPlus}{[}21{]} 的做法。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-humanplus_arxiv-2406.10454.png}}
+{\centering \includegraphics[width=0.61\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-humanplus_arxiv-2406.10454.png}
 
 }
 
-\caption{人形机器人实时影随人的动作，边做任务边录全身示教（图片出自参考文献
-21）}
+\caption{人形机器人实时影随人的动作，边做任务边录全身示教}
 
 \end{figure}%
 
@@ -686,94 +684,90 @@ Humanoid} 是这一路的两个代表------后者与 2.2.3
 最朴素的是用通用游戏手柄驱动机器人采集，开源项目
 \textbf{joycon-robotics}{[}22{]} 就直接把任天堂 Joy-Con 接成了遥操手柄。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-joycon.png}}
+{\centering \includegraphics[width=0.93\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-joycon.png}
 
 }
 
-\caption{用一对 Joy-Con
-手柄驱动两条机械臂采集（图片出处待核，项目见参考文献 22）}
+\caption{用一对 Joy-Con 手柄驱动两条机械臂采集（图片出处待核）}
 
 \end{figure}%
 
 \subsubsection{2.4.2 手机众包}\label{ux624bux673aux4f17ux5305}
 
 \textbf{RoboTurk}{[}23{]}
-把手机当成六自由度的控制器，再放到云端做众包，远端工人无需培训就能登录网页采集，单个项目就曾众包出上百小时的数据------\textbf{接口越通用，越能把采集规模化}。
+把手机当成六自由度的控制器，再放到云端做众包，远端工人无需培训就能登录网页采集，单个项目就曾众包出上百小时的数据，\textbf{接口越通用，越能把采集规模化}。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-roboturk_arxiv-1811.02790.png}}
 
 }
 
-\caption{用手机当控制器、在云端众包采集机器人示教（图片出自参考文献
-23）}
+\caption{用手机当控制器、在云端众包采集机器人示教}
 
 \end{figure}%
 
 \subsubsection{2.4.3
 虚拟现实与增强现实}\label{ux865aux62dfux73b0ux5b9eux4e0eux589eux5f3aux73b0ux5b9e}
 
-戴上头显做沉浸式遥操，可以同时获得立体视觉反馈和手臂、手部的动作映射，操作者像''附身''在机器人上，\textbf{Open-TeleVision}{[}24{]}
+戴上头显做沉浸式遥操，可以同时获得立体视觉反馈和手臂、手部的动作映射，操作者像``附身''在机器人上，\textbf{Open-TeleVision}{[}24{]}
 是这一路的代表。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-open-television_arxiv-2407.01512.png}}
+{\centering \includegraphics[width=0.93\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-open-television_arxiv-2407.01512.png}
 
 }
 
-\caption{沉浸式头显遥操，立体视觉反馈加手臂手部动作映射（图片出自参考文献
-24）}
+\caption{沉浸式头显遥操，立体视觉反馈加手臂手部动作映射}
 
 \end{figure}%
 
 基于通用消费级头显的方案（\textbf{OpenTeach}{[}25{]}），用自然手势就能驱动机器人，硬件门槛比专用头显低一截。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
-{\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-openteach_arxiv-2403.07870.jpeg}}
+{\centering \includegraphics[width=0.59\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-openteach_arxiv-2403.07870.jpeg}
 
 }
 
-\caption{基于通用消费级头显的自然手势遥操（图片出自参考文献 25）}
+\caption{基于通用消费级头显的自然手势遥操}
 
 \end{figure}%
 
 借助高端头显，\textbf{Bunny-VisionPro}{[}26{]}
 还能做到实时的双臂灵巧遥操。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-bunny-visionpro_arxiv-2407.03162.png}}
 
 }
 
-\caption{基于高端头显的实时双臂灵巧遥操（图片出自参考文献 26）}
+\caption{基于高端头显的实时双臂灵巧遥操}
 
 \end{figure}%
 
 \subsection{2.5
 无机器人数据}\label{ux65e0ux673aux5668ux4ebaux6570ux636e}
 
-最轻的一类连人体代理硬件都不必绑定机器人，直接采人做日常操作的数据，再想办法转成机器人能用的监督。它的可规模化程度最高，但''转化''这一步也最重。
+最轻的一类连人体代理硬件都不必绑定机器人，直接采人做日常操作的数据，再想办法转成机器人能用的监督。它的可规模化程度最高，但``转化''这一步也最重。
 
 \subsubsection{2.5.1
 第一视角人类操作数据}\label{ux7b2cux4e00ux89c6ux89d2ux4ebaux7c7bux64cdux4f5cux6570ux636e}
 
 \textbf{In-N-On}{[}27{]}
-用智能眼镜或头显直接采人做日常操作的第一视角视频，把数据分成''野外随手采''和''贴着目标任务采''两类，先用海量野外数据预训练、再用少量贴任务数据微调。
+用智能眼镜或头显直接采人做日常操作的第一视角视频，把数据分成``野外随手采''和``贴着目标任务采''两类，先用海量野外数据预训练、再用少量贴任务数据微调。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-innon_arxiv-2511.15704.png}}
 
 }
 
-\caption{用第一视角采集人类操作数据，分野外与贴任务两类使用（图片出自参考文献
-27）}
+\caption{用第一视角采集人类操作数据，分野外与贴任务两类使用}
 
 \end{figure}%
 
@@ -782,14 +776,13 @@ Humanoid} 是这一路的两个代表------后者与 2.2.3
 
 更激进的一步（\textbf{Ctrl-World}{[}28{]}）是让世界模型在策略的闭环里推演（rollout），直接合成轨迹来扩充数据，再用生成的数据反过来提升策略表现。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig92-ctrlworld_arxiv-2510.10125.png}}
 
 }
 
-\caption{让世界模型在策略闭环中推演，合成轨迹用于扩充数据（图片出自参考文献
-28）}
+\caption{让世界模型在策略闭环中推演，合成轨迹用于扩充数据}
 
 \end{figure}%
 
@@ -799,13 +792,13 @@ Humanoid} 是这一路的两个代表------后者与 2.2.3
 把四大类里的代表方法放在一张表里横向看，就能按手上的预算、场地、是否需要力触觉来选型：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2676\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1494\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2085\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1642\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1199\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.0903\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3227\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1386\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2011\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1542\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1073\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.0761\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 方法 & 所属大类 & 机器人在回路 & 力 / 触觉 & 成本 & 便携 \\
 \midrule\noalign{}
 原机示教 & 真机 & 是 & 有 & 中 & 低 \\
-主从臂（同构） & 真机 & 是 & 多无 & 低到中 & 低 \\
-主从臂（异构） & 真机 & 是 & 无 & 低 & 低 \\
+Leader--Follower 臂（同构） & 真机 & 是 & 多无 & 低到中 & 低 \\
+Leader--Follower 臂（异构） & 真机 & 是 & 无 & 低 & 低 \\
 移动整机遥操 & 真机 & 是 & 无 & 中 & 中 \\
 手持末端代理 & 人类代理 & 否 & 多无 & 低 & 高 \\
 增强现实反馈采集 & 人类代理 & 否 & 视觉提示 & 低 & 高 \\
@@ -819,18 +812,17 @@ Humanoid} 是这一路的两个代表------后者与 2.2.3
 \end{tabular}
 \end{center}
 
-落到本课：实物实验用 SO-101
-主从臂（真机、同构），它是这张地图里成本最低的入口；没有真机时，就用
-SO-101
-仿真器配手柄或键盘（对应通用接口那一类），落成同一种容器格式的数据。仿真里还有一条\textbf{完全不靠人遥操}的路：让一个视觉强化学习策略在仿真里从零学会任务、自动跑出成功轨迹充当训练数据------本课后面用来微调
-VLA 的那批 SO-101 仿真数据，正是这么来的，第16讲会把这套''视觉 RL
+落到本课：实物实验用 SO-101 Leader--Follower
+臂（真机、同构），它是这张地图里成本最低的入口；没有真机时，就用 SO-101
+仿真器配手柄或键盘（对应通用接口那一类），落成同一种容器格式的数据。仿真里还有一条\textbf{完全不靠人遥操}的路：让一个视觉强化学习策略在仿真里从零学会任务、自动跑出成功轨迹充当训练数据，本课后面用来微调
+VLA 的那批 SO-101 仿真数据，正是这么来的，第16讲会把这套``视觉 RL
 生成数据''的做法从头讲透。但在动手采之前，还得先认清承载这一切的
-\textbf{LeRobot 框架与数据集格式}------下一节就讲它，然后回头动手采。
+\textbf{LeRobot 框架与数据集格式}，下一节就讲它，然后回头动手采。
 
 \section{3 LeRobot
 框架与数据集}\label{lerobot-ux6846ux67b6ux4e0eux6570ux636eux96c6}
 
-上一节铺完了各种采集方法。但不管用哪种方法，采到的数据最终都要以\textbf{同一种标准格式}落盘、被训练代码直接读------否则每换一种机器人、每换一种算法都要重写一遍工具链。这套把数采、数据、训练串起来的框架，就是
+上一节铺完了各种采集方法。但不管用哪种方法，采到的数据最终都要以\textbf{同一种标准格式}落盘、被训练代码直接读，否则每换一种机器人、每换一种算法都要重写一遍工具链。这套把数采、数据、训练串起来的框架，就是
 HuggingFace 推出的
 \textbf{LeRobot}{[}8{]}。这一节先认清它，下一节再动手采。
 
@@ -841,15 +833,14 @@ LeRobot 是 HuggingFace 推出的\textbf{端到端具身智能开源框架}（Ap
 许可、PyTorch
 实现），目标是降低机器人学习的门槛。它把从硬件接口、数据采集、数据格式、策略训练到推理部署的整条栈，串成一个\textbf{闭环}：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.98\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig93-lerobot-overview.png}
 
 }
 
 \caption{LeRobot 串起的闭环，真实机器人到遥操作采集到数据集（托管在
-HuggingFace Hub）到策略训练（\(\pi_0\) / HIL-SERL /
-ACT）再到推理部署（图片出自 LeRobot 官方仓库，见参考文献 8）}
+HuggingFace Hub）到策略训练（\(\pi_0\) / HIL-SERL / ACT）再到推理部署}
 
 \end{figure}%
 
@@ -863,19 +854,19 @@ optimization}（经异步推理引擎部署回机器人）。本讲走的就是�
 数据集」这一段，下一讲接「策略训练」。
 
 把这个闭环落到代码里，LeRobot
-是一套\textbf{自上而下的分层架构}------每一层只管自己的事，上层调用下层的抽象，所以换机器人只动底层、换算法只动策略层：
+是一套\textbf{自上而下的分层架构}，每一层只管自己的事，上层调用下层的抽象，所以换机器人只动底层、换算法只动策略层：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/fig09-3-lerobot-layers.png}
 
 }
 
 \caption{LeRobot
-的六层结构自上而下排开，层与层之间那些朝下的小箭头是调用方向------只朝下，不朝上。绿色高亮的两层是本讲要动的；右侧那条红色回环标出
-\texttt{lerobot-record} 实际穿过哪几层：(1)起于命令 → (2)读主臂动作 →
-(3)从臂执行、相机出图 → (4)拼成一帧写进数据集（本书自绘，层名与目录名按
-LeRobot v0.5.1 源码整理）}
+的六层结构自上而下排开，层与层之间那些朝下的小箭头是调用方向，只朝下、不朝上。绿色高亮的两层是本讲要动的；右侧那条红色回环标出
+\texttt{lerobot-record} 实际经过哪几层：(1)起于命令 → (2)读 Leader
+臂动作 → (3)Follower 臂执行、相机出图 →
+(4)拼成一帧写进数据集（层名与目录名按 LeRobot v0.5.1 源码整理）}
 
 \end{figure}%
 
@@ -887,8 +878,8 @@ LeRobot v0.5.1 源码整理）}
 管统一数据格式，\textbf{实物与仿真抽象层（robots/ 与 envs/）}
 分别接真机（SO-100、Unitree
 G1\ldots\ldots）和仿真（LIBERO、MetaWorld\ldots\ldots），\textbf{遥操作器（teleoperators/）}
-提供主臂 / 手柄等输入，最底下是\textbf{基础设施层（configs/ + utils/ +
-transport/）}。换机器人只动 \texttt{robots/}、换算法只动
+提供 Leader 臂 / 手柄等输入，最底下是\textbf{基础设施层（configs/ +
+utils/ + transport/）}。换机器人只动 \texttt{robots/}、换算法只动
 \texttt{policies/}，彼此不牵连。
 
 \subsection{3.2
@@ -898,9 +889,9 @@ transport/）}。换机器人只动 \texttt{robots/}、换算法只动
 负责把采到的东西落成统一格式，\textbf{遥操作器（teleoperators/）}
 负责驱动机器人产生动作。上图右侧那条红色回环走的正是这条路：我们用
 \textbf{CLI 入口层}的 \texttt{lerobot-record} 采数据（第 4
-节），它向下调用\textbf{遥操作器}的主臂读动作、调用\textbf{实物抽象层}的
-SO-101
-执行并出图，最后把一帧交回\textbf{数据处理层}------采出来的，就是那里的一份
+节），它向下调用\textbf{遥操作器}的 Leader
+臂读动作、调用\textbf{实物抽象层}的 SO-101
+执行并出图，最后把一帧交回\textbf{数据处理层}，采出来的，就是那里的一份
 LeRobotDataset。注意这条路径\textbf{跳过了策略模型层}：采集阶段没有任何网络参与，动作全部来自人手。下面先把这个格式认全。
 
 \subsection{3.3
@@ -916,7 +907,7 @@ LeRobotDataset 是 HuggingFace
 \begin{quote}
 备注（版本口径）：本节及后文的目录结构、\texttt{meta/}
 字段、类名与源码文件位置，都基于 \textbf{LeRobot v0.5.1、LeRobotDataset
-v3.0，核验日期 2026-07-21}------本课装的 lerobot fork（\texttt{main}
+v3.0，核验日期 2026-07-21}，本课装的 lerobot fork（\texttt{main}
 分支）基线就是这一版。LeRobot 是一个迭代很快的库，目录布局、CLI
 参数名和源码文件名都可能随版本变动。照着跑之前先确认自己装的版本；对不上时以官方文档与当前源码为准。
 \end{quote}
@@ -924,7 +915,7 @@ v3.0，核验日期 2026-07-21}------本课装的 lerobot fork（\texttt{main}
 先记住一个最小单位------\textbf{episode（回合）}：就是机器人把某个任务从头到尾做一遍的完整记录，从初始状态开始、到任务结束为止，期间每一帧的图像、关节状态、动作都按时间顺序记下来。一个数据集，就是许许多多
 episode 的集合。用它做行为克隆（behavior
 cloning，直接照着示教学动作）时，episode 数常见 50\textasciitilde100
-个起步------这是经验值，随任务长度和要求的多样性浮动。
+个起步，这是经验值，随任务长度和要求的多样性浮动。
 
 落到磁盘上，LeRobotDataset
 把一份采集拆成\textbf{三大支柱}分开存：\textbf{低维数据进 Parquet
@@ -949,7 +940,7 @@ cloning，直接照着示教学动作）时，episode 数常见 50\textasciitild
 三大支柱各管一摊：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1429\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2612\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5959\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1963\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2415\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5623\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 支柱 & 存什么 & 怎么存 \\
 \midrule\noalign{}
@@ -965,15 +956,15 @@ cloning，直接照着示教学动作）时，episode 数常见 50\textasciitild
 \texttt{file-000.parquet}、帧合并进同一个 \texttt{file-000.mp4}，某条
 episode 的边界靠 \texttt{meta/episodes/}
 里记录的偏移量定位。这样做是为了减少文件数、降低文件系统压力、让 Hub
-大文件下载更高效。\textbf{这套结构与采集方式无关}------不管是 SO-101
+大文件下载更高效。\textbf{这套结构与采集方式无关}，不管是 SO-101
 真机遥操还是仿真器键盘采，最后都长成这个样子。
 \end{quote}
 
-这种''把许多 episode 合并进大文件''的组织方式，正是 v3.0 相比老版 v2.0
+这种``把许多 episode 合并进大文件''的组织方式，正是 v3.0 相比老版 v2.0
 最关键的改动。两版差别一表看清：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1823\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3438\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4740\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2051\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3389\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4561\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 特性 & v2.0 & v3.0（本课所用） \\
 \midrule\noalign{}
@@ -1014,21 +1005,21 @@ FPS & 10 \\
 \end{tabular}
 \end{center}
 
-下面不止''读属性表''，而是顺着它在 HuggingFace 上的页面
+下面不止``读属性表''，而是顺着它在 HuggingFace 上的页面
 \url{https://huggingface.co/datasets/lerobot/libero}，从\textbf{页面 →
 生态 → 物理文件 → 逐行数据}四个角度把它看穿。
 
 \subsubsection{3.4.1 HuggingFace 页面：四个
 tab，四种看法}\label{huggingface-ux9875ux9762ux56dbux4e2a-tabux56dbux79cdux770bux6cd5}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.98\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig93-libero-homepage.png}
 
 }
 
 \caption{lerobot/libero 数据集主页：顶部一排 tab，右侧是行数 / 体积 /
-月下载量与''谁在用它''（HuggingFace 页面截图，2026-07-21）}
+月下载量与``谁在用它''（HuggingFace 页面截图，2026-07-21）}
 
 \end{figure}%
 
@@ -1048,7 +1039,7 @@ tab，四种看法}\label{huggingface-ux9875ux9762ux56dbux4e2a-tabux56dbux79cdux
   \textbf{Community}：讨论区。
 \end{itemize}
 
-顶部那排\textbf{标签}本身就是一张''身份证''：
+顶部那排\textbf{标签}本身就是一张``身份证''：
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.4289\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5711\linewidth - 2\tabcolsep\relax}@{}}
@@ -1066,7 +1057,7 @@ tab，四种看法}\label{huggingface-ux9875ux9762ux56dbux4e2a-tabux56dbux79cdux
 \end{center}
 
 右侧关键数字（2026-07-21 页面快照）：\textbf{273,465 行 · 1.94 GB ·
-上月下载 7,230 次}------一个被大量真实使用的小型标准数据集。
+上月下载 7,230 次}，是一个被大量真实使用的小型标准数据集。
 
 \subsubsection{3.4.2 谁在用它：数据集 →
 模型的生态闭环}\label{ux8c01ux5728ux7528ux5b83ux6570ux636eux96c6-ux6a21ux578bux7684ux751fux6001ux95edux73af}
@@ -1077,8 +1068,8 @@ lerobot/libero''}
 
 这正好呼应 3.1 那张闭环图：\textbf{同一份数据集，喂给
 SmolVLA、\(\pi_{0.5}\) 等不同策略，就训出 /
-微调出一批模型}。数据在下游沉淀为能力------这就是第 1
-节''数据决定上限''最直观的体现。
+微调出一批模型}。数据在下游沉淀为能力，这就是第 1
+节``数据决定上限''最直观的体现。
 
 \subsubsection{3.4.3 物理视角：Files and
 versions}\label{ux7269ux7406ux89c6ux89d2files-and-versions}
@@ -1086,7 +1077,7 @@ versions}\label{ux7269ux7406ux89c6ux89d2files-and-versions}
 切到 Files 这个 tab，看到的是\textbf{磁盘上真实的样子}，正好印证 3.3
 的目录结构：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.98\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig93-libero-files.png}
 
@@ -1106,7 +1097,7 @@ data/ meta/ videos/，外加 .gitattributes 与 README.md（HuggingFace
 \subsubsection{3.4.4 逻辑视角：Data Studio
 逐行看数据}\label{ux903bux8f91ux89c6ux89d2data-studio-ux9010ux884cux770bux6570ux636e}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.98\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/figures/fig93-libero-data-studio.png}
 
@@ -1117,24 +1108,24 @@ data/ meta/ videos/，外加 .gitattributes 与 README.md（HuggingFace
 
 \end{figure}%
 
-摊开之后重点看这几列：
+摊开之后这几列最要紧：
 
 \begin{itemize}
 \tightlist
 \item
   \textbf{\texttt{observation.state}}：长度 8
   的浮点数组------机器人\textbf{自身的本体感知}（关节角度 +
-  夹爪），即''机器人感受到的身体状态''。
+  夹爪），即``机器人感受到的身体状态''。
 \item
   \textbf{\texttt{action}}：长度 7
-  的浮点数组------该时刻\textbf{要下发执行的目标动作}；策略要学的，就是''看到
+  的浮点数组------该时刻\textbf{要下发执行的目标动作}；策略要学的，就是``看到
   state + 图像 → 输出 action''。
 \item
   \textbf{三个 index 列的相对 vs 绝对语义}（看直方图分布最直观）：
 \end{itemize}
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2071\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6102\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1827\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2050\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5993\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1958\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 列 & 语义 & 取值范围 \\
 \midrule\noalign{}
@@ -1148,13 +1139,12 @@ data/ meta/ videos/，外加 .gitattributes 与 README.md（HuggingFace
 
 \begin{quote}
 备注：\texttt{action} 与 \texttt{state}
-的来源随\textbf{采集方式}而不同------本课的 SO-101
-是\textbf{真机遥操作}，\texttt{action}
-来自\textbf{主臂（leader）}、\texttt{state}
-来自\textbf{从臂（follower）}，action 背后其实是人的操作意图；而
-lerobot/libero 是\textbf{仿真}采集（Franka Panda in
-LIBERO），没有人手主臂，\texttt{action} 是策略 /
-脚本下发的目标动作。采集方式不同，落盘格式却完全一样------这正是统一格式的价值。
+的来源随\textbf{采集方式}而不同。本课的 SO-101
+是\textbf{真机遥操作}，\texttt{action} 来自 \textbf{Leader
+臂}、\texttt{state} 来自 \textbf{Follower 臂}，action
+背后其实是人的操作意图；而 lerobot/libero 是\textbf{仿真}采集（Franka
+Panda in LIBERO），没有人手持 Leader 臂，\texttt{action} 是策略 /
+脚本下发的目标动作。采集方式不同，落盘格式却完全一样，这正是统一格式的价值。
 \end{quote}
 
 认清了一份真实公开数据集长什么样，下面回到本课自己的 SO-101
@@ -1164,7 +1154,7 @@ LIBERO），没有人手主臂，\texttt{action} 是策略 /
 一帧数据里有什么}\label{ux4e00ux5e27ux6570ux636eux91ccux6709ux4ec0ux4e48}
 
 把数据集里的一个样本（一帧）展开，返回的就是一个 Python 字典（值为
-PyTorch 张量），这正是第8讲 2.1 节讲过的''观测 →
+PyTorch 张量），这正是第8讲 2.1 节讲过的``观测 →
 动作''配对，只是现在有了具体字段和形状。以本课 SO-101 双相机采集为例：
 
 \begin{Shaded}
@@ -1185,16 +1175,16 @@ PyTorch 张量），这正是第8讲 2.1 节讲过的''观测 →
 \end{Highlighting}
 \end{Shaded}
 
-这里有两个细节值得点破：
+这里有两个细节值得点破。
 
 \begin{quote}
-备注：列里看不到「图像」本身------图像存在 \texttt{videos/} 的 mp4
+备注：列里看不到「图像」本身，图像存在 \texttt{videos/} 的 mp4
 里。取样本时，LeRobotDataset 用这一帧的 \texttt{timestamp}
 去对应视频里\textbf{按时间解码出那一帧}，再和表格数据拼成一个完整样本。
 
 备注：索引列的语义和 3.4.4 里那张 lerobot/libero
 的表完全一样，换了机器人也不变。唯一要补一句的是
-\texttt{observation.state}------它是机器人\textbf{自己的关节读数}，属于部分可观测的观测，不是环境的真实状态：方块在哪、篮子在哪，全靠图像那一路带进来。
+\texttt{observation.state}，它是机器人\textbf{自己的关节读数}，属于部分可观测的观测，不是环境的真实状态：方块在哪、篮子在哪，全靠图像那一路带进来。
 \end{quote}
 
 \subsection{3.6
@@ -1272,7 +1262,7 @@ info.json，就读懂了一份数据集的全部口径。}
 
 \texttt{root} 指的是这份数据实际落盘的目录。不给 \texttt{root}，LeRobot
 就按 \texttt{\$HF\_LEROBOT\_HOME/\textless{}repo\_id\textgreater{}}
-去找；找不到会转去 HuggingFace Hub 下载同名仓库------对
+去找；找不到会转去 HuggingFace Hub 下载同名仓库，对
 \texttt{local/cuboid} 这种只在本机存在的数据集，结果就是一个
 404。下面几段的加载都沿用这个 \texttt{root}。
 
@@ -1292,7 +1282,7 @@ s，让灵巧操作更连贯）。\texttt{delta\_timestamps}
 \end{Shaded}
 
 \textbf{三、可视化回看。} 把某条 episode
-的图像与各维动作、状态曲线逐帧放出来，肉眼检查这条数据采得干不干净------这又回到质量这件事上。两条路：在线用
+的图像与各维动作、状态曲线逐帧放出来，肉眼检查这条数据采得干不干净，这又回到质量这件事上。两条路：在线用
 HuggingFace Spaces 的
 \texttt{visualize\_dataset}（无需下载、浏览器直接看），本地用基于 Rerun
 的可视化工具。仓库里的
@@ -1343,7 +1333,7 @@ Rerun 里能同步看到多相机图像、动作各维曲线、本体状态各�
 对比度抖动等），LeRobot 内置 \texttt{ImageTransforms}，作为
 \texttt{image\_transforms} 传入即可，落盘数据本身不动。
 
-最后给一张''想改源码时去哪找''的速查表。下表的路径都写在
+最后给一张``想改源码时去哪找''的速查表。下表的路径都写在
 \texttt{lerobot} 包根之内，即前面都省掉了一层
 \texttt{lerobot/}（\textbf{与版本相关}，按上文的 v0.5.1 / v3.0
 口径记录；新版本里文件可能改名或拆分，找不到就直接在源码树里搜类名）：
@@ -1372,38 +1362,42 @@ Rerun 里能同步看到多相机图像、动作各维曲线、本体状态各�
 \section{4
 实验：采一段抓取数据}\label{ux5b9eux9a8cux91c7ux4e00ux6bb5ux6293ux53d6ux6570ux636e}
 
-理论与格式都铺完了，这一节动手采一段''把方块放进篮子''的数据，把第 2
-节的主从臂方案跑成一份真实落盘的 LeRobotDataset。
+理论与格式都铺完了，这一节动手采一段``把方块放进篮子''的数据，把第 2
+节的 Leader--Follower 臂方案跑成一份真实落盘的 LeRobotDataset。
 
-\subsection{4.1 实物方案：SO-101
-主从臂}\label{ux5b9eux7269ux65b9ux6848so-101-ux4e3bux4eceux81c2}
+\subsection{4.1 实物方案：SO-101 Leader--Follower
+臂}\label{ux5b9eux7269ux65b9ux6848so-101-leaderfollower-ux81c2}
 
-实物方案用一对 SO-101 主从臂。它俩\textbf{结构完全同构}------都是 6 个
-Feetech
-舵机（\texttt{shoulder\_pan\ /\ shoulder\_lift\ /\ elbow\_flex\ /\ wrist\_flex\ /\ wrist\_roll\ /\ gripper}）。正因为同构，在\textbf{逐关节标定过、方向与量程都核对过}的前提下，主臂读到的关节角度可以逐关节映射成从臂的目标角度，这就是主从遥操作能成立的根本：
+实物方案用一对 SO-101 Leader--Follower
+臂。它俩\textbf{结构完全同构}------都是 6 个 Feetech
+舵机（\texttt{shoulder\_pan\ /\ shoulder\_lift\ /\ elbow\_flex\ /\ wrist\_flex\ /\ wrist\_roll\ /\ gripper}）。正因为同构，在\textbf{逐关节标定过、方向与量程都核对过}的前提下，Leader
+臂读到的关节角度可以逐关节映射成 Follower 臂的目标角度，这就是
+Leader--Follower 遥操作能成立的根本：
 
 \begin{itemize}
 \tightlist
 \item
-  人手扳动 \textbf{leader 主臂}，\textbf{follower
-  从臂}实时跟随做出同样的动作；
+  人手扳动 \textbf{Leader 臂}，\textbf{Follower
+  臂}实时跟随做出同样的动作；
 \item
-  主臂当前的关节角度，就是这一帧的\textbf{动作标签}
+  Leader 臂当前的关节角度，就是这一帧的\textbf{动作标签}
   \texttt{action}（人想让机械臂去的地方）；
 \item
-  从臂自身的关节读数 + 机位相机画面，就是这一帧的\textbf{观测}
+  Follower 臂自身的关节读数 + 机位相机画面，就是这一帧的\textbf{观测}
   \texttt{observation}。
 \end{itemize}
 
-于是人只要专注地用主臂把任务做一遍，\textbf{观测和动作标签就被同时、自动地配好对}。采集流程分两步走：先把遥操作本身跑通，再在遥操作之上开启录制。这两步对应
+于是人只要专注地用 Leader
+臂把任务做一遍，\textbf{观测和动作标签就被同时、自动地配好对}。采集流程分两步走：先把遥操作本身跑通，再在遥操作之上开启录制。这两步对应
 LeRobot 自带的两条命令------\texttt{lerobot-teleoperate} 和
 \texttt{lerobot-record}。
 
 \subsection{4.2
 第一步：先跑通遥操作（lerobot-teleoperate）}\label{ux7b2cux4e00ux6b65ux5148ux8dd1ux901aux9065ux64cdux4f5clerobot-teleoperate}
 
-正式录之前，先用 \texttt{lerobot-teleoperate}
-验证整套硬件------主臂扳动时从臂方向对不对、相机有没有画面、帧率稳不稳。这条命令在仓库里是
+正式录之前，先用 \texttt{lerobot-teleoperate} 验证整套硬件------Leader
+臂扳动时 Follower
+臂方向对不对、相机有没有画面、帧率稳不稳。这条命令在仓库里是
 \texttt{code/vla/2\_data\_collection/2\_3\_teleop\_record/tele.sh}：
 
 \begin{Shaded}
@@ -1424,48 +1418,52 @@ LeRobot 自带的两条命令------\texttt{lerobot-teleoperate} 和
 \end{Highlighting}
 \end{Shaded}
 
-参数其实只分三组------\textbf{从臂（\texttt{-\/-robot.*}）、主臂（\texttt{-\/-teleop.*}）、显示与帧率}：
+参数其实只分三组------\textbf{Follower
+臂（\texttt{-\/-robot.*}）、Leader
+臂（\texttt{-\/-teleop.*}）、显示与帧率}：
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.4565\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5435\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 参数 & 含义 \\
 \midrule\noalign{}
-\texttt{-\/-robot.type=so101\_\allowbreak follower} & 从臂类型，决定加载哪个 Robot 类 \\
-\texttt{-\/-robot.port=/dev/ttyFollower} & 从臂串口（udev 固定名） \\
-\texttt{-\/-robot.id=...} & 从臂唯一名，用于找到它的标定文件 \\
+\texttt{-\/-robot.type=so101\_\allowbreak follower} & Follower 臂类型，决定加载哪个 Robot 类 \\
+\texttt{-\/-robot.port=/dev/ttyFollower} & Follower 臂串口（udev 固定名） \\
+\texttt{-\/-robot.id=...} & Follower 臂唯一名，用于找到它的标定文件 \\
 \texttt{-\/-robot.cameras=...} & 相机配置：\texttt{top}（顶视）+ \texttt{wrist}（腕部），均 640×480@30。这里的键名会原样变成数据集里的 \texttt{observation.images.top} / \texttt{.wrist}，两条命令必须写同一套 \\
-\texttt{-\/-teleop.type=so101\_\allowbreak leader} & 主臂类型 \\
-\texttt{-\/-teleop.port=/dev/ttyLeader} & 主臂串口（udev 固定名） \\
-\texttt{-\/-teleop.id=...} & 主臂唯一名（对应主臂标定文件） \\
+\texttt{-\/-teleop.type=so101\_\allowbreak leader} & Leader 臂类型 \\
+\texttt{-\/-teleop.port=/dev/ttyLeader} & Leader 臂串口（udev 固定名） \\
+\texttt{-\/-teleop.id=...} & Leader 臂唯一名（对应 Leader 臂标定文件） \\
 \texttt{-\/-display\_\allowbreak data=true} & 开实时显示，看相机画面与动作曲线 \\
 \texttt{-\/-fps=30} & 控制环目标频率 30 Hz \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
-这一步只做「读主臂 → 写从臂」、不落盘，纯粹用来确认硬件正常。
+这一步只做「读 Leader 臂 → 写 Follower
+臂」、不落盘，纯粹用来确认硬件正常。
 
 \begin{quote}
-备注：本演示假设主从臂已完成\textbf{标定}（把主从臂关节读数对齐到同一套零位与量程，脚本
+备注：本演示假设 Leader--Follower 臂已完成\textbf{标定}（把
+Leader--Follower 臂关节读数对齐到同一套零位与量程，脚本
 \texttt{code/vla/2\_data\_collection/2\_2\_so101\_setup/calibrate\_follower.sh}），两路相机已用
 \texttt{code/vla/2\_data\_collection/2\_2\_so101\_setup/check\_cameras.py}
 确认过能同时跑满 30 fps，且串口已用 udev 规则固定成
-\texttt{/dev/ttyLeader}、\texttt{/dev/ttyFollower}（免得插拔一次设备号就变）。相机同理------上面写的
-\texttt{/dev/top\_camera}、\texttt{/dev/wrist\_camera} 是本课机架那份
+\texttt{/dev/ttyLeader}、\texttt{/dev/ttyFollower}（免得插拔一次设备号就变）。相机同理，上面写的
+\texttt{/dev/top\_camera}、\texttt{/dev/wrist\_camera} 就是本课机架那份
 udev 绑定给出的名字，换台机器就换成自己那套；但\textbf{冒号左边的键名
 \texttt{top} / \texttt{wrist}
 不要跟着改}，它决定了数据集里的字段名。零位对齐之后，这套遥操作就是
-2.2.2 说的\textbf{绝对跟踪}------录下的 \texttt{action}
-是下发给从臂的目标角度，从臂实测到达的姿态记在
-\texttt{observation.state} 里，两者会差一点跟踪误差。
+2.2.2 说的\textbf{绝对跟踪}，录下的 \texttt{action} 是下发给 Follower
+臂的目标角度，Follower 臂实测到达的姿态记在 \texttt{observation.state}
+里，两者会差一点跟踪误差。
 \end{quote}
 
 \subsection{4.3
 第二步：在遥操作之上录数据（lerobot-record）}\label{ux7b2cux4e8cux6b65ux5728ux9065ux64cdux4f5cux4e4bux4e0aux5f55ux6570ux636elerobot-record}
 
 硬件确认无误，把命令换成 \texttt{lerobot-record}（仓库脚本
-\texttt{code/vla/2\_data\_collection/2\_3\_teleop\_record/record.sh}）------它干的事就是「遥操作」再加上「把每一帧写进数据集」。前半段（robot
+\texttt{code/vla/2\_data\_collection/2\_3\_teleop\_record/record.sh}），它干的事就是「遥操作」再加上「把每一帧写进数据集」。前半段（robot
 / teleop / cameras / display）和上一条\textbf{一模一样}，新增的全是
 \texttt{-\/-dataset.*}：
 
@@ -1501,7 +1499,7 @@ udev 绑定给出的名字，换台机器就换成自己那套；但\textbf{冒�
 \texttt{-\/-dataset.num\_\allowbreak episodes=50} & 录 50 个回合（episode） \\
 \texttt{-\/-dataset.episode\_\allowbreak time\_\allowbreak s=30} & 每个回合录 30 秒 \\
 \texttt{-\/-dataset.reset\_\allowbreak time\_\allowbreak s=30} & 两个回合之间留 30 秒手动复位场景 \\
-\texttt{-\/-dataset.push\_\allowbreak to\_\allowbreak hub=false} & 不上传到 HuggingFace Hub。这才是''离线开关''；要上传时把 \texttt{repo\_\allowbreak id} 改成 \texttt{\textless{}HF\_\allowbreak USER\textgreater{}/\textless{}DATASET\_\allowbreak NAME\textgreater{}}（Hub 要求合法的用户名或组织命名空间） \\
+\texttt{-\/-dataset.push\_\allowbreak to\_\allowbreak hub=false} & 不上传到 HuggingFace Hub。这才是``离线开关''；要上传时把 \texttt{repo\_\allowbreak id} 改成 \texttt{\textless{}HF\_\allowbreak USER\textgreater{}/\textless{}DATASET\_\allowbreak NAME\textgreater{}}（Hub 要求合法的用户名或组织命名空间） \\
 \texttt{-\/-resume=true}（注释掉） & 在已有数据集上\textbf{续录}（追加 episode），而非新建 \\
 \bottomrule\noalign{}
 \end{tabular}
@@ -1521,22 +1519,23 @@ Esc & 结束整个录制流程 \\
 \end{tabular}
 \end{center}
 
-整段采集就是按 episode 反复采''抓放''这一个动作：录一回合 →
-留时间复位场景（复位段也跑遥操作让从臂跟随，但\textbf{不存盘}）→ 存盘 →
-下一回合，满意了按 →、搞砸了按 ←。录完，磁盘上就长出 3.3 节那套
+整段采集就是按 episode 反复采``抓放''这一个动作：录一回合 →
+留时间复位场景（复位段也跑遥操作让 Follower 臂跟随，但\textbf{不存盘}）→
+存盘 → 下一回合，满意了按 →、搞砸了按 ←。录完，磁盘上就长出 3.3 节那套
 \texttt{data/\ videos/\ meta/} 结构。
 
 \subsection{4.4 一帧是怎么配好对的：30 Hz
 循环}\label{ux4e00ux5e27ux662fux600eux4e48ux914dux597dux5bf9ux768430-hz-ux5faaux73af}
 
 揭开 \texttt{lerobot-record} 的盖子，它内部就是一个 \textbf{30 Hz
-的循环}，每一圈做三个动作------读观测、读遥操作动作、让从臂复现------再把这一帧拼好写进数据集：
+的循环}，每一圈做三个动作------读观测、读遥操作动作、让 Follower
+臂复现------再把这一帧拼好写进数据集：
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{obs }\OperatorTok{=}\NormalTok{ robot.get\_observation()           }\CommentTok{\# 读从臂 6 个关节 + 两路相机一帧 = 观测}
-\NormalTok{raw\_action }\OperatorTok{=}\NormalTok{ teleop.get\_action()        }\CommentTok{\# 读主臂 6 个关节当前角度 = 动作标签}
-\NormalTok{robot.send\_action(raw\_action)           }\CommentTok{\# 动作下发给从臂，从臂复现，画面随之变化}
+\NormalTok{obs }\OperatorTok{=}\NormalTok{ robot.get\_observation()           }\CommentTok{\# 读 Follower 臂 6 个关节 + 两路相机一帧 = 观测}
+\NormalTok{raw\_action }\OperatorTok{=}\NormalTok{ teleop.get\_action()        }\CommentTok{\# 读 Leader 臂 6 个关节当前角度 = 动作标签}
+\NormalTok{robot.send\_action(raw\_action)           }\CommentTok{\# 动作下发给 Follower 臂，Follower 臂复现，画面随之变化}
 \NormalTok{frame }\OperatorTok{=}\NormalTok{ \{}\OperatorTok{**}\NormalTok{obs, }\OperatorTok{**}\NormalTok{raw\_action, }\StringTok{"task"}\NormalTok{: single\_task\}}
 \NormalTok{dataset.add\_frame(frame)                }\CommentTok{\# 拼成一帧，攒进当前 episode 缓冲}
 \end{Highlighting}
@@ -1559,7 +1558,7 @@ Esc & 结束整个录制流程 \\
 把每圈凑够 \texttt{1/fps}，尽量贴住 30 Hz
 的节奏。把这一圈摊到时间轴上看：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture09/ref/fig09-4-record-loop-timing.png}
 
@@ -1569,21 +1568,37 @@ Esc & 结束整个录制流程 \\
 \texttt{precise\_sleep} 补足，正好凑满 33.3
 ms。下面是相机解码变慢的一圈：蓝段把余量整个吃光，连 sleep
 都没得睡，这一圈拖到约 40
-ms------两条竖虚线之间那一段就是帧间的抖动（本书自绘；各段长度是示意，不是实测值）}
+ms，两条竖虚线之间那一段就是帧间的抖动（各段长度是示意，不是实测值）}
 
 \end{figure}%
 
 图上要盯的是那段虚线框：正常圈里 \texttt{precise\_sleep}
-是\textbf{余量}，不是节拍器------它只在活干完之后把剩下的时间填掉。所以一旦蓝段变长，先被吃掉的就是这段余量；吃光之后这一圈直接超期，下一帧的起点随之往后推。注意
-sleep 只能''尽量''------它不是硬实时保证：相机解码、USB
-带宽、操作系统调度、写盘都会带来抖动，个别圈超期甚至丢帧是常态。所以真正可靠的做法是把\textbf{实际时间戳}记进数据集，同时监控每圈时长、超期次数和相机帧的''年龄''；训练时按时间戳对齐，而不是假设帧间严格等距。理解这条循环，就理解了''一份数据集是怎么一帧帧长出来的''。
+是\textbf{余量}，不是节拍器，它只在活干完之后把剩下的时间填掉。所以一旦蓝段变长，先被吃掉的就是这段余量；吃光之后这一圈直接超期，下一帧的起点随之往后推。注意
+sleep 只能``尽量''，它不是硬实时保证：相机解码、USB
+带宽、操作系统调度、写盘都会带来抖动，个别圈超期甚至丢帧是常态。所以真正可靠的做法是把\textbf{实际时间戳}记进数据集，同时监控每圈时长、超期次数和相机帧的``年龄''；训练时按时间戳对齐，而不是假设帧间严格等距。理解这条循环，就理解了``一份数据集是怎么一帧帧长出来的''。
+
+上图那种超期不用自己推算，\texttt{lerobot-record}
+会当场报出来。每一圈算完耗时
+\texttt{dt\_s}，剩余时间为负就打一条警告（\texttt{src/lerobot/scripts/lerobot\_record.py}）：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{Record loop is running slower (25.0 Hz) than the target FPS (30 Hz). Dataset frames}
+\NormalTok{might be dropped and robot control might be unstable. Common causes are:}
+\NormalTok{1) Camera FPS not keeping up 2) Policy inference taking too long 3) CPU starvation}
+\end{Highlighting}
+\end{Shaded}
+
+括号里那个频率就是这一圈实测耗时的倒数（上图下半条那一圈拖到约 40
+ms，倒数正好 25 Hz）。它列的三个常见原因------相机跟不上、推理太慢、CPU
+被抢------正对应图里蓝段变长的三种来路。日志里反复刷这一条，就说明帧间距已经不等距，训练时必须按时间戳对齐而不能假设等距。
 
 \subsection{4.5 仿真方案：SO-101 仿真器键盘 /
 手柄}\label{ux4effux771fux65b9ux6848so-101-ux4effux771fux5668ux952eux76d8-ux624bux67c4}
 
 没有真机也能做同一件事，\texttt{code/vla/2\_data\_collection/2\_5\_sim\_teleop\_record/teleop\_record.py}
-给出了现成实现：SO-101
-仿真器加一只普通键盘，就能驱动仿真里的从臂完成同样的抓取。控制方式比想象的还直接------六个关节各分一对按键（A/D
+给出了现成实现：SO-101 仿真器加一只普通键盘，就能驱动仿真里的 Follower
+臂完成同样的抓取。控制方式比想象的还直接------六个关节各分一对按键（A/D
 转底座、W/S 抬肩、E/Q 屈肘、R/F 弯腕、T/G 转腕、C/V
 开合夹爪），每帧给按住的关节一个小增量，不需要逆运动学；回车存一集、Esc
 结束采集。
@@ -1592,27 +1607,27 @@ sleep 只能''尽量''------它不是硬实时保证：相机解码、USB
 LeRobotDataset。因为两条线用的是同一副 SO-101
 的六个关节、同样的关节顺序，采出的数据在最要紧的地方能和实物那份对上：同样的
 \texttt{data/\ videos/\ meta/}
-落盘结构、同样的六维动作向量、同样的两路相机键名------3.3
-节那条备注说的''这套结构与采集方式无关''，在这里得到直接印证。
+落盘结构、同样的六维动作向量、同样的两路相机键名，3.3
+节那条备注说的``这套结构与采集方式无关''，在这里得到了直接印证。
 
-但别把''对上''理解成逐字段相同。仿真这条线的两路相机都是
+但别把``对上''理解成逐字段相同。仿真这条线的两路相机都是
 128×128、控制环按 20 Hz 走，实物那条线是两路 640×480、30
 Hz；能对齐的是关节定义、相机键名（同样是 \texttt{top} 与
-\texttt{wrist}）和落盘结构，分辨率与控制频率并不一样。脚本另带一个不接键盘的模式，用内置动作序列自动跑通''采集、转换、加载''整条链，先验证环境再上手实采------没有硬件的同学照样能把''采集到数据集''这个闭环完整走一遍。
+\texttt{wrist}）和落盘结构，分辨率与控制频率并不一样。脚本另带一个不接键盘的模式，用内置动作序列自动跑通``采集、转换、加载''整条链，先验证环境再上手实采，没有硬件的同学照样能把``采集到数据集''这个闭环完整走一遍。
 
 \begin{quote}
-备注：主臂遥操与键盘遥操给动作的方式并不相同，这正好是第8讲 3.3
-节那条''动作口径''在本课两条线上的现身------\textbf{形状一样，口径不一样}。实物线的
-\texttt{action}
-是主臂读到的六个关节\textbf{目标角度}，是绝对口径（人手怎么摆它怎么记）；仿真线的控制模式是
+备注：Leader 臂遥操与键盘遥操给动作的方式并不相同，这正好是第8讲 3.3
+节那条``动作口径''在本课两条线上的现身，\textbf{形状一样，口径不一样}。实物线的
+\texttt{action} 是 Leader
+臂读到的六个关节\textbf{目标角度}，是绝对口径（人手怎么摆它怎么记）；仿真线的控制模式是
 \texttt{pd\_joint\_target\_delta\_pos}，键盘每步给出的是归一化到
 \([-1, 1]\)
-的六维关节\textbf{增量}，是相对口径，由控制器在内部累加到关节目标上。要紧的是：官方转换器把轨迹里的动作\textbf{原样}写进数据集的
+的六维关节\textbf{增量}，是相对口径，由控制器在内部累加到关节目标上。要紧的是，官方转换器把轨迹里的动作\textbf{原样}写进数据集的
 \texttt{action}
 列，中间没有任何一步替你把增量换算成绝对目标。所以两边都是六维、落盘结构也一样，但同一个数字说的不是同一件事。\textbf{要把两份数据混起来训练，先把口径核对清楚、必要时换算成同一种}，否则就是第8讲
-3.3 节左图那种''把相对数据当绝对目标训''的翻车。
+3.3 节左图那种``把相对数据当绝对目标训''的翻车。
 
-再往前一步：这件事不能推广成''统一成 LeRobotDataset
+再往前一步：这件事不能推广成``统一成 LeRobotDataset
 就自动一致''。\textbf{容器格式一致，不等于 schema
 与语义一致}：手柄/键盘方案也可以输出末端增量而不是关节目标，不同装置的相机数量、状态维度、参考坐标系（frame）、控制频率都可能不同。所以跨真机/仿真、跨设备混数据训练之前，必须靠
 \texttt{features} schema
@@ -1625,7 +1640,7 @@ Hz；能对齐的是关节定义、相机键名（同样是 \texttt{top} 与
 episode 之间要把场景复位到一致的初始分布；操作失误、明显跑偏的轨迹当场按
 ← 剔掉重采，别混进要用来训练纯行为克隆的那份数据里。
 
-不过''剔掉''不等于''删掉''。失败轨迹、人工纠正段、从偏离状态恢复回来的片段，对训练失败检测器、恢复策略、奖励模型或偏好学习都很有价值------直接删就把这部分信息丢了。更好的做法是\textbf{分开存并打标签}：成功示教集一份、失败/纠正集另一份。训练纯
+不过``剔掉''不等于``删掉''。失败轨迹、人工纠正段、从偏离状态恢复回来的片段，对训练失败检测器、恢复策略、奖励模型或偏好学习都很有价值，直接删就把这部分信息丢了。更好的做法是\textbf{分开存并打标签}：成功示教集一份、失败/纠正集另一份。训练纯
 BC
 时只用前者；后面做恢复行为、奖励模型或强化学习（第14讲到第16讲）时，再把后者拿出来用。
 
@@ -1651,8 +1666,8 @@ BC
 
 手上还没有五十集自采数据时，先拿这条线把流程走顺，比空等硬件划算。
 
-这几条直接呼应第 1 节------\textbf{采集阶段控住质量，才有第 1
-节说的''好数据''}。
+这几条直接呼应第 1 节，\textbf{采集阶段控住质量，才有第 1
+节说的``好数据''}。
 
 \section{5
 任务设计与评测协议}\label{ux4efbux52a1ux8bbeux8ba1ux4e0eux8bc4ux6d4bux534fux8bae}
@@ -1662,7 +1677,7 @@ BC
 \subsection{5.1
 痛点：评测乱、不可复现}\label{ux75dbux70b9ux8bc4ux6d4bux4e71ux4e0dux53efux590dux73b0}
 
-机器人操作领域的评测长期是笔糊涂账。同一个仿真基准上，一个月内就能有几十篇论文报结果，但各自的协议、复位方式、成功判据都不一样，数字之间根本没法直接比{[}29{]}。更糟的是，很多评测把性能塌缩成一个''成功
+机器人操作领域的评测长期是笔糊涂账。同一个仿真基准上，一个月内就能有几十篇论文报结果，但各自的协议、复位方式、成功判据都不一样，数字之间根本没法直接比{[}29{]}。更糟的是，很多评测把性能塌缩成一个``成功
 /
 失败''的计数，掩盖了执行质量的差异{[}34{]}。要让训练有意义，先得把评测做规范。
 
@@ -1678,7 +1693,7 @@ BC
 \midrule\noalign{}
 物体与初始分布 & 用哪些物体、初始位姿或范围 & ``随便摆个方块'' \\
 语言指令 & 精确的指令文本 & 每次口头描述都不同 \\
-成功判据 & 可由机器自动判定的成功条件 & 人眼''差不多就算过'' \\
+成功判据 & 可由机器自动判定的成功条件 & 人眼``差不多就算过'' \\
 复位流程 & 每条闭环前如何复位场景 & 不复位，状态漂移 \\
 记录粒度 & 逐条记录成功或失败 & 只报一个总成功率 \\
 \bottomrule\noalign{}
@@ -1688,15 +1703,15 @@ BC
 \subsection{5.3
 成功判据与逐实例统计}\label{ux6210ux529fux5224ux636eux4e0eux9010ux5b9eux4f8bux7edfux8ba1}
 
-成功率只有在\textbf{固定协议下逐条记录}时才有意义，而且要报告不确定性，而不是给一个孤零零的数字。这里有两句话值得记住：\textbf{训练
+成功率只有在\textbf{固定协议下逐条记录}时才有意义，而且要报告不确定性，而不是给一个孤零零的数字。\textbf{训练
 loss
 低不等于任务成功}，必须真的跑闭环看成不成；\textbf{单一的成功率数字也会骗人}，要看它是在什么协议、多少次试验下统计出来的。这正好接上第
-1 节------所谓''数据质量''，最终也要落到闭环成功率上来定义。
+1 节，所谓``数据质量''，最终也要落到闭环成功率上来定义。
 
 \subsection{5.4
 一个可复现协议长什么样}\label{ux4e00ux4e2aux53efux590dux73b0ux534fux8baeux957fux4ec0ux4e48ux6837}
 
-一个完整的评测协议，本质上是把''从采集到打分''的每一步都固定下来：
+一个完整的评测协议，本质上是把``从采集到打分''的每一步都固定下来：
 
 \begin{center}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1562\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4375\linewidth - 2\tabcolsep\relax}@{}}
@@ -1717,22 +1732,48 @@ loss
 \subsection{5.5
 常用评测基准}\label{ux5e38ux7528ux8bc4ux6d4bux57faux51c6}
 
-落到具体工具，常用的评测基准各有侧重：
+落到具体工具，选哪个基准取决于你要回答哪个问题：策略在受控环境里做不做得成、它在真机上跟别人比谁强、还是它做得漂不漂亮。六个常用的各答一种。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2708\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1354\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5938\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2910\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1852\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5238\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
-基准 & 类型 & 特点 \\
+基准 & 类型 & 它回答的问题 \\
 \midrule\noalign{}
-LIBERO{[}31{]} & 仿真 & 多套件覆盖空间、物体、目标、长程，并有加扰动的更严版本 \\
-SimplerEnv{[}32{]} & 真实到仿真 & 在仿真里复刻真实场景评测真机策略 \\
-RoboArena{[}33{]} & 真机分布式 & 多机构分布式评测，让结果可比 \\
-RoboEval{[}34{]} & 行为指标 & 在二元成功之外补上执行质量 \\
-VLABench{[}35{]} & 仿真 & 面向语言条件的长程推理任务 \\
-UMI-Bench 1.0{[}30{]} & 真机 & 桌面操作的开放基准，协议、UMI 数据与打分脚本一起公开 \\
+LIBERO{[}31{]} & 仿真 & 换摆位 / 换物体 / 换目标，各掉多少 \\
+SimplerEnv{[}32{]} & 真实到仿真 & 没有真机时，仿真成绩信得过吗 \\
+RoboArena{[}33{]} & 真机分布式 & 我的策略和别人的比，谁强 \\
+RoboEval{[}34{]} & 行为指标 & 成功率打平时，谁做得更漂亮 \\
+VLABench{[}35{]} & 仿真 & 它听得懂带隐含意图的长指令吗 \\
+UMI-Bench 1.0{[}30{]} & 真机 & UMI 式策略在真机上到底行不行 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
+
+\textbf{LIBERO{[}31{]}} 用一条可扩展的程序化生成管线造出四个套件、共 130
+个任务。空间、物体、目标三个套件各 10
+个任务，各只动一个维度：空间套件同物体换摆位、物体套件同摆位换物体、目标套件物体与摆位都不动只换任务目标；第四个套件是
+100 个任务的大集合，覆盖多样物体、摆位与背景，其中 10
+个长程任务常被单独拎出来当「长程」那一档。变量单一是它最大的价值，三个小套件各只改一样东西，成绩掉在哪一档就能直接归因。第8讲第
+4 节的实验跑的就是它。
+
+\textbf{SimplerEnv{[}32{]}}
+反过来做：不追求造一个完全逼真的数字孪生，而是把仿真与真机之间的控制差异和视觉差异逐项补上，让真机策略能在仿真里评。论文报告仿真成绩与真机成绩强相关，也能复现真机策略对各种分布漂移的敏感性。没有真机时它能替掉一部分真机评测，边界是只覆盖它复刻过的那几套真实平台。
+
+\textbf{RoboArena{[}33{]}}
+解决的是「各家的数字没法比」。它不统一任务，统一的是比法：七家机构在同一套
+DROID 平台上，对策略两两做双盲对比，再把偏好反馈聚合成排名，首批跑了 600
+多次真机对比、覆盖七个通用策略，评测网络对社区开放。要回答「我的策略和别人的比谁强」，目前只有这种形态给得出答案。
+
+\textbf{RoboEval{[}34{]}}
+补的是二元成功率盖掉的那一层。它在一套模块化仿真环境里做八个双臂任务、并系统性地控制任务变体，把效率、协调性、安全与稳定性做成标准化指标，再按阶段追踪进度、把失败定位到具体哪一步。论文专门验证过这些指标能区分成功率相近的策略。成功率打平却想知道谁做得更漂亮时，用它。
+
+\textbf{VLABench{[}35{]}} 面向语言条件的长程推理：100 类任务、2000
+多个物体，每类都做强随机化。它的指令是带隐含意图的自然语言，不是模板句；考的也不只是动作策略，还有对网格与纹理、空间关系、物理规律、知识迁移与常识的理解。评
+VLA「懂不懂」而不只是「动得准不准」时用它。
+
+\textbf{UMI-Bench 1.0{[}30{]}} 是第一个专门评 UMI
+式策略的真机基准：把数据采集、场景复位、策略执行、结果记录与任务因子分析统一进一套协议，整个评测过程可复现、可审计。它的形态正好是
+5.4 那张表的一个现成实现，想照着搭自己的协议，可以直接拿它当模板。
 
 \subsection{5.6 小结}\label{ux5c0fux7ed3}
 
@@ -1740,11 +1781,11 @@ UMI-Bench 1.0{[}30{]} & 真机 & 桌面操作的开放基准，协议、UMI 数�
 
 \section{6 小结与下一讲}\label{ux5c0fux7ed3ux4e0eux4e0bux4e00ux8bb2}
 
-这一讲我们走完了一条完整的''操作数据闭环''：先论证了数据决定策略的上限，再把遥操作采集方法铺成一张四大类的地图，接着认清了承载这一切的
+这一讲我们走完了一条完整的``操作数据闭环''：先论证了数据决定策略的上限，再把遥操作采集方法铺成一张四大类的地图，接着认清了承载这一切的
 LeRobot 框架与统一数据集格式，然后用 SO-101
 把遥操作与录制两条命令跑成一份真实落盘的数据，最后立起了一套任务设计与评测协议。
 
-一句话总结：\textbf{数据决定上限，协议决定可信}------采到一份多样、干净的数据，再用一套可复现的协议去量它，才谈得上把策略训好。
+\textbf{数据决定上限，协议决定可信}。采到一份多样、干净的数据，再用一套可复现的协议去量它，才谈得上把策略训好。
 
 下一讲，我们就从这份数据出发，真正把策略学出来：从模仿学习的三条主线
 ACT、Diffusion Policy 与 Flow Matching 讲起。

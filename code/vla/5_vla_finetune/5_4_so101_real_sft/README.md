@@ -40,7 +40,7 @@ python vla/5_vla_finetune/5_4_so101_real_sft/infer_demo.py
 
 ## 验收判据为什么不是相关系数
 
-这批数据里 `action` 是主臂目标位姿、`observation.state` 是从臂实测位姿，两者天然贴在一起。
+这批数据里 `action` 是 Leader 臂目标位姿、`observation.state` 是 Follower 臂实测位姿，两者天然贴在一起。
 实测过：什么都不学、原样照抄 `state`，逐关节 `corr(pred, action)` 就有 0.936–0.995，
 全部能过 0.9——那条门槛没有任何区分力。
 
