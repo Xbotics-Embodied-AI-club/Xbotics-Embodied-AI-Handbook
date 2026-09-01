@@ -293,8 +293,8 @@ def action_space():
     for tick in (0.60, 0.90):
         ax.plot([tick, tick], [0.445, 0.495], color=ORANGE, linewidth=2)
     ax.plot(0.74, 0.47, "o", color=RED, markersize=8)
-    label(ax, 0.60, 0.395, "-1.0", "#8A5A08", 10)
-    label(ax, 0.90, 0.395, "+1.0", "#8A5A08", 10)
+    label(ax, 0.60, 0.395, "-1.0", INK, 10)
+    label(ax, 0.90, 0.395, "+1.0", INK, 10)
     label(ax, 0.74, 0.555, "任一实数", RED, 10)
     label(ax, 0.75, 0.29, "取值有无穷多个，没法逐个枚举", "#555555", 10)
     label(ax, 0.75, 0.15, "例：方向盘转角；", "#888888", 10)
@@ -445,7 +445,7 @@ def onoff_dataflow():
     arrow(ax, (0.27, 0.535), (0.27, 0.675), EDGE)
     label(ax, 0.305, 0.605, "更新一次", BLUE, 10, ha="left")
     arrow(ax, (0.22, 0.35), (0.22, 0.24), EDGE)
-    label(ax, 0.22, 0.185, "更新完立即作废", "#666666", 10)
+    label(ax, 0.22, 0.185, "更新完立即作废", INK, 10)
     label(ax, 0.22, 0.09, "策略一变，全部重采", "#999999", 10)
 
     # 右：三来源 → 经验池 → 目标策略。三条入池线各自竖直落到经验池顶边的三个等分点上，
@@ -472,9 +472,9 @@ def onoff_dataflow():
         else:
             connect(ax, policy, "top", pool, "bottom", color, src_t=tq, dst_t=tp, stub=0.03)
     label(ax, 0.645, 0.375, "随机抽 batch", RED, 10, ha="right")
-    label(ax, 0.90, 0.375, "新经验入池", "#666666", 10, ha="left")
+    label(ax, 0.90, 0.375, "新经验入池", INK, 10, ha="left")
     box(ax, *policy, RED, [("目标策略", 12, True)])
-    label(ax, 0.73, 0.075, "采数据的手 与 被训练的脑 解耦", "#666666", 10)
+    label(ax, 0.73, 0.075, "采数据的手 与 被训练的脑 解耦", INK, 10)
     save(fig, "lecture14", "fig-onoff-dataflow")
 
 
@@ -616,7 +616,7 @@ def replay_buffer():
         ax.add_patch(FancyArrowPatch((x0 + (i + 0.5) * cw, 0.705), (bx + bw / 2, 0.36),
                                      connectionstyle="arc3,rad=0.18", arrowstyle="-",
                                      linewidth=0.8, color="#C9C9C9"))
-    label(ax, 0.5, 0.115, "随机抽出的一个 batch（时刻、回合、来源全打散）", "#444444", 10)
+    label(ax, 0.5, 0.115, "随机抽出的一个 batch（时刻、回合、来源全打散）", INK, 10)
 
     # 图例放在最下面一行，不再贴着右侧的柱子。
     lx = 0.20
@@ -754,86 +754,11 @@ def cartpole_task():
         plain_box(ax, cx - 0.030, 0.36, 0.060, 0.048, GREY)
         draw_pole(cx, 0.408, deg, 1.05, color, lw=2.6)
         label(ax, cx, 0.315, cap1, color, 10, True)
-        label(ax, cx, 0.268, cap2, "#666666", 10)
+        label(ax, cx, 0.268, cap2, INK, 10)
     arrow(ax, (0.762, 0.435), (0.828, 0.435), EDGE, lw=2.0)
     label(ax, 0.795, 0.478, "往右推", RED, 10, True)
 
     save(fig, "lecture16", "fig16-cartpole-task")
-
-
-# ── 第13讲 1.2：三条实时路线各动推理链路的哪一段 ───────────────────────
-# 1.2 那张表已经说清"谁是谁、用什么手段"，图要多给的是**位置关系**：三条路线的作用点
-# 落在同一条推理链的不同位置上——这正是它们能叠加而不打架的原因，表格排不出来。
-def realtime_three_routes():
-    fig, ax = canvas(7.8, 5.2)
-
-    # 公共链路：一次推理从观测进来到控制器消费动作。
-    chain = [(0.02, 0.145, "观测进来"), (0.145, 0.365, "VLM prefill"),
-             (0.365, 0.60, "N 步去噪"), (0.60, 0.775, "动作块出队"),
-             (0.775, 0.98, "控制器逐个消费")]
-    for x0, x1, text in chain:
-        plain_box(ax, x0, 0.865, x1 - x0 - 0.004, 0.075, GREY, fill="#F0F0F0", lw=1.2)
-        label(ax, (x0 + x1) / 2, 0.9025, text, "#444444", 10)
-    label(ax, 0.98, 0.825, "时间 →", "#999999", 10, ha="right")
-
-    def bracket(x0, x1, y, color, text):
-        """在链路下方拉一道括号，指明这条路线动的是哪一段。"""
-        ax.plot([x0, x0, x1, x1], [y + 0.016, y, y, y + 0.016], color=color, linewidth=1.3)
-        label(ax, (x0 + x1) / 2, y - 0.022, text, color, 10, True)
-
-    # 系统层：把 prefill + 去噪这两段本身压快。
-    bracket(0.145, 0.60, 0.795, GREEN, "系统层动这里")
-    label(ax, 0.02, 0.735, "系统层（Realtime-VLA V1）：不改算法，把模型本身在硬件上跑快",
-          GREEN, 11, True, ha="left")
-    for y, text in ((0.635, "大模型慢回路：几十 ms 看一次场景"),
-                    (0.565, "Action Expert 快回路：约 2 ms 出一次动作")):
-        plain_box(ax, 0.07, y, 0.47, 0.055, GREEN)
-        label(ax, 0.305, y + 0.0275, text, "#3A6B4F", 10)
-    ax.plot([0.045, 0.045], [0.567, 0.688], color=GREEN, linewidth=1.3)
-    label(ax, 0.038, 0.6275, "并\n发", GREEN, 10, True, ha="right")
-
-    label(ax, 0.585, 0.675, "单次推理耗时（4090，双视角）", "#3A6B4F", 10, ha="left")
-    plain_box(ax, 0.585, 0.605, 0.375, 0.045, GREY, fill="#EDEDED")
-    label(ax, 0.6, 0.6275, "106 ms（朴素实现）", "#666666", 10, ha="left")
-    plain_box(ax, 0.585, 0.545, 0.375 * 27 / 106, 0.045, GREEN)
-    label(ax, 0.69, 0.5675, "27 ms（手调 kernel）", GREEN, 10, ha="left")
-
-    # 算法层：只改推理期的调度，作用点在去噪与动作块的接缝上。
-    bracket(0.365, 0.775, 0.505, BLUE, "算法层动这里")
-    label(ax, 0.02, 0.445, "算法层（RTC、FASTER）：不改模型、不重训，只改推理期的调度",
-          BLUE, 11, True, ha="left")
-
-    label(ax, 0.03, 0.385, "FASTER：沿时间视界分配去噪步数", BLUE, 10, ha="left")
-    for i in range(6):
-        h = 0.022 + i * 0.014
-        ax.add_patch(FancyBboxPatch((0.05 + i * 0.055, 0.245), 0.040, h,
-                                    boxstyle="round,pad=0.002,rounding_size=0.006",
-                                    linewidth=1.2, edgecolor=BLUE, facecolor=FILL[BLUE]))
-    label(ax, 0.07, 0.222, "近端 1 步", BLUE, 10)
-    label(ax, 0.34, 0.222, "远端多步", BLUE, 10, ha="right")
-
-    label(ax, 0.44, 0.385, "RTC：块与块的接缝切成三段，只重画未来段", BLUE, 10, ha="left")
-    plain_box(ax, 0.44, 0.305, 0.24, 0.042, GREY, fill="#EDEDED")
-    label(ax, 0.56, 0.326, "上一块（正在执行）", "#666666", 10)
-    for x0, w, color, fill, text in ((0.62, 0.10, GREY, "#E3E3E3", "冻结"),
-                                     (0.72, 0.11, BLUE, FILL[BLUE], "软过渡"),
-                                     (0.83, 0.15, BLUE, "#BFD9F0", "自由重画")):
-        plain_box(ax, x0, 0.245, w, 0.042, color, fill=fill)
-        label(ax, x0 + w / 2, 0.266, text, "#3B5E7A" if color is BLUE else "#666666", 10)
-    label(ax, 0.75, 0.222, "新算出来的这一块", BLUE, 10)
-
-    # 学习+投机层：作用在链路外侧——一条绕过主干的旁路，外加给整条链定节奏。
-    bracket(0.02, 0.98, 0.175, ORANGE, "学习+投机层作用在整条链的外侧")
-    label(ax, 0.02, 0.115, "学习+投机层（Realtime-VLA V2、FLASH）", ORANGE, 11, True, ha="left")
-    plain_box(ax, 0.02, 0.038, 0.29, 0.050, ORANGE)
-    label(ax, 0.165, 0.063, "小模型一步猜整块 7.8 ms", "#8A5A08", 10)
-    arrow(ax, (0.315, 0.063), (0.355, 0.063), EDGE)
-    plain_box(ax, 0.36, 0.038, 0.21, 0.050, ORANGE)
-    label(ax, 0.465, 0.063, "主模型并行验证", "#8A5A08", 10)
-    arrow(ax, (0.575, 0.063), (0.615, 0.063), EDGE)
-    label(ax, 0.62, 0.075, "命中 → 走旁路，绕开去噪", "#8A5A08", 10, ha="left")
-    label(ax, 0.62, 0.038, "未命中 → 回主干完整推理 58 ms", "#8A5A08", 10, ha="left")
-    save(fig, "lecture13", "fig13-1-realtime-three-routes")
 
 
 # ── 第13讲 2.6：长程操作的四种范式 ─────────────────────────────────────
@@ -868,7 +793,7 @@ def long_horizon_paradigms():
         if with_gate:
             arrow(ax, (cx, y0 + 0.278), (cx, y0 + 0.250), EDGE)
             plain_box(ax, cx - 0.0375, y0 + 0.195, 0.075, 0.048, ORANGE)
-            label(ax, cx, y0 + 0.219, "掩码闸门", "#8A5A08", 10)
+            label(ax, cx, y0 + 0.219, "掩码闸门", INK, 10)
             arrow(ax, (cx, y0 + 0.190), (cx, y0 + 0.166), EDGE)
         else:
             arrow(ax, (cx, y0 + 0.278), (cx, y0 + 0.166), EDGE)
@@ -877,21 +802,21 @@ def long_horizon_paradigms():
         w, h = 0.475, 0.38
         plain_box(ax, x0, y0, w, h, GREY, fill="#FCFCFC", lw=1.0)
         label(ax, x0 + w / 2, y0 + 0.345, tag, "#333333", 10, True)
-        label(ax, x0 + w / 2, y0 + 0.295, "一整条长任务的观测", "#666666", 10)
+        label(ax, x0 + w / 2, y0 + 0.295, "一整条长任务的观测", INK, 10)
         draw(x0 + w / 2, y0)
         marks(x0 + w / 2, y0 + 0.025, flags)
 
     def one_policy(cx, y0, with_gate):
         feed(cx, y0, with_gate)
         plain_box(ax, cx - 0.16, y0 + 0.105, 0.32, 0.055, BLUE)
-        label(ax, cx, y0 + 0.1325, "一个 VLA 策略", "#25567F", 10)
-        label(ax, cx, y0 + 0.070, "$a^{t-1},\\; a^{t},\\; a^{t+1}$", "#666666", 10)
+        label(ax, cx, y0 + 0.1325, "一个 VLA 策略", INK, 10)
+        label(ax, cx, y0 + 0.070, "$a^{t-1},\\; a^{t},\\; a^{t+1}$", INK, 10)
 
     def two_policies(cx, y0, with_gate):
         for dx, name in ((-0.115, "移动策略"), (0.115, "交互策略")):
             feed(cx + dx, y0, with_gate)
             plain_box(ax, cx + dx - 0.09, y0 + 0.105, 0.18, 0.055, BLUE)
-            label(ax, cx + dx, y0 + 0.1325, name, "#25567F", 10)
+            label(ax, cx + dx, y0 + 0.1325, name, INK, 10)
         # 两个策略之间是一道接缝：不是同一个模型，交接处要单独想办法。
         ax.plot([cx, cx], [y0 + 0.098, y0 + 0.168], color=RED, linewidth=1.4, linestyle=(0, (3, 2)))
         label(ax, cx, y0 + 0.070, "两个模型，中间有接缝" if not with_gate else "接缝靠输入级适配接住",
@@ -926,47 +851,49 @@ def one_cut_three_lines():
     label(ax, 0.16, 0.885, "实时线：切在时间上", BLUE, 11, True)
     label(ax, 0.16, 0.705, "正在执行的动作块", "#999999", 10)
     plain_box(ax, 0.03, 0.545, 0.115, 0.085, GREY, fill="#EDEDED")
-    label(ax, 0.0875, 0.5875, "已冻结", "#666666", 10)
+    label(ax, 0.0875, 0.5875, "已冻结", INK, 10)
     plain_box(ax, 0.175, 0.545, 0.115, 0.085, BLUE)
-    label(ax, 0.2325, 0.5875, "可重画", "#25567F", 10)
+    label(ax, 0.2325, 0.5875, "可重画", INK, 10)
     cut(0.16, 0.50, 0.16, 0.675)
     label(ax, 0.16, 0.465, "时间轴 →", "#999999", 10)
     label(ax, 0.16, 0.335, "刀口：软过渡段", RED, 10)
-    label(ax, 0.16, 0.245, "左边来不及改，", "#666666", 10)
-    label(ax, 0.16, 0.165, "右边重新生成", "#666666", 10)
+    label(ax, 0.16, 0.245, "左边来不及改，", INK, 10)
+    label(ax, 0.16, 0.165, "右边重新生成", INK, 10)
 
     # 记忆线：刀切在信息上。
     label(ax, 0.5, 0.885, "记忆线：切在信息上", GREEN, 11, True)
     label(ax, 0.435, 0.775, "每帧刷新", "#999999", 10)
     label(ax, 0.625, 0.775, "写入与巩固", "#999999", 10)
     plain_box(ax, 0.375, 0.665, 0.12, 0.075, BLUE)
-    label(ax, 0.435, 0.7025, "当下单帧", "#25567F", 10)
+    label(ax, 0.435, 0.7025, "当下单帧", INK, 10)
     plain_box(ax, 0.565, 0.665, 0.12, 0.075, GREEN)
-    label(ax, 0.625, 0.7025, "记忆库", "#3A6B4F", 10)
+    label(ax, 0.625, 0.7025, "记忆库", INK, 10)
     cut(0.53, 0.615, 0.53, 0.79)
-    arrow(ax, (0.435, 0.660), (0.495, 0.575), EDGE)
-    arrow(ax, (0.625, 0.660), (0.565, 0.575), EDGE)
+    # 两条汇入线走正交：竖直下来，再横到决策框顶边的两个点上。
+    for x_from, x_to in ((0.435, 0.500), (0.625, 0.560)):
+        _polyline(ax, [(x_from, 0.660), (x_from, 0.605), (x_to, 0.605), (x_to, 0.565)],
+                  EDGE, 1.4, 0.012)
     plain_box(ax, 0.465, 0.485, 0.13, 0.075, GREY, fill="#F0F0F0")
-    label(ax, 0.53, 0.5225, "决策", "#666666", 10)
+    label(ax, 0.53, 0.5225, "决策", INK, 10)
     label(ax, 0.53, 0.335, "刀口：检索 + 门控融合", RED, 10)
-    label(ax, 0.53, 0.245, "两边各存各的，", "#666666", 10)
-    label(ax, 0.53, 0.165, "各有各的更新节奏", "#666666", 10)
+    label(ax, 0.53, 0.245, "两边各存各的，", INK, 10)
+    label(ax, 0.53, 0.165, "各有各的更新节奏", INK, 10)
 
     # 人形线：刀切在职责上。
     label(ax, 0.845, 0.885, "人形线：切在职责上", ORANGE, 11, True)
     plain_box(ax, 0.775, 0.735, 0.14, 0.070, GREY, fill="#F0F0F0")
-    label(ax, 0.845, 0.770, "语言指令", "#666666", 10)
+    label(ax, 0.845, 0.770, "语言指令", INK, 10)
     arrow(ax, (0.845, 0.730), (0.845, 0.705), EDGE)
     plain_box(ax, 0.735, 0.625, 0.22, 0.075, ORANGE)
-    label(ax, 0.845, 0.6625, "S2：懂任务的大脑", "#8A5A08", 10)
+    label(ax, 0.845, 0.6625, "S2：懂任务的大脑", INK, 10)
     cut(0.715, 0.575, 0.975, 0.575)
     plain_box(ax, 0.735, 0.485, 0.22, 0.075, ORANGE)
-    label(ax, 0.845, 0.5225, "S1：会走路的身体", "#8A5A08", 10)
+    label(ax, 0.845, 0.5225, "S1：会走路的身体", INK, 10)
     arrow(ax, (0.845, 0.480), (0.845, 0.450), EDGE)
-    label(ax, 0.845, 0.415, "电机指令", "#666666", 10)
+    label(ax, 0.845, 0.415, "电机指令", INK, 10)
     label(ax, 0.845, 0.335, "刀口：潜在 verb / 分块命令", RED, 10)
-    label(ax, 0.845, 0.245, "上面不学走路，", "#666666", 10)
-    label(ax, 0.845, 0.165, "下面不懂任务", "#666666", 10)
+    label(ax, 0.845, 0.245, "上面不学走路，", INK, 10)
+    label(ax, 0.845, 0.165, "下面不懂任务", INK, 10)
 
     save(fig, "lecture13", "fig13-4-one-cut-three-lines")
 
@@ -1011,26 +938,6 @@ def motion_taxonomy():
     save(fig, "lecture08", "fig08-1-motion-taxonomy")
 
 
-# ── 第8讲 2.1：智能体与环境的回路（本讲版，不含奖励）────────────────────
-# 与第14讲那张同一个概念、两种视角（D8）：这一讲只讲"观测进、动作出"，
-# 所以奖励那条线画成灰色虚线、明写"第14讲才接上"，避免图和自己的走读打架。
-def agent_env_loop_l08():
-    fig, ax = canvas(5.8, 2.9)
-    agent = (0.28, 0.68, 0.44, 0.22)
-    env = (0.28, 0.06, 0.44, 0.22)
-    box(ax, *agent, BLUE,
-        [("智能体（机器人）", 12, True), ("策略 $\\pi$：看到什么 → 做什么", 10, False)])
-    box(ax, *env, GREEN, [("环境", 12, True), ("被动作改变，再给出新画面", 10, False)])
-
-    # 同上：两端接框的边中点，右侧下行送动作，左侧上行回观测。
-    elbow(ax, side(*agent, "right"), side(*env, "right"), RED, via="hvh", detour=0.89)
-    label(ax, 0.89, 0.48, "动作 $a_t$", RED, 11, True, bg=True)
-    elbow(ax, side(*env, "left"), side(*agent, "left"), BLUE, via="hvh", detour=0.11)
-    label(ax, 0.11, 0.48, "观测 $o_{t+1}$", BLUE, 11, True, bg=True)
-    label(ax, 0.5, 0.48, "$a=\\pi(o)$，如此循环", "#888888", 10)
-    save(fig, "lecture08", "fig08-2-agent-env-loop")
-
-
 # ── 第8讲 2.3：策略的四档谱系 ──────────────────────────────────────────
 # 正文用整段描述了一条谱系却没有图。图要多给的是**递进关系**：每往右一档，
 # 观测里多进来一样东西，能听懂的指令就宽一层——这条"加法"是文字列举给不出的。
@@ -1049,8 +956,8 @@ def policy_spectrum():
         plain_box(ax, x0, 0.325, w, 0.535, color)
         label(ax, x0 + w / 2, 0.805, name, color, 12, True)
         label(ax, x0 + w / 2, 0.752, en, "#888888", 10, va="top")
-        label(ax, x0 + w / 2, 0.575, add, "#444444", 11, True)
-        label(ax, x0 + w / 2, 0.505, gain, "#666666", 10)
+        label(ax, x0 + w / 2, 0.575, add, INK, 11, True)
+        label(ax, x0 + w / 2, 0.505, gain, INK, 10)
         label(ax, x0 + w / 2, 0.440, "代表：" + cases if cases != "—" else "",
               "#666666", 10, va="top")
 
@@ -1080,7 +987,7 @@ def train_deploy_roundtrip():
     for i, text in enumerate(upper):
         x0 = 0.015 + i * (w + gap)
         plain_box(ax, x0, 0.665, w, 0.225, BLUE)
-        label(ax, x0 + w / 2, 0.7775, text, "#25567F", 10)
+        label(ax, x0 + w / 2, 0.7775, text, INK, 10)
         if i:                       # 上排从左往右：数据进网络
             arrow(ax, (x0 - gap + 0.003, 0.7775), (x0 - 0.003, 0.7775), EDGE)
     for i, text in enumerate(lower):
@@ -1094,7 +1001,7 @@ def train_deploy_roundtrip():
     for i, text in enumerate(("两端必须用\n同一套口径", "两端必须用\n同一套统计量")):
         x = 0.015 + (i + 1) * (w + gap) + w / 2
         ax.plot([x, x], [0.545, 0.660], color="#888888", linewidth=1.4, linestyle=(0, (4, 3)))
-        label(ax, x + 0.012, 0.6025, text, "#666666", 10, ha="left")
+        label(ax, x + 0.012, 0.6025, text, INK, 10, ha="left")
 
     save(fig, "lecture08", "fig08-3-train-deploy-roundtrip")
 
@@ -1244,7 +1151,7 @@ def lerobot_layers():
         plain_box(ax, x0, y, w, h, color, fill=FILL[GREEN] if mine else "#F6F6F6",
                   lw=2.0 if mine else 1.2)
         label(ax, x0 + 0.02, y + h / 2, name, GREEN if mine else "#333333", 11, mine, ha="left")
-        label(ax, x0 + w - 0.02, y + h / 2, detail, "#666666", 10, ha="right")
+        label(ax, x0 + w - 0.02, y + h / 2, detail, INK, 10, ha="right")
         if i:
             arrow(ax, (x0 + 0.10, y + h + gap - 0.003), (x0 + 0.10, y + h + 0.003), EDGE, lw=1.2)
 
@@ -1252,15 +1159,18 @@ def lerobot_layers():
     px = x0 + w + 0.045
     label(ax, px, 0.955, "lerobot-record 穿过的路", RED, 11, True, ha="left")
     order = [0, 4, 3, 2]
-    for a, b in zip(order, order[1:]):
-        ax.add_patch(FancyArrowPatch((px, tops[a]), (px, tops[b]),
-                                     connectionstyle="arc3,rad=-0.55", arrowstyle="-|>",
-                                     mutation_scale=12, linewidth=1.6, color=RED))
+    # 三段跳各占一条竖带（越靠外的跳得越远），走正交折线。
+    # 早先三段同挤在 px 上、又都是大圆弧，四步的先后顺序在图上根本读不出来。
+    for k, (a, b) in enumerate(zip(order, order[1:])):
+        lane = px + 0.030 + k * 0.026
+        _polyline(ax, [(px, tops[a]), (lane, tops[a]), (lane, tops[b]), (px, tops[b])],
+                  RED, 1.4, 0.012)
     for i, note in ((0, "(1) 起于命令"), (4, "(2) 读主臂动作"), (3, "(3) 从臂执行、相机出图"),
                     (2, "(4) 拼成一帧写进数据集")):
         ax.plot([x0 + w + 0.004, px], [tops[i], tops[i]], color=RED, linewidth=1.0,
                 linestyle=(0, (2, 2)))
-        label(ax, px + 0.02, tops[i], note, RED, 10, ha="left")
+        # 标签让到最外一条竖带右侧，否则跳线会从字上穿过去
+        label(ax, px + 0.030 + 2 * 0.026 + 0.018, tops[i], note, RED, 10, ha="left")
     label(ax, 0.03, 0.045, "绿色那两层是本讲要动的：teleoperators/ 读动作、datasets/ 落数据集",
           GREEN, 10, ha="left")
     save(fig, "lecture09", "fig09-3-lerobot-layers")
@@ -1280,7 +1190,7 @@ def record_loop_timing():
         for color, wfrac in zip(colors, widths):
             plain_box(ax, x, y, wfrac * span - 0.004, 0.10, color)
             x += wfrac * span
-        label(ax, x0 + widths[0] * span / 2, y + 0.05, "get_observation", "#25567F", 10)
+        label(ax, x0 + widths[0] * span / 2, y + 0.05, "get_observation", INK, 10)
         if sleep_w > 0:
             plain_box(ax, x, y, sleep_w * span - 0.004, 0.10, GREY, fill="#FAFAFA",
                       style=(0, (3, 2)), lw=1.2)
@@ -1301,7 +1211,7 @@ def record_loop_timing():
     # 两条竖线：一条是本该收圈的 33.3 ms，一条是这一圈实际收圈的时刻。
     ax.plot([end_ok, end_ok], [0.255, 0.830], color="#999999", linewidth=1.2,
             linestyle=(0, (4, 3)))
-    label(ax, end_ok, 0.870, "33.3 ms", "#666666", 10)
+    label(ax, end_ok, 0.870, "33.3 ms", INK, 10)
     ax.plot([end_bad, end_bad], [0.255, 0.470], color=RED, linewidth=1.4, linestyle=(0, (4, 3)))
     label(ax, end_bad, 0.505, "约 40 ms", RED, 10)
     ax.annotate("", xy=(end_bad, 0.215), xytext=(end_ok, 0.215),
@@ -1320,8 +1230,8 @@ def act_step3_dataflow():
 
     plain_box(ax, 0.02, 0.30, 0.115, 0.50, GREY, fill="#F6F6F6")
     label(ax, 0.077, 0.72, "四路相机", "#333333", 11, True)
-    label(ax, 0.077, 0.58, "480×640\n的 RGB 图", "#666666", 10)
-    label(ax, 0.077, 0.38, "机器人关节\n状态 + $z$", "#666666", 10)
+    label(ax, 0.077, 0.58, "480×640\n的 RGB 图", INK, 10)
+    label(ax, 0.077, 0.38, "机器人关节\n状态 + $z$", INK, 10)
 
     plain_box(ax, 0.165, 0.46, 0.145, 0.34, BLUE)
     label(ax, 0.2375, 0.70, "ResNet18", BLUE, 11, True)
@@ -1373,8 +1283,8 @@ def chunking_vs_ensemble():
 
     # 时间刻度：两半共用同一条时间轴，位置一一对应。
     for s in range(8):
-        label(ax, x0 + s * dx + bw / 2, 0.955, str(s), "#666666", 10)
-    label(ax, x0 - 0.012, 0.955, "时间步", "#666666", 10, ha="right")
+        label(ax, x0 + s * dx + bw / 2, 0.955, str(s), INK, 10)
+    label(ax, x0 - 0.012, 0.955, "时间步", INK, 10, ha="right")
 
     label(ax, x0 - 0.012, 0.855, "动作队列", BLUE, 11, True, ha="right")
     for s in range(4):
@@ -1782,8 +1692,8 @@ def alternating_ca_sa():
 
     # 左侧：被冻结的 VLM，只取前 N 层的输出。三个方案共用同一个来源。
     plain_box(ax, 0.010, 0.30, 0.135, 0.53, GREY, fill="#F0F0F0")
-    label(ax, 0.0775, 0.735, "VLM\n（冻结）", "#444444", 11, True)
-    label(ax, 0.0775, 0.435, "只取前 $N$ 层\n作 key/value", "#666666", 10)
+    label(ax, 0.0775, 0.735, "VLM\n（冻结）", INK, 11, True)
+    label(ax, 0.0775, 0.435, "只取前 $N$ 层\n作 key/value", INK, 10)
 
     # 标题与脚注都拆成两行——三格并排时，单行长标题一定会横向撞在一起。
     panels = [
@@ -1811,7 +1721,7 @@ def alternating_ca_sa():
                 ax.plot([0.147, x0 + 0.026], [y + 0.050, y + 0.050], color=GREY,
                         linewidth=1.0, linestyle=(0, (2, 2)), zorder=0)
                 arrow(ax, (x0 + 0.008, y + 0.050), (x0 + 0.028, y + 0.050), EDGE, lw=1.3)
-        label(ax, x0 + w / 2, 0.272, note, "#666666", 10)
+        label(ax, x0 + w / 2, 0.272, note, INK, 10)
 
     # 因果掩码画成下三角，说明 SA 只往回看。
     mx, my, cell = 0.400, 0.025, 0.020
@@ -1892,9 +1802,9 @@ def two_axes_map():
         ax.plot([x0, x0 + 3 * cw], [y0 + i * ch] * 2, color="#E4E4E4", linewidth=1.0, zorder=0)
         ax.plot([x0 + i * cw] * 2, [y0, y0 + 3 * ch], color="#E4E4E4", linewidth=1.0, zorder=0)
     for j, name in enumerate(cols):
-        label(ax, x0 + (j + 0.5) * cw, 0.905, name, "#444444", 11, True)
+        label(ax, x0 + (j + 0.5) * cw, 0.905, name, INK, 11, True)
     for i, name in enumerate(rows):
-        label(ax, x0 - 0.018, y0 + (i + 0.5) * ch, name, "#444444", 11, True, ha="right")
+        label(ax, x0 - 0.018, y0 + (i + 0.5) * ch, name, INK, 11, True, ha="right")
 
     # 只有真正在本讲（或第15讲）出现过的组合才摆点，不为了填满格子编组合。
     # 格子只有 0.23 宽，长名字一律拆两行——单行写满会顶出框外。
@@ -1988,7 +1898,6 @@ teleop_tradeoff_map()
 lerobot_layers()
 record_loop_timing()
 motion_taxonomy()
-agent_env_loop_l08()
 policy_spectrum()
 train_deploy_roundtrip()
 normalization_ranges()
@@ -1997,7 +1906,6 @@ error_snowball()
 abs_vs_delta_axis()
 mismatch_failures()
 q99_normalization()
-realtime_three_routes()
 long_horizon_paradigms()
 one_cut_three_lines()
 agent_env_loop()
