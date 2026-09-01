@@ -259,16 +259,15 @@ def action_space():
     fig, ax = canvas(6.8, 3.2)
     ax.plot([0.5, 0.5], [0.03, 0.89], color="#CCCCCC", linewidth=1.4, linestyle="--")
 
-    label(ax, 0.25, 0.855, "离散动作空间", BLUE, 12, True)
+    label(ax, 0.25, 0.855, "离散动作空间", INK, 12, True)
     label(ax, 0.25, 0.765, "从有限个选项里挑一个", "#4A6A85", 10)
     for (bx, by, text) in [(0.10, 0.545, "←"), (0.28, 0.545, "→"),
                            (0.10, 0.395, "A"), (0.28, 0.395, "B")]:
         box(ax, bx, by, 0.12, 0.115, BLUE, [(text, 12, False)])
-    label(ax, 0.25, 0.29, "动作个数有限，可以逐个比较好坏", "#555555", 10)
     label(ax, 0.25, 0.15, "例：手柄的四个键；", "#888888", 10)
     label(ax, 0.25, 0.06, "语言模型选下一个 token", "#888888", 10)
 
-    label(ax, 0.75, 0.855, "连续动作空间", RED, 12, True)
+    label(ax, 0.75, 0.855, "连续动作空间", INK, 12, True)
     label(ax, 0.75, 0.765, "动作是一个实数区间里的取值", "#4A6A85", 10)
     ax.annotate("", xy=(0.94, 0.47), xytext=(0.57, 0.47),
                 arrowprops=dict(arrowstyle="-|>", color=ORANGE, linewidth=2.0))
@@ -278,7 +277,6 @@ def action_space():
     label(ax, 0.60, 0.395, "-1.0", INK, 10)
     label(ax, 0.90, 0.395, "+1.0", INK, 10)
     label(ax, 0.74, 0.555, "任一实数", RED, 10)
-    label(ax, 0.75, 0.29, "取值有无穷多个，没法逐个枚举", "#555555", 10)
     label(ax, 0.75, 0.15, "例：方向盘转角；", "#888888", 10)
     label(ax, 0.75, 0.06, "G1 的 29 个关节目标量", "#888888", 10)
     save(fig, "lecture14", "fig-action-space")
@@ -312,7 +310,7 @@ def discount_horizon():
 
     left.set_xlabel("往后第 $k$ 步", fontsize=10)
     left.set_ylabel("这一步奖励在回报里的权重 $\\gamma^{k}$", fontsize=10)
-    left.set_title("$\\gamma$ 决定未来的奖励还剩多少分量", fontsize=11, color="#444444")
+    left.set_title("往后第 $k$ 步的权重 $\\gamma^{k}$", fontsize=11, color="#444444")
     left.set_xlim(0, 300); left.set_ylim(0, 1.02)
     left.set_xticks([0, 100, 200, 300])
     left.tick_params(labelsize=10)
@@ -323,7 +321,7 @@ def discount_horizon():
     right.axis("off")
     right.set_xticks([]); right.set_yticks([])
     right.set_xlim(0, 1); right.set_ylim(0, 1)
-    right.set_title("同样三个 $\\gamma$，视野贴到一整个回合上", fontsize=11, color="#444444")
+    right.set_title("有效视野在一个回合里占多长", fontsize=11, color="#444444")
 
     x0, span = 0.30, 0.68                       # 轴左端与全长，全长 = 1000 步
     right.annotate("", xy=(x0, 0.90), xytext=(x0 + span, 0.90),
@@ -355,9 +353,6 @@ def discount_horizon():
             right.text(x0 + w + 0.02, y + h / 2, note, ha="left", va="center",
                        fontsize=10, color=color)
 
-    right.text(x0 + span / 2, 0.05,
-               "有效视野 $1/(1-\\gamma)$ 给的是步数，不是秒",
-               ha="center", va="center", fontsize=10, color="#444444")
 
     fig.tight_layout()
     save(fig, "lecture14", "fig14-3-discount-horizon")
@@ -368,7 +363,6 @@ def discount_horizon():
 # 这件事，光靠 π(a|s) 这个记号看不出来，画出来就一目了然。
 def policy_distribution():
     fig, ax = canvas(7.2, 3.0)
-    label(ax, 0.30, 0.95, "策略：把状态映射成一个动作分布", "#333333", 13, True)
     box(ax, 0.02, 0.46, 0.24, 0.34, BLUE,
         [("状态 $s$", 12, True), ("关节角度、躯干姿态", 10, False), ("目标速度指令", 10, False)])
     box(ax, 0.32, 0.46, 0.20, 0.34, ORANGE,
@@ -400,7 +394,7 @@ def policy_distribution():
     inset.annotate("采出来的动作 $a$", xy=(sampled + 0.06, 0.50), xytext=(1.85, 0.72),
                    fontsize=10, color="#333333", va="center",
                    arrowprops=dict(arrowstyle="->", color="#333333", linewidth=1.1))
-    inset.set_title("动作分布 $\\pi_\\theta(a \\mid s)$", fontsize=11, color=RED, pad=16)
+    inset.set_title("动作分布 $\\pi_\\theta(a \\mid s)$", fontsize=11, color=INK, pad=16)
     inset.set_xlim(-3, 4.0); inset.set_ylim(0, 1.20)
     inset.set_xlabel("动作取值", fontsize=10, labelpad=1)
     inset.set_xticks([-2, 0, 2]); inset.tick_params(labelsize=10)
@@ -415,20 +409,18 @@ def policy_distribution():
 # ── 第14讲 3.4：on-policy 与 off-policy 的数据流对比 ────────────────────
 def onoff_dataflow():
     fig, ax = canvas(7.8, 3.4)
-    label(ax, 0.22, 0.955, "on-policy（第14讲、第15讲）", BLUE, 13, True)
-    label(ax, 0.75, 0.955, "off-policy（第16讲）", RED, 13, True)
+    label(ax, 0.22, 0.955, "on-policy（第14讲、第15讲）", INK, 13, True)
+    label(ax, 0.75, 0.955, "off-policy（第16讲）", INK, 13, True)
     ax.plot([0.46, 0.46], [0.02, 0.90], color="#DDDDDD", linewidth=1.4, linestyle="--")
 
     # 左：采样 → 更新 → 作废
     box(ax, 0.09, 0.68, 0.26, 0.13, BLUE, [("当前策略", 12, True)])
     box(ax, 0.07, 0.36, 0.30, 0.17, BLUE, [("新鲜数据", 12, True), ("（只来自当前策略）", 10, False)])
     arrow(ax, (0.17, 0.675), (0.17, 0.535), EDGE)
-    label(ax, 0.135, 0.605, "采样", BLUE, 10, ha="right")
+    label(ax, 0.135, 0.605, "采样", INK, 10, ha="right")
     arrow(ax, (0.27, 0.535), (0.27, 0.675), EDGE)
-    label(ax, 0.305, 0.605, "更新一次", BLUE, 10, ha="left")
+    label(ax, 0.305, 0.605, "更新一次", INK, 10, ha="left")
     arrow(ax, (0.22, 0.35), (0.22, 0.24), EDGE)
-    label(ax, 0.22, 0.185, "更新完立即作废", INK, 10)
-    label(ax, 0.22, 0.09, "策略一变，全部重采", "#999999", 10)
 
     # 右：三来源 → 经验池 → 目标策略。三条入池线各自竖直落到经验池顶边的三个等分点上，
     # 不用斜线汇聚——斜线在这种"多对一"里最容易看成随手连的。
@@ -453,10 +445,9 @@ def onoff_dataflow():
             connect(ax, pool, "bottom", policy, "top", color, src_t=tp, dst_t=tq, stub=0.03)
         else:
             connect(ax, policy, "top", pool, "bottom", color, src_t=tq, dst_t=tp, stub=0.03)
-    label(ax, 0.645, 0.375, "随机抽 batch", RED, 10, ha="right")
+    label(ax, 0.645, 0.375, "随机抽 batch", INK, 10, ha="right")
     label(ax, 0.90, 0.375, "新经验入池", INK, 10, ha="left")
     box(ax, *policy, RED, [("目标策略", 12, True)])
-    label(ax, 0.73, 0.075, "采数据的手 与 被训练的脑 解耦", INK, 10)
     save(fig, "lecture14", "fig-onoff-dataflow")
 
 
@@ -579,8 +570,7 @@ def replay_buffer():
     n = len(cells)
 
     x0, x1, cw = 0.02, 0.98, (0.98 - 0.02) / n
-    label(ax, 0.02, 0.955, "池内经验（按时间存放：相邻转移几乎一样，来源成片）",
-          "#444444", 10, ha="left")
+    label(ax, 0.02, 0.955, "池内经验（按时间存放）", INK, 10, ha="left")
     for i, color in enumerate(cells):
         ax.add_patch(FancyBboxPatch((x0 + i * cw + cw * 0.12, 0.72), cw * 0.76, 0.15,
                                     boxstyle="round,pad=0.001,rounding_size=0.004",
@@ -595,10 +585,12 @@ def replay_buffer():
         ax.add_patch(FancyBboxPatch((bx, 0.20), bw, 0.15,
                                     boxstyle="round,pad=0.001,rounding_size=0.004",
                                     linewidth=0.8, edgecolor=cells[i], facecolor=cells[i]))
-        ax.add_patch(FancyArrowPatch((x0 + (i + 0.5) * cw, 0.705), (bx + bw / 2, 0.36),
-                                     connectionstyle="arc3,rad=0.18", arrowstyle="-",
-                                     linewidth=0.8, color="#C9C9C9"))
-    label(ax, 0.5, 0.115, "随机抽出的一个 batch（时刻、回合、来源全打散）", INK, 10)
+        # 连线走正交，与全书其余流程图一致；中间那条横带按 j 错开，八条不叠在一起。
+        src_x, dst_x = x0 + (i + 0.5) * cw, bx + bw / 2
+        _polyline(ax, [(src_x, 0.715), (src_x, 0.56 - j * 0.012),
+                       (dst_x, 0.56 - j * 0.012), (dst_x, 0.355)],
+                  "#C9C9C9", 0.9, 0.010)
+    label(ax, 0.5, 0.115, "随机抽出的一个 batch", INK, 10)
 
     # 图例放在最下面一行，不再贴着右侧的柱子。
     lx = 0.20
@@ -638,10 +630,8 @@ def q_propagation():
 
     ax.set_xticks(range(3)); ax.set_xticklabels([g[0] for g in groups], fontsize=10)
     ax.set_ylabel("Q 值", fontsize=10)
-    ax.set_ylim(0, 1.85); ax.set_yticks([0, 0.5, 1.0])
+    ax.set_ylim(0, 1.60); ax.set_yticks([0, 0.5, 1.0])
     ax.tick_params(labelsize=10)
-    ax.set_title("一个终点奖励沿转移链回传成价值坡道（$\\gamma=0.9$；起点三个 $Q$ 全为 0）",
-                 fontsize=11, color="#444444")
     ax.legend(fontsize=10, frameon=False, ncol=3, loc="upper center", borderpad=0.2,
               handlelength=1.2, columnspacing=1.0)
     ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
@@ -712,23 +702,21 @@ def cartpole_task():
 
     # 自由转轴是这个任务的题眼：没有任何电机去扶那根杆
     arrow(ax, (0.075, 0.585), (CART_X - 0.020, PIVOT[1] + 0.014), EDGE, rad=-0.22, lw=1.4)
-    label(ax, 0.030, 0.615, "自由转轴：没有电机", "#333333", 10, True, ha="left")
+    label(ax, 0.030, 0.615, "自由转轴：没有电机", INK, 10, True, ha="left")
 
     ax.annotate("", xy=(CART_X, TRACK_Y - 0.115), xytext=(XC, TRACK_Y - 0.115),
                 arrowprops=dict(arrowstyle="<|-|>", color=BLUE, linewidth=1.5))
-    label(ax, 0.31, TRACK_Y - 0.175, "(1) 车位置 x", BLUE, 10, True)
+    label(ax, 0.31, TRACK_Y - 0.175, "(1) 车位置 $x$", INK, 10, True)
     arrow(ax, (CART_X + 0.045, TRACK_Y + 0.028), (CART_X + 0.108, TRACK_Y + 0.028), EDGE, lw=1.5)
-    label(ax, CART_X + 0.118, TRACK_Y + 0.028, "(2) 车速度 $\\dot{x}$", BLUE, 10,
+    label(ax, CART_X + 0.118, TRACK_Y + 0.028, "(2) 车速度 $\\dot{x}$", INK, 10,
           ha="left", bg=True)
 
 
     # ── 右半上：动作只有两档 ──────────────────────────────────────────
-    label(ax, 0.80, 0.845, "动作只有两档，没有第三个选项", "#333333", 11, True)
     for ax_x, txt, color in ((0.70, "0：左推 ←", BLUE), (0.90, "1：右推 →", RED)):
         box(ax, ax_x - 0.085, 0.735, 0.17, 0.075, color, [(txt, 11, True)])
 
     # ── 右半下：反直觉的那一下 ────────────────────────────────────────
-    label(ax, 0.80, 0.605, "杆往右倒，车要往哪边推？", "#333333", 11, True)
     for cx, deg, color, cap1, cap2 in (
             (0.685, 11, RED, "倒到 11°", "再偏一点就出界"),
             (0.905, 4, GREEN, "回到 4°", "车追到了杆下面")):
@@ -896,12 +884,12 @@ def policy_spectrum():
     w = 0.229
     for x0, color, name, en, add, gain, cases in stages:
         plain_box(ax, x0, 0.325, w, 0.535, color)
-        label(ax, x0 + w / 2, 0.805, name, color, 12, True)
+        label(ax, x0 + w / 2, 0.805, name, INK, 12, True)
         label(ax, x0 + w / 2, 0.752, en, "#888888", 10, va="top")
         label(ax, x0 + w / 2, 0.575, add, INK, 11, True)
         label(ax, x0 + w / 2, 0.505, gain, INK, 10)
         label(ax, x0 + w / 2, 0.440, "代表：" + cases if cases != "—" else "",
-              "#666666", 10, va="top")
+              INK, 10, va="top")
 
     ax.annotate("", xy=(0.985, 0.245), xytext=(0.015, 0.245),
                 arrowprops=dict(arrowstyle="-|>", color="#999999", linewidth=1.6))
@@ -909,7 +897,7 @@ def policy_spectrum():
     label(ax, 0.87, 0.175, "看图、听话、会推理", "#999999", 10)
 
     ax.plot([0.756, 0.756], [0.075, 0.235], color=RED, linewidth=1.4, linestyle=(0, (3, 2)))
-    label(ax, 0.985, 0.100, "第11讲起从这里展开", RED, 11, True, ha="right")
+    label(ax, 0.985, 0.100, "第11讲起从这里展开", INK, 11, True, ha="right")
     save(fig, "lecture08", "fig08-2-policy-spectrum")
 
 
@@ -922,8 +910,8 @@ def train_deploy_roundtrip():
     lower = ["机器人执行\n（裁剪 / 限位兜底）", "还原动作口径\n（相对口径需累加）",
              "反归一化\n（乘回 $\\sigma$、加回 $\\mu$）", "网络\n（推理输出）"]
 
-    label(ax, 0.015, 0.935, "训练时：数据一路进网络", BLUE, 12, True, ha="left")
-    label(ax, 0.015, 0.235, "部署时：输出必须原路逆着走回来", RED, 12, True, ha="left")
+    label(ax, 0.015, 0.935, "训练时：数据一路进网络", INK, 12, True, ha="left")
+    label(ax, 0.015, 0.235, "部署时：输出必须原路逆着走回来", INK, 12, True, ha="left")
 
     w, gap = 0.213, 0.031
     for i, text in enumerate(upper):
@@ -1176,27 +1164,27 @@ def act_step3_dataflow():
     label(ax, 0.077, 0.38, "机器人关节\n状态 + $z$", INK, 10)
 
     plain_box(ax, 0.165, 0.46, 0.145, 0.34, BLUE)
-    label(ax, 0.2375, 0.70, "ResNet18", BLUE, 11, True)
+    label(ax, 0.2375, 0.70, "ResNet18", INK, 11, True)
     label(ax, 0.2375, 0.555, "每路出\n15×20×512", "#4A6A85", 10)
     arrow(ax, (0.138, 0.63), (0.162, 0.63), EDGE, lw=1.4)
 
     plain_box(ax, 0.34, 0.46, 0.145, 0.34, BLUE)
-    label(ax, 0.4125, 0.70, "展平 + 位置编码", BLUE, 11, True)
+    label(ax, 0.4125, 0.70, "展平 + 位置编码", INK, 11, True)
     label(ax, 0.4125, 0.555, "每路 300 个\n512 维 token", "#4A6A85", 10)
     arrow(ax, (0.313, 0.63), (0.337, 0.63), EDGE, lw=1.4)
 
     plain_box(ax, 0.515, 0.46, 0.15, 0.34, GREEN)
-    label(ax, 0.59, 0.70, "Transformer\nEncoder", GREEN, 11, True)
+    label(ax, 0.59, 0.70, "Transformer\nEncoder", INK, 11, True)
     label(ax, 0.59, 0.535, "4 层自注意力", "#3D6B51", 10)
     arrow(ax, (0.488, 0.63), (0.512, 0.63), EDGE, lw=1.4)
 
     plain_box(ax, 0.695, 0.46, 0.15, 0.34, ORANGE)
-    label(ax, 0.77, 0.70, "Transformer\nDecoder", ORANGE, 11, True)
+    label(ax, 0.77, 0.70, "Transformer\nDecoder", INK, 11, True)
     label(ax, 0.77, 0.535, "1 层交叉注意力", "#8A6212", 10)
     arrow(ax, (0.668, 0.63), (0.692, 0.63), EDGE, lw=1.4)
 
     plain_box(ax, 0.875, 0.46, 0.108, 0.34, RED)
-    label(ax, 0.929, 0.70, "预测的\n动作序列", RED, 11, True)
+    label(ax, 0.929, 0.70, "预测的\n动作序列", INK, 11, True)
     label(ax, 0.929, 0.535, "$k$ 步动作块", "#8B3A2E", 10)
     arrow(ax, (0.848, 0.63), (0.872, 0.63), EDGE, lw=1.4)
 
@@ -1206,8 +1194,6 @@ def act_step3_dataflow():
     label(ax, 0.42, 0.315, "关节状态与 $z$ 各过一个线性层，直接投到 512 维",
           "#888888", 10, bg=True)
 
-    label(ax, 0.5, 0.045, "配置项就是 2.5 节那张表里的 $d_{\\mathrm{model}}=512$ 与 "
-                          "n_decoder_layers = 1", "#888888", 10)
     save(fig, "lecture10", "fig10-2-act-step3-dataflow")
 
 
