@@ -1,6 +1,11 @@
 ---
 title: "第11讲 VLA 模型导览：从 OpenVLA 到 $\\pi_0$ 家族"
 lang: zh-CN
+# 表格列宽自动排版。写在每讲的 front matter 里而不是只写在 docs/_quarto.yml：
+# 每讲自带 format: 块，会覆盖项目级配置，导致项目级 filters 不生效——
+# 实测宽表会退化成 longtable{ll}、长单元格冲出版心被裁掉。
+filters:
+  - ../_filters/tbl-autowidth.lua
 format:
   pdf:
     toc: true

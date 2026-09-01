@@ -256,17 +256,9 @@ Control）则用动力学模型往前推演几步，再决定当下这一步怎�
 modeling：运动学、规划、控制），右边是这一讲要讲的\textbf{隐式建模}（implicit
 modeling：从示教中学习、强化学习）：
 
-\begin{figure}[H]
+\includegraphics[width=0.72\linewidth,height=\textheight,keepaspectratio,alt={生成机器人运动的两支：左支显式建模，下挂正运动学、逆运动学、基于控制的规划；右支隐式建模，下挂深度强化学习与从专家示教中学习。本讲以及第9--13讲都站在右边这一支上（图片出自参考文献 1）}]{../../assets/figures/lecture08/ref/fig08-1-motion-taxonomy_lerobot-tutorial.png}\{width=100\%\}
 
-{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture08/ref/fig08-1-motion-taxonomy.png}
-
-}
-
-\caption{生成机器人运动分成两支：左支显式建模，下挂正运动学、逆运动学、规划与控制（RRT、MPC）三类人写规则的方法；右支隐式建模，下挂深度强化学习与从专家示教中学习。右支底下那个加粗的绿框标出了本讲的落点------观测直接进、动作直接出（本书自绘）}
-
-\end{figure}%
-
-图上要看的不只是''分成两支''，还有那个绿色落点：这一讲以及往后的第9--13讲，全都站在右边这一支上。左支的好处写在它下面------每一步都看得见、查得到，哪里出错就去修哪一段，可解释、可调试。
+图上要看的不只是''分成两支''，还有右支那两片叶子------深度强化学习与从专家示教中学习，正是这一讲以及往后第9--13讲的落点。左支的好处则在于每一步都看得见、查得到，哪里出错就去修哪一段，可解释、可调试。
 
 \subsection{1.2
 流水线的死穴：有些环节根本写不出规则}\label{ux6d41ux6c34ux7ebfux7684ux6b7bux7a74ux6709ux4e9bux73afux8282ux6839ux672cux5199ux4e0dux51faux89c4ux5219}
@@ -328,22 +320,7 @@ Levine
 策略（policy）就是一个从\textbf{观测}到\textbf{动作}的函数：你给它当前看到的东西，它告诉你下一步该怎么动。
 \end{quote}
 
-放进机器人和环境的互动里看最清楚：\textbf{智能体}（agent，在这里就是机器人）从环境收到观测，输出一个动作作用回环境，环境再给出新的观测------如此往复。这张经典的''智能体---环境''回路就是策略工作的舞台：
-
-\begin{figure}[H]
-
-{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture08/ref/fig08-2-agent-env-loop.png}
-
-}
-
-\caption{智能体与环境只有两条边的闭环：智能体（策略
-\(\pi\)）看到观测就给出动作
-\(a_t\)，动作作用到环境上，环境被改变后返回新的观测
-\(o_{t+1}\)，如此循环（本书自绘）}
-
-\end{figure}%
-
-这张图上只有两条边------动作出去、观测回来，这一讲要的正是这两条。图下那行灰字提醒的是：强化学习那套习惯记号里还有第三条边（奖励
+放进机器人和环境的互动里看最清楚：\textbf{智能体}（agent，在这里就是机器人）从环境收到观测，输出一个动作作用回环境，环境再给出新的观测------如此往复。这个回路上只有两条边：动作出去、观测回来，这一讲要的正是这两条。强化学习那套习惯记号里还有第三条边（奖励
 \(r_{t+1}\)），第14讲会把它接上，本讲先不碰。写成符号是
 \(a = \pi(o)\)；更一般地写成一个分布
 \(\pi(a \mid o)\)------同一个观测下，合理的动作往往不止一个。这件事会成为第10讲

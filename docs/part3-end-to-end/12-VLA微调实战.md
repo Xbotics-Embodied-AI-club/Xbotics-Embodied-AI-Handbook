@@ -1,6 +1,11 @@
 ---
 title: "第12讲 VLA 微调实战：从全量 SFT 到 LoRA 上真机"
 lang: zh-CN
+# 表格列宽自动排版。写在每讲的 front matter 里而不是只写在 docs/_quarto.yml：
+# 每讲自带 format: 块，会覆盖项目级配置，导致项目级 filters 不生效——
+# 实测宽表会退化成 longtable{ll}、长单元格冲出版心被裁掉。
+filters:
+  - ../_filters/tbl-autowidth.lua
 format:
   pdf:
     toc: true
