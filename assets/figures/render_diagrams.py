@@ -789,8 +789,6 @@ def long_horizon_paradigms():
             label(ax, cx + dx, y0 + 0.1325, name, INK, 10)
         # 两个策略之间是一道接缝：不是同一个模型，交接处要单独想办法。
         ax.plot([cx, cx], [y0 + 0.098, y0 + 0.168], color=RED, linewidth=1.4, linestyle=(0, (3, 2)))
-        label(ax, cx, y0 + 0.070, "两个模型，中间有接缝" if not with_gate else "接缝靠输入级适配接住",
-              RED, 10)
 
     cell(0.010, 0.575, "(a) 朴素端到端 VLA", (True, False, False),
          lambda cx, y0: one_policy(cx, y0, with_gate=False))
@@ -946,8 +944,8 @@ def normalization_ranges():
     for i, (name, lo, hi, color) in enumerate(rows):
         left.barh(i, hi - lo, left=lo, height=0.42, color=FILL[color], edgecolor=color, linewidth=2)
         right.barh(i, 2.0, left=-1.0, height=0.42, color=FILL[color], edgecolor=color, linewidth=2)
-    for axis, title, xlabel in ((left, "原始值：各维尺度天差地别", "原始数值"),
-                                (right, "各维各自归一化后：统一落到 [-1, +1]", "归一化后的数值")):
+    for axis, title, xlabel in ((left, "原始值", "原始数值"),
+                                (right, "各维各自归一化后", "归一化后的数值")):
         axis.set_yticks(range(len(rows)))
         axis.set_yticklabels([r[0] for r in rows], fontsize=10)
         axis.set_title(title, fontsize=11, color="#444444")
@@ -995,67 +993,6 @@ def scale_error_symptoms():
     right.text(20, 0.62, "实际执行", ha="center", fontsize=10, color=RED)
     fig.tight_layout()
     save(fig, "lecture08", "fig08-3-scale-error-symptoms")
-
-
-# ── 第9讲 2.1：采集方法的权衡地图 ───────────────────────────────────────
-# 2.1 那张表给的是逐字段属性；图要给的是**相对位置**——二十来个方法落在平面上，
-# 从左上到右下连成一条带，"越可执行越不可规模化"这件事才看得见。
-# 两条轴都取自那张表自己的列（机器人是否在回路 / 便携·可规模化）。
-def teleop_tradeoff_map():
-    fig, ax = plt.subplots(figsize=(7.6, 5.0))
-
-    # (x=机器人在回路的程度, y=可规模化程度, 名字, 标签相对点的偏移)
-    groups = [
-        (BLUE, "真机数据", [
-            (9.45, 1.5, "KineDex", (0.16, 0.00)), (9.05, 0.6, "KineSoft", (0.16, 0.00)),
-            (9.30, 2.6, "Mobile ALOHA", (0.16, 0.00)), (8.35, 3.2, "U-Arm（异构主从）", (0.16, 0.00)),
-            (7.95, 2.1, "TeleMoMa", (-0.16, 0.00))]),
-        (ORANGE, "通用接口遥操作", [
-            (7.35, 3.9, "Bunny-VisionPro", (-0.16, 0.00)),
-            (7.05, 4.8, "Open-TeleVision", (-0.16, 0.00)),
-            (6.60, 5.5, "OpenTeach", (0.16, 0.00)), (6.15, 4.4, "手柄 joycon", (-0.16, 0.00)),
-            (5.75, 6.4, "RoboTurk 手机众包", (0.16, 0.00))]),
-        (GREEN, "人类代理数据", [
-            (5.05, 5.6, "PIKA", (0.16, 0.00)), (4.75, 7.2, "UMI", (-0.16, 0.00)),
-            (4.30, 7.9, "FastUMI", (0.16, 0.00)), (4.10, 6.4, "AnyTeleop", (0.16, 0.00)),
-            (3.70, 7.0, "ARCap", (-0.16, 0.00)), (3.95, 5.2, "DOGlove", (-0.16, 0.00)),
-            (3.30, 5.9, "U-Arm Humanoid", (-0.16, 0.00)),
-            (2.95, 7.6, "HumanPlus", (-0.16, 0.00))]),
-        (GREY, "无机器人数据", [
-            (1.75, 8.9, "In-N-On", (0.16, 0.00)), (1.15, 9.6, "Ctrl-World", (0.16, 0.00))]),
-    ]
-
-    # 那条负相关带：从左上（轻、可规模化）到右下（重、可执行）。
-    ax.fill_between([0.4, 11.8], [10.6, 0.6], [8.4, -1.6], color="#F2F2F2", zorder=0)
-    ax.text(2.6, 3.1, "越往右下：轨迹越能直接执行，\n但越贵、越不便携\n\n"
-                      "越往左上：越轻越能规模化，\n但越需要重定向与后处理",
-            fontsize=10, color="#888888", ha="center", va="center", zorder=1)
-
-    for color, name, points in groups:
-        ax.scatter([p[0] for p in points], [p[1] for p in points], s=46,
-                   facecolor=FILL[color], edgecolor=color, linewidth=1.6, zorder=3)
-        for x, y, text, (dx, dy) in points:
-            ax.text(x + dx, y + dy, text, fontsize=10, color=color, zorder=4,
-                    ha="left" if dx > 0 else "right", va="center")
-        ax.scatter([], [], s=46, facecolor=FILL[color], edgecolor=color, linewidth=1.6, label=name)
-
-    # 本课入口单独高亮：同一张图上标出"我们从哪儿进"。
-    ax.scatter([8.75], [1.9], s=190, facecolor=FILL[RED], edgecolor=RED, linewidth=2.2,
-               marker="*", zorder=5)
-    ax.annotate("SO-101 主从臂（本课入口）", xy=(8.62, 1.9), xytext=(6.5, 1.1),
-                fontsize=10, color=RED, ha="right", va="center", zorder=5,
-                arrowprops=dict(arrowstyle="->", color=RED, linewidth=1.2))
-
-    ax.set_xlabel("机器人在回路的程度（左：完全不在　→　右：全程在回路）", fontsize=10)
-    ax.set_ylabel("便携 / 可规模化程度", fontsize=10)
-    ax.set_xlim(0.3, 11.8); ax.set_ylim(-0.4, 10.6)
-    ax.set_xticks([]); ax.set_yticks([])
-    ax.legend(fontsize=10, frameon=False, ncol=4, loc="upper center",
-              bbox_to_anchor=(0.5, 1.10), handletextpad=0.3, columnspacing=1.1)
-    for side in ("top", "right"):
-        ax.spines[side].set_visible(False)
-    fig.tight_layout()
-    save(fig, "lecture09", "fig09-2-teleop-tradeoff-map")
 
 
 # ── 第9讲 3.1：LeRobot 的分层与 lerobot-record 穿过哪几层 ─────────────────
@@ -1531,14 +1468,14 @@ def interpolation_paths():
     ax.scatter([0, 1], [a, b], s=58, facecolor=FILL[RED], edgecolor=RED, linewidth=2.2, zorder=6)
     t = 0.55
     ax.scatter([t], [(1 - t) * a + t * b], s=58, color=RED, zorder=6)
-    ax.text(-0.04, a, "$z_0$", ha="right", va="center", fontsize=11, color=RED)
-    ax.text(1.04, b, "$z_1$", ha="left", va="center", fontsize=11, color=RED)
+    ax.text(-0.04, a, "$z_0$", ha="right", va="center", fontsize=11, color=INK)
+    ax.text(1.04, b, "$z_1$", ha="left", va="center", fontsize=11, color=INK)
     ax.text(t - 0.02, (1 - t) * a + t * b + 0.34, "$z_t=(1-t)\\,z_0+t\\,z_1$",
             ha="center", fontsize=10, color=RED, zorder=7,
             bbox=dict(facecolor="white", edgecolor="none", pad=1.5))
 
-    ax.text(0, 2.62, "噪声 $\\mathcal{N}(0, I)$", ha="center", fontsize=10, color=BLUE)
-    ax.text(1, 2.62, "数据分布（双峰）", ha="center", fontsize=10, color=GREEN)
+    ax.text(0, 2.62, "噪声 $\\mathcal{N}(0, I)$", ha="center", fontsize=10, color=INK)
+    ax.text(1, 2.62, "数据分布（双峰）", ha="center", fontsize=10, color=INK)
     ax.set_xlim(-0.24, 1.24); ax.set_ylim(-3.4, 2.9)
     ax.set_xticks([]); ax.set_yticks([]); ax.axis("off")
     fig.tight_layout()
@@ -1637,13 +1574,13 @@ def alternating_ca_sa():
     ]
     w = 0.245
     for x0, color, title, blocks, note in panels:
-        label(ax, x0 + w / 2, 0.888, title, color, 11, True)
+        label(ax, x0 + w / 2, 0.888, title, INK, 11, True)
         for i, name in enumerate(blocks):
             y = 0.355 + i * 0.125
             is_ca = name.startswith("CA")
             plain_box(ax, x0 + 0.030, y, w - 0.06, 0.100, color,
                       fill=FILL[color] if is_ca else "#FFFFFF")
-            label(ax, x0 + w / 2, y + 0.050, name, color, 10)
+            label(ax, x0 + w / 2, y + 0.050, name, INK, 10)
             # CA 块的 key/value 来自 VLM：从左侧引一条横向虚线加箭头进来。
             if is_ca:
                 ax.plot([0.147, x0 + 0.026], [y + 0.050, y + 0.050], color=GREY,
@@ -1751,7 +1688,7 @@ def two_axes_map():
         cy = y0 + (i + 0.5) * ch + (0.055 if (j, i) == (2, 0) else 0) - k * 0.110
         plain_box(ax, x0 + (j + 0.5) * cw - 0.115, cy - 0.047, 0.23, 0.094, color,
                   lw=2.2 if main else 1.6)
-        label(ax, x0 + (j + 0.5) * cw, cy, text, color, 10, main)
+        label(ax, x0 + (j + 0.5) * cw, cy, text, INK, 10, main)
 
     label(ax, 0.5, 0.075, "参数更新范围：越往右，被更新的参数越少", "#555555", 10)
     label(ax, 0.012, 0.905, "训练信号\n↑", "#888888", 10, ha="left")
@@ -1822,7 +1759,6 @@ chunking_vs_ensemble()
 libero_success_curve()
 flow_matching_path()
 interpolation_paths()
-teleop_tradeoff_map()
 lerobot_layers()
 record_loop_timing()
 policy_spectrum()
