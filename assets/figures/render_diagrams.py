@@ -51,18 +51,25 @@ BODY_WIDTH_IN = 6.5    # A4 加 1 英寸边距后的版心宽度
 MIN_PRINT_PT = 8.0     # 图内最小字印在纸上的下限
 
 BLUE, GREEN, ORANGE, RED, GREY = "#1F6FB2", "#2E8B57", "#D68910", "#C0392B", "#777777"
-FILL = {BLUE: "#E8F1FA", GREEN: "#E7F4EC", ORANGE: "#FDF2E0", RED: "#FBEAE8", GREY: "#F4F4F4"}
+FILL = {BLUE: "#DCE9F7", GREEN: "#DDEEE3", ORANGE: "#FBEBCE", RED: "#F7DDDA", GREY: "#EDEDED"}
+
+# 流程图的线条与文字统一走这三个常量，颜色只留在框的填充上。
+# 参照 fig142-rl-taxonomy（draw.io 出品）：细深灰框线 + 黑字 + 淡填充，
+# 而不是"每个元素各自上色"——后者会让整张图花得刺眼、框线粗过内容。
+EDGE = "#5A5A5A"        # 框线与箭头
+INK = "#1A1A1A"         # 框内文字
+BOX_LW = 1.1
 
 
 def box(ax, x, y, w, h, color, lines):
     """在 (x,y) 画一个圆角框；lines 是 (文字, 字号, 是否加粗) 的列表，纵向居中均分。"""
-    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.008,rounding_size=0.02",
-                                linewidth=2, edgecolor=color, facecolor=FILL[color]))
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.008,rounding_size=0.014",
+                                linewidth=BOX_LW, edgecolor=EDGE, facecolor=FILL[color]))
     n = len(lines)
     gap = h / (n + 1)
     for i, (text, size, bold) in enumerate(lines, 1):
         ax.text(x + w / 2, y + h - i * gap, text, ha="center", va="center", fontsize=size,
-                fontweight="bold" if bold else "normal", color=color if bold else "#444444")
+                fontweight="bold" if bold else "normal", color=INK)
 
 
 def side(x, y, w, h, where, t=0.5):
@@ -84,14 +91,15 @@ def side(x, y, w, h, where, t=0.5):
     return (x + w, y + h * t)
 
 
-def plain_box(ax, x, y, w, h, color, fill=None, style="solid", lw=1.6):
+def plain_box(ax, x, y, w, h, color, fill=None, style="solid", lw=None):
     """只画框不写字，供需要自己排版内部元素的图使用。"""
-    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.004,rounding_size=0.012",
-                                linewidth=lw, edgecolor=color, linestyle=style,
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.004,rounding_size=0.010",
+                                linewidth=BOX_LW, edgecolor=EDGE, linestyle=style,
                                 facecolor=FILL[color] if fill is None else fill))
 
 
-def arrow(ax, a, b, color, rad=0.0, lw=1.7, style="-|>"):
+def arrow(ax, a, b, color=None, rad=0.0, lw=1.4, style="-|>"):
+    color = EDGE if color is None else color
     ax.add_patch(FancyArrowPatch(a, b, connectionstyle=f"arc3,rad={rad}", arrowstyle=style,
                                  mutation_scale=13, linewidth=lw, color=color))
 
@@ -99,7 +107,7 @@ def arrow(ax, a, b, color, rad=0.0, lw=1.7, style="-|>"):
 _NORMAL = {"top": (0, 1), "bottom": (0, -1), "left": (-1, 0), "right": (1, 0)}
 
 
-def connect(ax, src, src_side, dst, dst_side, color, lw=1.7, stub=0.055,
+def connect(ax, src, src_side, dst, dst_side, color=None, lw=1.4, stub=0.055,
             src_t=0.5, dst_t=0.5, lane=None, radius=0.016):
     """把两个框用正交折线连起来，线从边中点**垂直离开**框，不贴任何框边跑。
 
@@ -114,6 +122,7 @@ def connect(ax, src, src_side, dst, dst_side, color, lw=1.7, stub=0.055,
         lane: 中间那条公共通道的位置；两端同向时用它指定绕行的横带/竖带，
               避免两条线挤在同一条通道上。
     """
+    color = EDGE if color is None else color
     p0 = side(*src, src_side, src_t)
     p1 = side(*dst, dst_side, dst_t)
     n0, n1 = _NORMAL[src_side], _NORMAL[dst_side]
@@ -382,8 +391,8 @@ def policy_distribution():
         [("状态 $s$", 12, True), ("关节角度、躯干姿态", 10, False), ("目标速度指令", 10, False)])
     box(ax, 0.32, 0.46, 0.20, 0.34, ORANGE,
         [("策略网络 $\\pi$", 12, True), ("参数 $\\theta$", 10, False)])
-    arrow(ax, (0.265, 0.63), (0.315, 0.63), "#666666")
-    arrow(ax, (0.525, 0.63), (0.575, 0.63), "#666666")
+    arrow(ax, (0.265, 0.63), (0.315, 0.63), EDGE)
+    arrow(ax, (0.525, 0.63), (0.575, 0.63), EDGE)
 
     # 右端：高斯密度 + 一个采样点。均值 μ 是网络算出来的，宽度 σ 就是探索强度。
     inset = fig.add_axes([0.585, 0.30, 0.40, 0.44])
@@ -431,11 +440,11 @@ def onoff_dataflow():
     # 左：采样 → 更新 → 作废
     box(ax, 0.09, 0.68, 0.26, 0.13, BLUE, [("当前策略", 12, True)])
     box(ax, 0.07, 0.36, 0.30, 0.17, BLUE, [("新鲜数据", 12, True), ("（只来自当前策略）", 10, False)])
-    arrow(ax, (0.17, 0.675), (0.17, 0.535), BLUE)
+    arrow(ax, (0.17, 0.675), (0.17, 0.535), EDGE)
     label(ax, 0.135, 0.605, "采样", BLUE, 10, ha="right")
-    arrow(ax, (0.27, 0.535), (0.27, 0.675), BLUE)
+    arrow(ax, (0.27, 0.535), (0.27, 0.675), EDGE)
     label(ax, 0.305, 0.605, "更新一次", BLUE, 10, ha="left")
-    arrow(ax, (0.22, 0.35), (0.22, 0.24), GREY)
+    arrow(ax, (0.22, 0.35), (0.22, 0.24), EDGE)
     label(ax, 0.22, 0.185, "更新完立即作废", "#666666", 10)
     label(ax, 0.22, 0.09, "策略一变，全部重采", "#999999", 10)
 
@@ -715,18 +724,18 @@ def cartpole_task():
 
     # ④ 角速度画成杆尖上的一小段转向弧，落在它描述的那个量上
     arrow(ax, (pole_x + 0.008, pole_y + 0.030), (pole_x + 0.042, pole_y - 0.030),
-          "#8B5A2B", rad=-0.5, lw=1.4)
+          EDGE, rad=-0.5, lw=1.4)
     label(ax, pole_x + 0.050, pole_y - 0.048, "(4) 杆角速度 $\\dot{\\theta}$",
           "#8B5A2B", 10, ha="left")
 
     # 自由转轴是这个任务的题眼：没有任何电机去扶那根杆
-    arrow(ax, (0.075, 0.585), (CART_X - 0.020, PIVOT[1] + 0.014), "#333333", rad=-0.22, lw=1.4)
+    arrow(ax, (0.075, 0.585), (CART_X - 0.020, PIVOT[1] + 0.014), EDGE, rad=-0.22, lw=1.4)
     label(ax, 0.030, 0.615, "自由转轴：没有电机", "#333333", 10, True, ha="left")
 
     ax.annotate("", xy=(CART_X, TRACK_Y - 0.115), xytext=(XC, TRACK_Y - 0.115),
                 arrowprops=dict(arrowstyle="<|-|>", color=BLUE, linewidth=1.5))
     label(ax, 0.31, TRACK_Y - 0.175, "(1) 车位置 x", BLUE, 10, True)
-    arrow(ax, (CART_X + 0.045, TRACK_Y + 0.028), (CART_X + 0.108, TRACK_Y + 0.028), BLUE, lw=1.5)
+    arrow(ax, (CART_X + 0.045, TRACK_Y + 0.028), (CART_X + 0.108, TRACK_Y + 0.028), EDGE, lw=1.5)
     label(ax, CART_X + 0.118, TRACK_Y + 0.028, "(2) 车速度 $\\dot{x}$", BLUE, 10,
           ha="left", bg=True)
 
@@ -746,7 +755,7 @@ def cartpole_task():
         draw_pole(cx, 0.408, deg, 1.05, color, lw=2.6)
         label(ax, cx, 0.315, cap1, color, 10, True)
         label(ax, cx, 0.268, cap2, "#666666", 10)
-    arrow(ax, (0.762, 0.435), (0.828, 0.435), RED, lw=2.0)
+    arrow(ax, (0.762, 0.435), (0.828, 0.435), EDGE, lw=2.0)
     label(ax, 0.795, 0.478, "往右推", RED, 10, True)
 
     save(fig, "lecture16", "fig16-cartpole-task")
@@ -818,10 +827,10 @@ def realtime_three_routes():
     label(ax, 0.02, 0.115, "学习+投机层（Realtime-VLA V2、FLASH）", ORANGE, 11, True, ha="left")
     plain_box(ax, 0.02, 0.038, 0.29, 0.050, ORANGE)
     label(ax, 0.165, 0.063, "小模型一步猜整块 7.8 ms", "#8A5A08", 10)
-    arrow(ax, (0.315, 0.063), (0.355, 0.063), ORANGE)
+    arrow(ax, (0.315, 0.063), (0.355, 0.063), EDGE)
     plain_box(ax, 0.36, 0.038, 0.21, 0.050, ORANGE)
     label(ax, 0.465, 0.063, "主模型并行验证", "#8A5A08", 10)
-    arrow(ax, (0.575, 0.063), (0.615, 0.063), ORANGE)
+    arrow(ax, (0.575, 0.063), (0.615, 0.063), EDGE)
     label(ax, 0.62, 0.075, "命中 → 走旁路，绕开去噪", "#8A5A08", 10, ha="left")
     label(ax, 0.62, 0.038, "未命中 → 回主干完整推理 58 ms", "#8A5A08", 10, ha="left")
     save(fig, "lecture13", "fig13-1-realtime-three-routes")
@@ -857,12 +866,12 @@ def long_horizon_paradigms():
     def feed(cx, y0, with_gate):
         """从观测落到策略的一条输入通路；带闸门的多插一道分阶段掩码。"""
         if with_gate:
-            arrow(ax, (cx, y0 + 0.278), (cx, y0 + 0.250), "#888888")
+            arrow(ax, (cx, y0 + 0.278), (cx, y0 + 0.250), EDGE)
             plain_box(ax, cx - 0.0375, y0 + 0.195, 0.075, 0.048, ORANGE)
             label(ax, cx, y0 + 0.219, "掩码闸门", "#8A5A08", 10)
-            arrow(ax, (cx, y0 + 0.190), (cx, y0 + 0.166), "#888888")
+            arrow(ax, (cx, y0 + 0.190), (cx, y0 + 0.166), EDGE)
         else:
-            arrow(ax, (cx, y0 + 0.278), (cx, y0 + 0.166), "#888888")
+            arrow(ax, (cx, y0 + 0.278), (cx, y0 + 0.166), EDGE)
 
     def cell(x0, y0, tag, flags, draw):
         w, h = 0.475, 0.38
@@ -935,8 +944,8 @@ def one_cut_three_lines():
     plain_box(ax, 0.565, 0.665, 0.12, 0.075, GREEN)
     label(ax, 0.625, 0.7025, "记忆库", "#3A6B4F", 10)
     cut(0.53, 0.615, 0.53, 0.79)
-    arrow(ax, (0.435, 0.660), (0.495, 0.575), "#888888")
-    arrow(ax, (0.625, 0.660), (0.565, 0.575), "#888888")
+    arrow(ax, (0.435, 0.660), (0.495, 0.575), EDGE)
+    arrow(ax, (0.625, 0.660), (0.565, 0.575), EDGE)
     plain_box(ax, 0.465, 0.485, 0.13, 0.075, GREY, fill="#F0F0F0")
     label(ax, 0.53, 0.5225, "决策", "#666666", 10)
     label(ax, 0.53, 0.335, "刀口：检索 + 门控融合", RED, 10)
@@ -947,13 +956,13 @@ def one_cut_three_lines():
     label(ax, 0.845, 0.885, "人形线：切在职责上", ORANGE, 11, True)
     plain_box(ax, 0.775, 0.735, 0.14, 0.070, GREY, fill="#F0F0F0")
     label(ax, 0.845, 0.770, "语言指令", "#666666", 10)
-    arrow(ax, (0.845, 0.730), (0.845, 0.705), "#888888")
+    arrow(ax, (0.845, 0.730), (0.845, 0.705), EDGE)
     plain_box(ax, 0.735, 0.625, 0.22, 0.075, ORANGE)
     label(ax, 0.845, 0.6625, "S2：懂任务的大脑", "#8A5A08", 10)
     cut(0.715, 0.575, 0.975, 0.575)
     plain_box(ax, 0.735, 0.485, 0.22, 0.075, ORANGE)
     label(ax, 0.845, 0.5225, "S1：会走路的身体", "#8A5A08", 10)
-    arrow(ax, (0.845, 0.480), (0.845, 0.450), "#888888")
+    arrow(ax, (0.845, 0.480), (0.845, 0.450), EDGE)
     label(ax, 0.845, 0.415, "电机指令", "#666666", 10)
     label(ax, 0.845, 0.335, "刀口：潜在 verb / 分块命令", RED, 10)
     label(ax, 0.845, 0.245, "上面不学走路，", "#666666", 10)
@@ -978,7 +987,7 @@ def motion_taxonomy():
 
     # 分叉走正交：从根框底边中点下来，沿一条横带分左右，再垂直进两个子框顶边。
     for child in (left, right):
-        connect(ax, root, "bottom", child, "top", "#888888", stub=0.035, lane=0.825)
+        connect(ax, root, "bottom", child, "top", EDGE, stub=0.035, lane=0.825)
 
     # 每组的竖干落在子框外侧的空白里（早先取在框内 0.085，线就贴着框左边缘跑）。
     for parent, xbox, color, items in (
@@ -989,16 +998,16 @@ def motion_taxonomy():
             y = 0.500 - i * 0.110
             child = (xbox, y, 0.335, 0.086)
             plain_box(ax, *child, color)
-            label(ax, xbox + 0.1675, y + 0.043, text, "#444444", 10)
+            label(ax, xbox + 0.1675, y + 0.043, text, INK, 10)
             ax.plot([xline, xline], [parent[1] - 0.030, y + 0.043],
-                    color=color, linewidth=1.2)
-            arrow(ax, (xline, y + 0.043), (xbox - 0.008, y + 0.043), color, lw=1.2)
-        ax.plot([xline, xline], [parent[1], parent[1] - 0.030], color=color, linewidth=1.2)
+                    color=EDGE, linewidth=BOX_LW)
+            arrow(ax, (xline, y + 0.043), (xbox - 0.008, y + 0.043), lw=BOX_LW)
+        ax.plot([xline, xline], [parent[1], parent[1] - 0.030], color=EDGE, linewidth=BOX_LW)
 
 
     plain_box(ax, 0.535, 0.115, 0.42, 0.175, GREEN, fill="#D8EDE1", lw=2.0)
-    label(ax, 0.745, 0.235, "本讲起走这一支", GREEN, 11, True)
-    label(ax, 0.745, 0.155, "观测直接进、动作直接出", "#3A6B4F", 10)
+    label(ax, 0.745, 0.235, "本讲起走这一支", INK, 11, True)
+    label(ax, 0.745, 0.155, "观测直接进、动作直接出", INK, 10)
     save(fig, "lecture08", "fig08-1-motion-taxonomy")
 
 
@@ -1073,13 +1082,13 @@ def train_deploy_roundtrip():
         plain_box(ax, x0, 0.665, w, 0.225, BLUE)
         label(ax, x0 + w / 2, 0.7775, text, "#25567F", 10)
         if i:                       # 上排从左往右：数据进网络
-            arrow(ax, (x0 - gap + 0.003, 0.7775), (x0 - 0.003, 0.7775), BLUE)
+            arrow(ax, (x0 - gap + 0.003, 0.7775), (x0 - 0.003, 0.7775), EDGE)
     for i, text in enumerate(lower):
         x0 = 0.015 + i * (w + gap)
         plain_box(ax, x0, 0.315, w, 0.225, RED)
         label(ax, x0 + w / 2, 0.4275, text, "#8E3226", 10)
         if i:                       # 下排从右往左：输出原路走回来
-            arrow(ax, (x0 - 0.003, 0.4275), (x0 - gap + 0.003, 0.4275), RED)
+            arrow(ax, (x0 - 0.003, 0.4275), (x0 - gap + 0.003, 0.4275), EDGE)
 
     # 两条虚线就是本节要拆的两处衔接：断在这里，网络再好也没用。
     for i, text in enumerate(("两端必须用\n同一套口径", "两端必须用\n同一套统计量")):
@@ -1237,7 +1246,7 @@ def lerobot_layers():
         label(ax, x0 + 0.02, y + h / 2, name, GREEN if mine else "#333333", 11, mine, ha="left")
         label(ax, x0 + w - 0.02, y + h / 2, detail, "#666666", 10, ha="right")
         if i:
-            arrow(ax, (x0 + 0.10, y + h + gap - 0.003), (x0 + 0.10, y + h + 0.003), "#AAAAAA", lw=1.2)
+            arrow(ax, (x0 + 0.10, y + h + gap - 0.003), (x0 + 0.10, y + h + 0.003), EDGE, lw=1.2)
 
     # lerobot-record 实际穿过的那条路：入口 → 遥操作器读动作 → 实物执行 → 数据管线落盘。
     px = x0 + w + 0.045
@@ -1317,27 +1326,27 @@ def act_step3_dataflow():
     plain_box(ax, 0.165, 0.46, 0.145, 0.34, BLUE)
     label(ax, 0.2375, 0.70, "ResNet18", BLUE, 11, True)
     label(ax, 0.2375, 0.555, "每路出\n15×20×512", "#4A6A85", 10)
-    arrow(ax, (0.138, 0.63), (0.162, 0.63), GREY, lw=1.4)
+    arrow(ax, (0.138, 0.63), (0.162, 0.63), EDGE, lw=1.4)
 
     plain_box(ax, 0.34, 0.46, 0.145, 0.34, BLUE)
     label(ax, 0.4125, 0.70, "展平 + 位置编码", BLUE, 11, True)
     label(ax, 0.4125, 0.555, "每路 300 个\n512 维 token", "#4A6A85", 10)
-    arrow(ax, (0.313, 0.63), (0.337, 0.63), GREY, lw=1.4)
+    arrow(ax, (0.313, 0.63), (0.337, 0.63), EDGE, lw=1.4)
 
     plain_box(ax, 0.515, 0.46, 0.15, 0.34, GREEN)
     label(ax, 0.59, 0.70, "Transformer\nEncoder", GREEN, 11, True)
     label(ax, 0.59, 0.535, "4 层自注意力", "#3D6B51", 10)
-    arrow(ax, (0.488, 0.63), (0.512, 0.63), GREY, lw=1.4)
+    arrow(ax, (0.488, 0.63), (0.512, 0.63), EDGE, lw=1.4)
 
     plain_box(ax, 0.695, 0.46, 0.15, 0.34, ORANGE)
     label(ax, 0.77, 0.70, "Transformer\nDecoder", ORANGE, 11, True)
     label(ax, 0.77, 0.535, "1 层交叉注意力", "#8A6212", 10)
-    arrow(ax, (0.668, 0.63), (0.692, 0.63), GREY, lw=1.4)
+    arrow(ax, (0.668, 0.63), (0.692, 0.63), EDGE, lw=1.4)
 
     plain_box(ax, 0.875, 0.46, 0.108, 0.34, RED)
     label(ax, 0.929, 0.70, "预测的\n动作序列", RED, 11, True)
     label(ax, 0.929, 0.535, "$k$ 步动作块", "#8B3A2E", 10)
-    arrow(ax, (0.848, 0.63), (0.872, 0.63), GREY, lw=1.4)
+    arrow(ax, (0.848, 0.63), (0.872, 0.63), EDGE, lw=1.4)
 
     # 关节状态与 z 走的是旁路：不过 ResNet，各自一个线性层直接投到 512 维进 encoder。
     ax.add_patch(FancyArrowPatch((0.138, 0.40), (0.560, 0.44), connectionstyle="arc3,rad=0.16",
@@ -1801,7 +1810,7 @@ def alternating_ca_sa():
             if is_ca:
                 ax.plot([0.147, x0 + 0.026], [y + 0.050, y + 0.050], color=GREY,
                         linewidth=1.0, linestyle=(0, (2, 2)), zorder=0)
-                arrow(ax, (x0 + 0.008, y + 0.050), (x0 + 0.028, y + 0.050), GREY, lw=1.3)
+                arrow(ax, (x0 + 0.008, y + 0.050), (x0 + 0.028, y + 0.050), EDGE, lw=1.3)
         label(ax, x0 + w / 2, 0.272, note, "#666666", 10)
 
     # 因果掩码画成下三角，说明 SA 只往回看。
