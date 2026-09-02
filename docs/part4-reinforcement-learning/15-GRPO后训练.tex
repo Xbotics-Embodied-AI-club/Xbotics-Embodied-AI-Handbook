@@ -157,6 +157,10 @@
 
 \usepackage{fvextra}
 \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,commandchars=\\\{\}}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.75}
 \usepackage{bm}
 \usepackage{amssymb}
 \makeatletter
@@ -229,8 +233,6 @@
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
-\listoffigures
-\listoftables
 
 \section{1 从 PPO 到
 GRPO：为什么不再请评分员}\label{ux4ece-ppo-ux5230-grpoux4e3aux4ec0ux4e48ux4e0dux518dux8bf7ux8bc4ux5206ux5458}
@@ -327,7 +329,7 @@ critic 与策略共不共享骨干、怎么并行与 offload，没有一个放�
 \]
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0880\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4697\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4423\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0898\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4688\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4414\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 符号 & 含义 & 典型取值 \\
 \midrule\noalign{}
@@ -348,7 +350,7 @@ GRPO 格外依赖''组里有对有错''的题目；第 6
 节里调采样温度、做动态采样，很大程度上就是在保证每组内部有信号可比。
 \end{quote}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture15/ref/fig151-ppo-vs-grpo_arxiv-2402.03300.png}}
 
@@ -426,7 +428,7 @@ GRPO 把''怎么算优势''解决了，但每条回答的分数 \(r_i\)
 从哪来？后训练大模型有三条路：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1338\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3903\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4758\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2031\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3594\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4375\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 路线 & 做法 & 毛病 \\
 \midrule\noalign{}
@@ -458,7 +460,7 @@ Rewards）：数学题比对最终答案、代码跑测试用例、机器人任�
 条回答，只要有对有错，组内立刻分出高下，0/1
 奖励经过组内标准化就变成了有正有负的密集学习信号。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture15/ref/fig153-visual-rft-framework_arxiv-2503.01785.png}}
 
@@ -544,7 +546,7 @@ Visual-RFT}\label{ux642cux5230ux591aux6a21ux6001r1-v-ux4e0e-visual-rft}
 式的后训练扩展到检测、分类、定位等一系列视觉任务------检测框的
 IoU、分类的对错，都可以写成判分规则。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture15/ref/fig153-visual-rft-overview_arxiv-2503.01785.png}}
 
@@ -728,7 +730,7 @@ GRPO step。完整代码在
 \end{tabular}
 \end{center}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.75\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture15/ref/fig154-vlm-counting-before-after.png}
 
@@ -785,7 +787,7 @@ LIBERO{[}8{]}
 强化学习后训练集中爆发。我们选三篇代表作，它们恰好回答三个不同层次的问题：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3805\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.0838\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5357\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3786\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.0886\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5328\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 工作 & 层次 & 回答的问题 \\
 \midrule\noalign{}
@@ -828,7 +830,7 @@ VLA 有一个硬条件：动作得以离散 token 的形式生成------只有这
 Learning}{[}9{]}，2025 年 9 月（arXiv: 2509.09674）
 \end{quote}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture15/ref/fig155-simplevla-rl_arxiv-2509.09674.png}}
 
@@ -933,7 +935,7 @@ Rollout & 与环境持续交互，每步执行动作后获取新观测，\textbf
 两者最关键的差异在于 rollout 方式：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1897\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3108\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4995\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2097\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3027\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4876\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 维度 & LLM RL & VLA RL \\
 \midrule\noalign{}
@@ -993,7 +995,7 @@ r_{i,t}(\theta) = \frac{\pi_\theta(a_{i,t}|s_{i,t})}{\pi_{\theta_{\text{old}}}(a
 
 \subsubsection{6.3.1 总体框架}\label{ux603bux4f53ux6846ux67b6}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture15/ref/fig-simplevla-overview_arxiv-2509.09674.png}}
 
@@ -1107,7 +1109,7 @@ GRPO）在组内所有轨迹获得相同奖励时会产生零梯度------优势�
 模型在 rollout 阶段生成更多样化的轨迹。更高的温度增加了 action token
 分布的熵，促进对不同动作策略的探索。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.5\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture15/ref/fig-simplevla-ablation_arxiv-2509.09674.png}
 
@@ -1171,7 +1173,7 @@ SFT 得到 OpenVLA-OFT 基线，再在仿真环境中用 SimpleVLA-RL 继续训�
 核心结果可以压缩成一张表：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1659\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1034\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2147\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5160\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1991\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1366\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2107\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4536\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 评估场景 & SFT 基线 & + SimpleVLA-RL & 结果含义 \\
 \midrule\noalign{}
@@ -1237,7 +1239,7 @@ SimpleVLA-RL
 实验设置：每个任务套件的 10 个任务中，9 个用于训练，1
 个保留为未见任务进行分布外评估。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.5\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture15/ref/fig-simplevla-unseen-goal_arxiv-2509.09674.png}
 
@@ -1278,7 +1280,7 @@ RL 在未见任务上更不容易崩掉。
 的收益能迁移到真实世界}\label{sim-to-realux4effux771f-rl-ux7684ux6536ux76caux80fdux8fc1ux79fbux5230ux771fux5b9eux4e16ux754c}
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2644\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1660\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1440\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1706\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1550\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1001\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2261\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1829\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1517\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1829\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1673\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.0892\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 模型 & Stack Bowls & Place Cup & Pick Bottle & Click Bell & 平均 \\
 \midrule\noalign{}
@@ -1310,7 +1312,7 @@ shortcut，推动捷径）。在 RoboTwin 2.0 的 \textbf{move can pot}
 训练后，模型自主发现了一种更省事的解法：\textbf{直接把罐子推到目标位置}，绕过抓取动作。同样的事也发生在
 \textbf{place a2b left/right} 任务上，下图取的正是后者：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.5\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture15/ref/fig-simplevla-pushcut_arxiv-2509.09674.png}
 
@@ -1328,7 +1330,7 @@ shortcut，推动捷径）。在 RoboTwin 2.0 的 \textbf{move can pot}
 ``Pushcut'' 的意义在于，它非常直观地展示了 SFT 和 RL 的目标差异：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0819\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.9181\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0857\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.9143\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 方法 & 行为模式 \\
 \midrule\noalign{}
@@ -1429,7 +1431,7 @@ Reinforcement Learning of Vision-Language-Action Models}{[}10{]}，2025
 回看 SimpleVLA-RL 的训练回路，一次迭代里其实混着三种完全不同的计算负载：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0722\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3077\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6202\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0827\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3042\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6131\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 负载 & 干什么 & 资源特征 \\
 \midrule\noalign{}
@@ -1449,7 +1451,7 @@ Reinforcement Learning of Vision-Language-Action Models}{[}10{]}，2025
 \subsection{7.2
 一套接口，三种编排}\label{ux4e00ux5957ux63a5ux53e3ux4e09ux79cdux7f16ux6392}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture15/ref/fig-rlinf-overview_arxiv-2510.06710.png}}
 
@@ -1517,7 +1519,7 @@ Experience}{[}11{]}，Physical Intelligence，2025 年 11 月（arXiv:
 2511.14759）
 \end{quote}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture15/ref/fig-pi06-teaser_arxiv-2511.14759.png}}
 
@@ -1565,7 +1567,7 @@ cloning）：给模型看专家示教，让它模仿每一步动作。
 模型和真实世界部署上，还面临几个特殊挑战：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1085\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.8915\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1989\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.8011\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 挑战 & 具体表现 \\
 \midrule\noalign{}
@@ -1972,7 +1974,7 @@ bin 的概率，再全部加起来。
 670M。它接收与 VLA
 相同的输入（图像、语言指令），输出价值分布。为防止过拟合，价值函数也会在少量多模态网络数据上联合训练。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \pandocbounded{\includegraphics[keepaspectratio]{../../assets/figures/lecture15/ref/fig-pi06-arch_arxiv-2511.14759.png}}
 
@@ -2015,7 +2017,7 @@ r_t = \begin{cases}
 实际中，价值被归一化到 \((-1, 0)\) 区间，其中 \(0\) 表示成功完成，\(-1\)
 表示最差情况。不同任务的最大 episode 长度不同，所以按任务分别归一化。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture15/ref/fig-pi06-value-vis_arxiv-2511.14759.png}
 
@@ -2347,7 +2349,7 @@ flow matching VLA 加真机离线数据这个组合，把 advantage
 论文在三类复杂的真实世界任务上评估
 RECAP：叠衣服、制作咖啡和组装箱子。它们共同覆盖了变形物体、液体操作、长时序多步骤任务和真实工厂部署场景。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture15/ref/fig-pi06-tasks_arxiv-2511.14759.png}
 
@@ -2366,7 +2368,7 @@ RECAP：叠衣服、制作咖啡和组装箱子。它们共同覆盖了变形物
 
 机器人本体则一直是同一台：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.75\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture15/ref/fig-pi06-robot_arxiv-2511.14759.jpg}
 
@@ -2386,7 +2388,7 @@ RECAP：叠衣服、制作咖啡和组装箱子。它们共同覆盖了变形物
 
 先看核心指标。论文没有只报成功率，而是用\textbf{吞吐量}（每小时成功完成的任务数）当主指标------因为它同时装下了两件事：任务做没做成、做得够不够快。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.98\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture15/ref/fig-pi06-throughput_arxiv-2511.14759.png}
 
@@ -2439,7 +2441,7 @@ SFT 之后成功率就已经接近上限了，可 RECAP
 在课程体系中的位置}\label{ux5728ux8bfeux7a0bux4f53ux7cfbux4e2dux7684ux4f4dux7f6e}
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1053\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2010\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1322\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2682\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2934\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1828\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1984\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1131\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2530\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2527\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 出处 & 方法 & RL 类型 & 策略提取 & 适用场景 \\
 \midrule\noalign{}
@@ -2512,7 +2514,7 @@ critic}------同题采一组、组内平均分当基线；\textbf{可验证奖�
 锚定参考模型}------防止整场训练漂离胜任区。然后同一套外壳换了两种载体：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1615\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3400\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4985\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1794\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3330\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4876\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
  & VLM 数数（第 4 节，动手） & VLA 操作（第 6 节 SimpleVLA-RL） \\
 \midrule\noalign{}

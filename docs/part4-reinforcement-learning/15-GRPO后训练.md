@@ -17,6 +17,24 @@ format:
     colorlinks: true
     keep-tex: true
     tbl-colwidths: false
+    # 单讲 PDF 不出图索引 / 表索引：本讲十几张图撑起三页图索引，而带题注的表一张都
+    # 没有，表索引底下是空的。图的落位允许「就放这儿」（LaTeX 默认只给 tbp，装不下
+    # 就整张推到次页、原地留一大片空白）；浮动体参数放宽，让图和正文共用一页。
+    lof: false
+    lot: false
+    fig-pos: 'htbp'
+    # ⚠️ 这一块会**整体覆盖** docs/_quarto.yml 的项目级 include-in-header，不是叠加。
+    # 所以 fvextra 那段必须在这里再写一遍：少了它，pandoc 默认的 Highlighting 环境
+    # 不折行，超过版心（letter 减 1in 边距 = 468pt，等宽体约 86 列）的代码行会被
+    # 直接裁掉。判据是渲完在生成的 .tex 里搜得到 fvextra。
+    include-in-header:
+      text: |
+        \usepackage{fvextra}
+        \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,commandchars=\\\{\}}
+        \renewcommand{\topfraction}{0.9}
+        \renewcommand{\bottomfraction}{0.7}
+        \renewcommand{\textfraction}{0.1}
+        \renewcommand{\floatpagefraction}{0.75}
 header-includes:
   - \usepackage{bm}
   - \usepackage{amssymb}
