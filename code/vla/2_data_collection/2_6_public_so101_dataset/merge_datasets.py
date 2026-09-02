@@ -2,9 +2,20 @@
 
 对应第9讲《操作数据闭环》4.6 节末尾的公开数据集路线，接在 download_dataset.py 之后。
 
-用 lerobot 官方的 aggregate_datasets：它会先 validate_all_metadata 强校验 9 份的 fps /
-robot_type / features 完全一致（不一致直接抛错，而不是静默错位），然后重映射每份的
-task_index 到合并后的统一任务表、重建全局 index 与 episode_index、重算 stats。
+合并用官方命令 `lerobot-edit-dataset --operation.type merge`，与 `lerobot-record`
+`lerobot-replay` `lerobot-train` 同一家族。它先强校验 9 份的 fps / robot_type /
+features 完全一致（不一致直接抛错，而不是静默错位），然后重映射每份的 task_index
+到合并后的统一任务表、重建全局 index 与 episode_index、重算 stats。
+
+★为什么是这条命令，而不是自己写合并：
+  合并这件事有唯一官方入口，自己写就多出一个数据写入者。两个写入者产出的
+  数据集在细节上必然分岔（分片边界、统计量、任务表顺序），而分岔不报错 ——
+  只在训练读到不同数值时才显形，那时已经查不回来了。
+
+★为什么不是 `MultiLeRobotDataset`（运行时挂多份、不落盘）：
+  它读得进来，但训练入口吃不下。`lerobot.datasets.factory.make_dataset` 对
+  非 str 的 `repo_id` 直接 `raise NotImplementedError`，多数据集那条分支是
+  死代码。所以训练需要的是一份真正合并好的数据集。
 
 不做任何上采样。9 个任务各 200-300 集本来就均匀，合并即平衡；反过来向某个任务偏斜
 上采样会伤害泛化——真机上对比过，偏斜版明显不如平衡版。
@@ -12,9 +23,9 @@ task_index 到合并后的统一任务表、重建全局 index 与 episode_index
 
 import json
 import os
+import subprocess
 from pathlib import Path
 
-from lerobot.datasets.aggregate import aggregate_datasets
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
 TASKS = [
@@ -38,12 +49,17 @@ for root in roots:
     if not (root / "meta" / "info.json").exists():
         raise SystemExit(f"缺数据集：{root}")
 
+# 列表参数按 draccus 的写法给：`--operation.repo_ids='[a,b,c]'`。
+# 顺序即合并后的集顺序，两个列表必须一一对应。
 print(f"合并 {len(TASKS)} 个任务 -> {MERGED_DIR}", flush=True)
-aggregate_datasets(
-    repo_ids=[f"so101/{task}" for task in TASKS],
-    aggr_repo_id=MERGED_REPO_ID,
-    roots=roots,
-    aggr_root=MERGED_DIR,
+subprocess.run(
+    ["lerobot-edit-dataset",
+     "--operation.type=merge",
+     f"--operation.repo_ids=[{','.join(f'so101/{t}' for t in TASKS)}]",
+     f"--operation.roots=[{','.join(str(r) for r in roots)}]",
+     f"--new_repo_id={MERGED_REPO_ID}",
+     f"--new_root={MERGED_DIR}"],
+    check=True,
 )
 
 # 计数核对：合并后必须等于 9 份之和

@@ -2695,7 +2695,7 @@ wheels = [
 [[package]]
 name = "lerobot"
 version = "0.5.1"
-source = { git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=main#175faf9375c8c16f2196e857df7316560612b76e" }
+source = { git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=main#432e58a8c0faf7a2968807d22af74d319a511898" }
 dependencies = [
     { name = "accelerate" },
     { name = "av" },
@@ -5732,7 +5732,7 @@ wheels = [
 [[package]]
 name = "so101-sim"
 version = "0.1.0"
-source = { git = "https://github.com/Xbotics-Embodied-AI-club/Xbotics-SO101-Sim.git#475923052748116529af15cc96646881b08974cc" }
+source = { git = "https://github.com/Xbotics-Embodied-AI-club/Xbotics-SO101-Sim.git#730672bd730b7a5c697e47b71b2a44d46c460861" }
 dependencies = [
     { name = "dacite", marker = "(platform_machine != 'aarch64' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or (platform_python_implementation != 'CPython' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or (sys_platform != 'linux' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or extra == 'extra-19-xbotics-experiments-gpu-x86' or extra == 'extra-19-xbotics-experiments-rdk-s100'" },
     { name = "gymnasium", marker = "(platform_machine != 'aarch64' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or (platform_python_implementation != 'CPython' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or (sys_platform != 'linux' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or extra == 'extra-19-xbotics-experiments-gpu-x86' or extra == 'extra-19-xbotics-experiments-rdk-s100'" },
@@ -6740,7 +6740,6 @@ dependencies = [
     { name = "wheel", marker = "platform_machine == 's390x' or sys_platform == 'emscripten' or sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "xformers", marker = "(platform_machine == 'AMD64' and sys_platform == 'win32') or (platform_machine == 'x86_64' and sys_platform == 'win32') or (platform_machine == 'AMD64' and sys_platform == 'emscripten' and 'linux' in sys_platform) or (platform_machine == 'x86_64' and sys_platform == 'emscripten' and 'linux' in sys_platform) or (platform_machine == 'AMD64' and sys_platform == 'linux' and 'linux' in sys_platform) or (platform_machine == 'x86_64' and sys_platform == 'linux' and 'linux' in sys_platform)" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/86/05/c86f27785a3f5c62b8e037535d9c168af0440c0cb006bd12d8c8c6ade5f8/unsloth-2026.6.9.tar.gz", hash = "sha256:fec791e196c410b4d79c5ce2ccfdef6b69c779a4829ffded7d1158c2e9ba8fc1", size = 78491339, upload-time = "2026-06-22T16:13:07.554Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ca/6e/a26d81e2ddcd85e3755e15e28f6231c04a48f11d9b06e18cd557c6b16198/unsloth-2026.6.9-py3-none-any.whl", hash = "sha256:e36f1960cde6cdba5105350d37908926254626bd82c09b840a42df2dd0b135f8", size = 73998446, upload-time = "2026-06-22T16:13:03.063Z" },
 ]
