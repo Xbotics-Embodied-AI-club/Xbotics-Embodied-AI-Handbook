@@ -157,6 +157,10 @@
 
 \usepackage{fvextra}
 \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,commandchars=\\\{\}}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.75}
 \usepackage{array}
 \usepackage{booktabs}
 \usepackage{longtable}
@@ -234,8 +238,6 @@
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
-\listoffigures
-\listoftables
 
 从第8讲开始，我们做的事情其实只有一件：训练一个\textbf{策略}，再把它部署到闭环里。第8讲立起了这个概念------策略就是从观测到动作的映射；第9到12讲围着它转了一整圈：采数据、用
 ACT 和 VLA
@@ -281,8 +283,8 @@ PPO。最后把同一套 PPO
   \textbf{有些任务根本采不到合用的示教}。桌面操作可以用 Leader--Follower
   臂示教（第9讲），但人形行走要 29
   个关节以每秒几十次的频率协调发力，很难直接采到\textbf{足够覆盖、足够稳定、又能当低层控制标签}的示教数据------Leader--Follower
-  遥操作这类装置尤其够不着（动捕、动作重定向能提供某种参考动作，但那是另一种监督，6.6
-  节就会这么用）。本讲的任务------让 G1 学走路------恰好就是这种情形。
+  遥操作这类装置尤其够不着（动捕、动作重定向能提供某种参考动作，但那是另一种监督，第
+  8 节就会这么用）。本讲的任务------让 G1 学走路------恰好就是这种情形。
 \item
   \textbf{缺少直接优化任务回报的机制}。纯行为克隆的学习目标是''贴近示教动作''，受示教分布与标签质量约束；监督信号里没有''哪种做法回报更高''这个概念。（要注意这不等于''模型上限就是示范者水平''：聚合多个示范者、去噪、泛化，都可能让策略在某些指标上超过单个示范者。真正的限制是数据支持范围、优化目标和评测分布。）
 \item
@@ -337,7 +339,7 @@ rollout
 \texttt{trainer.fit(model,\ data)}；要调的超参就写在第一次用到它的地方，改文件里的变量即可。\textbf{版本之间的差异（diff）就是这一讲的知识点}------读懂三个文件的区别，就读懂了从
 REINFORCE 到 PPO 的演进。
 
-讲完 PPO，6.6 节还会把同一套代码原样搬到一个难得多的任务------让 G1
+讲完 PPO，第 8 节还会把同一套代码原样搬到一个难得多的任务------让 G1
 逐帧贴住一段真实武术动作------看看同一套算法在硬任务上能做到什么程度。
 
 \section{2
@@ -351,7 +353,17 @@ REINFORCE 到 PPO 的演进。
 
 强化学习的基本场景只有两个角色：一个\textbf{智能体（agent）}在一个\textbf{环境（environment）}里行动。智能体每一步看到环境的状态，做一个动作；环境收到动作后，给出一个奖励、并转移到下一个状态。
 
-\includegraphics[width=0.78\linewidth,height=\textheight,keepaspectratio,alt={智能体与环境的交互闭环：智能体在状态 s\_t 下输出动作 a\_t，环境返回新的状态 s\_\{t+1\} 和奖励 r\_\{t+1\}（``做完 a\_t 之后拿到的那一份''），如此循环（图片出自参考文献 11）}]{../../assets/figures/lecture14/ref/fig141-agent-env-loop_lerobot-tutorial.png}\{width=100\%\}
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=0.78\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig141-agent-env-loop_lerobot-tutorial.png}
+
+}
+
+\caption{智能体与环境的交互闭环：智能体在状态 \(s_t\) 下输出动作
+\(a_t\)，环境返回新的状态 \(s_{t+1}\) 和奖励 \(r_{t+1}\)（``做完 \(a_t\)
+之后拿到的那一份''），如此循环（图片出自参考文献 11）}
+
+\end{figure}%
 
 把一步交互写成符号，就是：
 
@@ -385,7 +397,7 @@ G1
 
 智能体''看到什么''叫\textbf{观测空间}，``能做什么''叫\textbf{动作空间}。对入门来说，动作空间的区别尤其要分清：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig-action-space.png}
 
@@ -439,7 +451,7 @@ R_t \;=\; r_{t+1} + \gamma\, r_{t+2} + \gamma^2 r_{t+3} + \cdots \;=\; \sum_{k=0
 越只顾眼前。但求和式本身看不出它到底把视野截在哪儿------那要看权重
 \(\gamma^k\) 衰减得多快。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig14-3-discount-horizon.png}
 
@@ -471,7 +483,7 @@ R_t \;=\; r_{t+1} + \gamma\, r_{t+2} + \gamma^2 r_{t+3} + \cdots \;=\; \sum_{k=0
 \(\pi_\theta(a\mid s)\)------参数为 \(\theta\) 的网络，在状态 \(s\)
 下给出动作 \(a\) 的概率。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig14-2-policy-distribution.png}
 
@@ -486,11 +498,11 @@ R_t \;=\; r_{t+1} + \gamma\, r_{t+2} + \gamma^2 r_{t+3} + \cdots \;=\; \sum_{k=0
 \end{figure}%
 
 和第8讲不同的一点是：本讲用\textbf{随机策略}。G1
-的策略网络对每个关节吐出高斯分布的\textbf{均值}；标准差不由网络算，而是一组跟着一起训练、但不随状态变化的参数（4.5
+的策略网络对每个关节吐出高斯分布的\textbf{均值}；标准差不由网络算，而是一组跟着一起训练、但不随状态变化的参数（5.4
 节的优化器那一行会再见到它）。训练时从这个分布里\textbf{采样}去试探，部署时直接取均值。随机性是''探索''的来源------不试新动作，就永远不知道有没有更好的走法；这也是试错学习必须付的入场费。
 
 除了策略，强化学习还有第二个基本量：\textbf{价值（value）}------给''一个状态本身有多好''打分的评分员。现在只需要记住有这么个概念：策略负责''怎么做''，价值负责''值多少分''。它的精确定义（\(V\)、\(Q\)、优势
-\(A\)）等到第 5 节第一个真正需要它的算法出现时再展开。
+\(A\)）等到第 6 节第一个真正需要它的算法出现时再展开。
 
 \subsection{2.5 本节小结}\label{ux672cux8282ux5c0fux7ed3}
 
@@ -498,14 +510,14 @@ R_t \;=\; r_{t+1} + \gamma\, r_{t+2} + \gamma^2 r_{t+3} + \cdots \;=\; \sum_{k=0
 的策略网络是智能体，物理仿真是环境，每回合随机给速度指令，跟上加分、摔倒扣分；4096
 个并行环境提供试错的量。G1 的动作空间是 29 维\textbf{连续}空间。策略
 \(\pi_\theta(a\mid s)\) 输出高斯分布、采样探索，目标是最大化折扣回报
-\(R_t\) 而非单步奖励；价值是''状态值多少分''的评分员，第 5 节正式登场。
+\(R_t\) 而非单步奖励；价值是''状态值多少分''的评分员，第 6 节正式登场。
 
 \section{3
 强化学习方法分类}\label{ux5f3aux5316ux5b66ux4e60ux65b9ux6cd5ux5206ux7c7b}
 
 概念备齐，先别急着钻算法。强化学习的算法出了名的多------REINFORCE、A2C、TRPO、PPO、DQN、DDPG、SAC、AlphaZero\ldots\ldots 第一次接触很容易被缩写淹没，而且不同教材的分类词还长得很像，一混就乱。这一节把地图画清楚：\textbf{三个互相独立的划分}，每个算法对三个问题各回答一次，就有了自己唯一的坐标。这张地图不但罩住本讲，也罩住后面两讲。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.94\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig142-rl-taxonomy.png}
 
@@ -574,7 +586,7 @@ Actor-Critic：横跨两类的混合架构}\label{actor-criticux6a2aux8de8ux4e24
 \begin{itemize}
 \tightlist
 \item
-  本讲的 A2C 和 PPO 带 critic，但 critic 只是给策略梯度当参照物（第 5
+  本讲的 A2C 和 PPO 带 critic，但 critic 只是给策略梯度当参照物（第 6
   节会讲清楚），\textbf{优化主体仍是策略}------它们是策略梯度方法；
 \item
   分类树上画在两族\textbf{中间}的 DDPG、TD3、SAC 也带 actor 和
@@ -595,14 +607,14 @@ off-policy------学的策略和采数据的策略是不是同一个}\label{ux7b2
 \tightlist
 \item
   \textbf{on-policy}：是同一个。数据只在\textbf{当前策略附近的一小段窗口内}管用------策略一更新，旧
-  rollout 的分布就和新策略对不上，不能像经验池那样长期留着反复复用（6.3
+  rollout 的分布就和新策略对不上，不能像经验池那样长期留着反复复用（7.3
   节会看到 PPO
   抢在数据被推远之前复用几轮，正是在这个短窗口里做文章）------稳，但费样本。
 \item
   \textbf{off-policy}：不是同一个。历史数据（甚至别的策略采的数据）都能塞进经验池反复复用------省样本，但训练更容易不稳。
 \end{itemize}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig-onoff-dataflow.png}
 
@@ -644,10 +656,10 @@ off-policy''是\textbf{常见对应，不是定义}：两条轴一个说''学什
 \toprule\noalign{}
 算法 & 学什么 & 数据 & 在课程里的位置 \\
 \midrule\noalign{}
-REINFORCE & 基于策略（策略梯度） & on-policy & 第14讲 4.3；代码 4.5（v1） \\
-A2C & 基于策略（策略梯度 + critic 参照） & on-policy & 第14讲 5.3；代码 5.4（v2） \\
-TRPO & 基于策略（策略梯度 + 硬约束步长） & on-policy & 第14讲 6.1（一句话带过） \\
-\textbf{PPO} & 基于策略（策略梯度 + clip） & on-policy & 第14讲 6.2；代码 6.4（v3） \\
+REINFORCE & 基于策略（策略梯度） & on-policy & 第14讲 5.3；代码 5.4（v1） \\
+A2C & 基于策略（策略梯度 + critic 参照） & on-policy & 第14讲 6.3；代码 6.4（v2） \\
+TRPO & 基于策略（策略梯度 + 硬约束步长） & on-policy & 第14讲 7.1（一句话带过） \\
+\textbf{PPO} & 基于策略（策略梯度 + clip） & on-policy & 第14讲 7.2；代码 7.4（v3） \\
 GRPO & 基于策略（策略梯度，去掉 critic，用组内平均当参照） & on-policy & 第15讲 1.4 \\
 Q-learning / DQN & 基于价值 & off-policy & 第16讲 2.3--2.4 \\
 SAC（及 DDPG/TD3） & 两族之间的 actor-critic & off-policy & 第16讲 5.2 \\
@@ -663,7 +675,7 @@ SAC（及 DDPG/TD3） & 两族之间的 actor-critic & off-policy & 第16讲 5.2
   \textbf{本讲的三级阶梯 REINFORCE → A2C → PPO
   是同一支内的演进}，不是三个门类：都是
   model-free、基于策略（策略梯度）、on-policy，坐标完全相同，差别只在''怎么把策略梯度算得更稳''------这正是第
-  4 节到第 6 节一节补一块的机制。演进链再往后一站就是第15讲的
+  5 节到第 7 节一节补一块的机制。演进链再往后一站就是第15讲的
   GRPO：它保留 PPO 的 clip、去掉
   critic，是这条链在大模型后训练场景下的延伸。
 \item
@@ -683,9 +695,149 @@ model-based）、学什么（基于价值 /
 走到底；GRPO（第15讲）和 SAC（第16讲）都能在这张地图上找到自己的格子。
 
 \section{4
-REINFORCE：最朴素的策略梯度方法}\label{reinforceux6700ux6734ux7d20ux7684ux7b56ux7565ux68afux5ea6ux65b9ux6cd5}
+基础：跑起来要哪些零件}\label{ux57faux7840ux8dd1ux8d77ux6765ux8981ux54eaux4e9bux96f6ux4ef6}
 
-\subsection{4.1
+后面三节各讲一个算法，但它们共用同一套地基：仿真器、参考动作，以及代码放在哪。这一节把地基一次交代完，后面就只谈算法。
+
+三位''幕后工作人员''先认识一下。5.4 节代码走读里的
+\texttt{code/rl/1\_rl\_basics/1\_1\_g1\_walk\_rl/env.py}
+只是薄薄一层包装，真正干重活的是几个开源组件。它们是本讲实验的依赖，不是研究对象------每一位用一段话知道它是谁、替我们干了什么，就足够了。
+
+\subsection{4.1 mjlab：G1
+的练功房}\label{mjlabg1-ux7684ux7ec3ux529fux623f}
+
+第一位是 \textbf{mjlab}{[}7{]}，G1
+的''练功房''。强化学习靠海量试错吃饭，一个环境一步一步跑太慢，我们的训练一次开
+4096 个环境同时采样。mjlab 把 GPU 并行版的 MuJoCo（MuJoCo Warp）接进
+Isaac Lab
+那套按管理器组装环境的接口：场景、观测、奖励、终止条件都是现成积木，还内置了宇树
+G1
+的标准任务------行走实验用的平地速度跟随（\texttt{Mjlab-Velocity-Flat-Unitree-G1}）、第
+8
+节动作跟随用的动作跟踪（\texttt{Mjlab-Tracking-Flat-Unitree-G1}），都直接取自它。课程这层包装做的只是把它的接口整理得顺手一点。
+
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=0.92\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig145-mjlab-parallel.png}
+
+}
+
+\caption{mjlab 并行仿真中的大批宇树
+G1，同屏各自执行行走、翻滚等不同动作，GPU
+并行让''海量试错''在一张显卡上成为可能。图出自 mjlab 项目主页（右下角带
+mjlab 水印），见参考文献 7}
+
+\end{figure}%
+
+\subsection{4.2
+GVHMR：从视频里抠出人的动作}\label{gvhmrux4eceux89c6ux9891ux91ccux62a0ux51faux4ebaux7684ux52a8ux4f5c}
+
+第二位是 \textbf{GVHMR}{[}8{]}，负责从视频里''抠''出人的动作。第 8
+节要让 G1
+逐帧贴住一段真实武术动作，参考动作最方便的来源是一段普通视频。GVHMR（浙江大学团队开源）输入单目视频，输出世界坐标系下连贯的三维人体动作------人在哪里、朝向哪边、每一帧什么姿势，全部恢复出来，并用
+SMPL-X
+参数化人体表示（用一组低维参数描述体型与逐帧姿态，相当于人体动作的通用''语言''）。它的做法是先把姿态估计在一个由\textbf{重力方向
++
+相机朝向}定义的坐标系里，再靠相机旋转转回世界系，从而避开''世界坐标系怎么定''这个老问题。
+
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=0.98\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig145-gvhmr-teaser_arxiv-2409.06662.png}
+
+}
+
+\caption{GVHMR
+从街头单目视频恢复世界坐标系下的人体动作：蓝色人体网格为恢复结果，沿真实运动轨迹排开；四周小图给出若干帧的原始画面与恢复姿态的正、侧视对照（绿色箭头是重力方向），左上角与左下角两块分别展示脚部打滑更少、以及俯视的运动轨迹。图出自参考文献
+8}
+
+\end{figure}%
+
+\subsection{4.3 GMR：把人的动作翻译成 G1
+的动作}\label{gmrux628aux4ebaux7684ux52a8ux4f5cux7ffbux8bd1ux6210-g1-ux7684ux52a8ux4f5c}
+
+第三位是 \textbf{GMR}（General Motion
+Retargeting）{[}9{]}{[}10{]}，负责把''人的动作''翻译成''G1
+的动作''。人和 G1
+体型比例不同、关节构成也不同，人的动作不能直接照搬到机器人身上；这道翻译工序的术语叫\textbf{重定向}（retargeting）。GMR
+先对齐人与机器人的关键部位、按体型做缩放，再用逆运动学逐帧解出 G1
+各关节的角度，输出机器人真正能执行的参考轨迹。
+
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=0.8\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig145-gmr-pipeline_arxiv-2510.02252.png}
+
+}
+
+\caption{GMR
+的重定向流程：输入人体各部位的平移与旋转，经关键部位匹配、笛卡尔空间对齐、非均匀局部缩放，再两轮求解带约束的机器人逆运动学，输出机器人根姿态与关节位置。图出自参考文献
+9}
+
+\end{figure}%
+
+\subsection{4.4 一条管线四步：从视频到 G1
+参考动作}\label{ux4e00ux6761ux7ba1ux7ebfux56dbux6b65ux4eceux89c6ux9891ux5230-g1-ux53c2ux8003ux52a8ux4f5c}
+
+GVHMR 和 GMR
+各管一段，把它们接起来还差两道工序。完整的管线是四步，在课程实验仓库里是独立模块
+\texttt{code/rl/1\_rl\_basics/1\_0\_video\_to\_g1\_reference/}：
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.0665\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3937\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5397\linewidth - 2\tabcolsep\relax}@{}}
+\toprule\noalign{}
+步 & 脚本 & 干什么 \\
+\midrule\noalign{}
+1 & \texttt{video\_\allowbreak to\_\allowbreak human\_\allowbreak motion.py} & 用 GVHMR 从单目视频恢复人体动作（SMPL-X 参数） \\
+2 & \texttt{run\_\allowbreak gvhmr\_\allowbreak no\_\allowbreak render.py} & GVHMR 推理的无渲染封装，服务器上开不了窗口 \\
+3 & \texttt{human\_\allowbreak motion\_\allowbreak to\_\allowbreak g1\_\allowbreak reference.py} & 用 GMR 把人体动作重定向到 G1 的 29 个关节 \\
+4 & \texttt{build\_\allowbreak motion\_\allowbreak npz.py} & 打包成训练用的 \texttt{.npz}（关节轨迹 + body 位姿 + 帧率） \\
+\bottomrule\noalign{}
+\end{tabular}
+\end{center}
+
+产物是一个参考动作文件
+\texttt{code/rl/1\_rl\_basics/data/g1\_reference\_motions/marshal-arts.npz}（682
+帧、50 Hz、29
+个关节），课程自带的这一份就是用这条链生成的；想换自己的视频，把四步再走一遍即可。
+
+这个模块\textbf{编号是 \texttt{1\_0} 而不是
+\texttt{1\_1}}，因为它不是算法阶梯上的一级：它只产数据、不产结论，是后面动作跟随实验的\textbf{前置}。本讲的行走实验完全不用它（奖励由环境在线给出，不需要任何参考数据）；这份参考动作要等到第
+8 节才派上用场。
+
+\subsection{4.5
+代码地图：一节讲义对一个模块}\label{ux4ee3ux7801ux5730ux56feux4e00ux8282ux8bb2ux4e49ux5bf9ux4e00ux4e2aux6a21ux5757}
+
+本讲从这里往后的每一个一级标题，都对应实验仓库里的一个代码单元。读到哪一节，打开哪一个目录即可：
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1629\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4157\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4214\linewidth - 2\tabcolsep\relax}@{}}
+\toprule\noalign{}
+讲义 & 代码 & 内容 \\
+\midrule\noalign{}
+第 4 节（本节） & \texttt{1\_\allowbreak 0\_\allowbreak video\_\allowbreak to\_\allowbreak g1\_\allowbreak reference/} & 视频 → G1 参考动作的四步管线 \\
+第 5 节 & \texttt{1\_\allowbreak 1\_\allowbreak g1\_\allowbreak walk\_\allowbreak rl/train\_\allowbreak v1\_\allowbreak reinforce.py} & 行走任务 · REINFORCE \\
+第 6 节 & \texttt{1\_\allowbreak 1\_\allowbreak g1\_\allowbreak walk\_\allowbreak rl/train\_\allowbreak v2\_\allowbreak a2c.py} & 行走任务 · A2C \\
+第 7 节 & \texttt{1\_\allowbreak 1\_\allowbreak g1\_\allowbreak walk\_\allowbreak rl/train\_\allowbreak v3\_\allowbreak ppo.py} & 行走任务 · PPO \\
+第 8 节 & \texttt{1\_\allowbreak 3\_\allowbreak g1\_\allowbreak motion\_\allowbreak tracking/} & 同三个算法 · 换成动作跟随这个更难的任务 \\
+\bottomrule\noalign{}
+\end{tabular}
+\end{center}
+
+两条任务线（\texttt{1\_1} 行走 / \texttt{1\_3}
+动作跟随）的文件名一一对应：\texttt{train\_v1\_reinforce.py} /
+\texttt{train\_v2\_a2c.py} / \texttt{train\_v3\_ppo.py} /
+\texttt{rollout.py}，同一级算法在两条线上是同一份代码换个环境。建议横向对照着读：\textbf{算法不变，任务变难}。
+
+每条线内部还有三个共用件，它们是''受控对照''的机械保证：\texttt{env.py}
+包装 mjlab
+环境（\textbf{这是两条线唯一被设计成不同的东西}），\texttt{model.py}
+提供三个版本共用的 \texttt{ActorCritic} 与 GAE
+工具函数（两条线逐字相同），\texttt{rollout.py}
+按统一口径评测并录像。要调的超参就写在第一次用到它的地方，没有命令行参数层。
+
+\section{5 v1
+REINFORCE：最朴素的策略梯度方法}\label{v1-reinforceux6700ux6734ux7d20ux7684ux7b56ux7565ux68afux5ea6ux65b9ux6cd5}
+
+\subsection{5.1
 什么是策略梯度}\label{ux4ec0ux4e48ux662fux7b56ux7565ux68afux5ea6}
 
 基于策略的方法只做一件事：调策略参数
@@ -712,7 +864,7 @@ REINFORCE：最朴素的策略梯度方法}\label{reinforceux6700ux6734ux7d20ux7
 沿这个梯度做上升的算法，统称\textbf{策略梯度方法}------就是 3.2
 节点过名、本讲从头走到尾的那条子类链。
 
-\subsection{4.2
+\subsection{5.2
 梯度往哪指：好动作加概率，坏动作减概率}\label{ux68afux5ea6ux5f80ux54eaux6307ux597dux52a8ux4f5cux52a0ux6982ux7387ux574fux52a8ux4f5cux51cfux6982ux7387}
 
 公式里两个因子各管一件事。\(\nabla_\theta \log \pi_\theta(a_t\mid s_t)\)
@@ -738,7 +890,7 @@ REINFORCE：最朴素的策略梯度方法}\label{reinforceux6700ux6734ux7d20ux7
 
 落成损失函数，就是在前面加个负号交给梯度下降。下面这一行等会儿会原样出现在
 v1 的代码里（代码里那个 \texttt{advantages} 目前就是 \(R_t\)
-做了一点归一化，4.5 节细说）：
+做了一点归一化，5.4 节细说）：
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -746,7 +898,7 @@ v1 的代码里（代码里那个 \texttt{advantages} 目前就是 \(R_t\)
 \end{Highlighting}
 \end{Shaded}
 
-\subsection{4.3
+\subsection{5.3
 REINFORCE：采一批轨迹、算回报、更新一次}\label{reinforceux91c7ux4e00ux6279ux8f68ux8ff9ux7b97ux56deux62a5ux66f4ux65b0ux4e00ux6b21}
 
 把上面的公式变成可执行的循环，就是
@@ -771,87 +923,12 @@ REINFORCE，教材上也叫\textbf{蒙特卡洛策略梯度}{[}5{]}------``蒙�
 都只是在这四步里''换零件''：A2C 换第 2 步的权重，PPO 改第 3
 步的更新方式。
 
-\subsection{4.4 认识三个外部依赖：mjlab、GVHMR 与
-GMR}\label{ux8ba4ux8bc6ux4e09ux4e2aux5916ux90e8ux4f9dux8d56mjlabgvhmr-ux4e0e-gmr}
-
-跑实验之前，先认识几位''幕后工作人员''。下一节代码走读里的
-\texttt{code/rl/1\_rl\_basics/1\_1\_g1\_walk\_rl/env.py}
-只是薄薄一层包装，真正干重活的是几个开源组件。它们是本讲实验的依赖，不是研究对象------每一位用一段话知道它是谁、替我们干了什么，就足够了。
-
-第一位是 \textbf{mjlab}{[}7{]}，G1
-的''练功房''。强化学习靠海量试错吃饭，一个环境一步一步跑太慢，我们的训练一次开
-4096 个环境同时采样。mjlab 把 GPU 并行版的 MuJoCo（MuJoCo Warp）接进
-Isaac Lab
-那套按管理器组装环境的接口：场景、观测、奖励、终止条件都是现成积木，还内置了宇树
-G1
-的标准任务------行走实验用的平地速度跟随（\texttt{Mjlab-Velocity-Flat-Unitree-G1}）、6.6
-节动作跟随用的动作跟踪（\texttt{Mjlab-Tracking-Flat-Unitree-G1}），都直接取自它。课程这层包装做的只是把它的接口整理得顺手一点。
-
-\begin{figure}[H]
-
-{\centering \includegraphics[width=0.92\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig145-mjlab-parallel.png}
-
-}
-
-\caption{mjlab 并行仿真中的大批宇树
-G1，同屏各自执行行走、翻滚等不同动作，GPU
-并行让''海量试错''在一张显卡上成为可能。图出自 mjlab 项目主页（右下角带
-mjlab 水印），见参考文献 7}
-
-\end{figure}%
-
-第二位是 \textbf{GVHMR}{[}8{]}，负责从视频里''抠''出人的动作。6.6 节要让
-G1
-逐帧贴住一段真实武术动作，参考动作最方便的来源是一段普通视频。GVHMR（浙江大学团队开源）输入单目视频，输出世界坐标系下连贯的三维人体动作------人在哪里、朝向哪边、每一帧什么姿势，全部恢复出来，并用
-SMPL-X
-参数化人体表示（用一组低维参数描述体型与逐帧姿态，相当于人体动作的通用''语言''）。它的做法是先把姿态估计在一个由\textbf{重力方向
-+
-相机朝向}定义的坐标系里，再靠相机旋转转回世界系，从而避开''世界坐标系怎么定''这个老问题。
-
-\begin{figure}[H]
-
-{\centering \includegraphics[width=0.98\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig145-gvhmr-teaser_arxiv-2409.06662.png}
-
-}
-
-\caption{GVHMR
-从街头单目视频恢复世界坐标系下的人体动作：蓝色人体网格为恢复结果，沿真实运动轨迹排开；四周小图给出若干帧的原始画面与恢复姿态的正、侧视对照（绿色箭头是重力方向），左上角与左下角两块分别展示脚部打滑更少、以及俯视的运动轨迹。图出自参考文献
-8}
-
-\end{figure}%
-
-第三位是 \textbf{GMR}（General Motion
-Retargeting）{[}9{]}{[}10{]}，负责把''人的动作''翻译成''G1
-的动作''。人和 G1
-体型比例不同、关节构成也不同，人的动作不能直接照搬到机器人身上；这道翻译工序的术语叫\textbf{重定向}（retargeting）。GMR
-先对齐人与机器人的关键部位、按体型做缩放，再用逆运动学逐帧解出 G1
-各关节的角度，输出机器人真正能执行的参考轨迹。
-
-\begin{figure}[H]
-
-{\centering \includegraphics[width=0.8\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig145-gmr-pipeline_arxiv-2510.02252.png}
-
-}
-
-\caption{GMR
-的重定向流程：输入人体各部位的平移与旋转，经关键部位匹配、笛卡尔空间对齐、非均匀局部缩放，再两轮求解带约束的机器人逆运动学，输出机器人根姿态与关节位置。图出自参考文献
-9}
-
-\end{figure}%
-
-从一段视频开始，先用 GVHMR 恢复人体动作，再用 GMR 重定向成 G1
-参考动作------这条预处理管线在课程实验仓库里是独立模块
-\texttt{code/rl/1\_rl\_basics/1\_2\_video\_to\_g1\_reference/}，产物是一个参考动作文件
-\texttt{code/rl/1\_rl\_basics/data/g1\_reference\_motions/marshal-arts.npz}（682
-帧、50 Hz、29 个关节）。本讲的行走实验只用到 mjlab；这份参考动作，等 6.6
-节动作跟随登场时才派上用场。
-
-\subsection{4.5 代码走读：v1
+\subsection{5.4 代码走读：v1
 版训练循环}\label{ux4ee3ux7801ux8d70ux8bfbv1-ux7248ux8badux7ec3ux5faaux73af}
 
 行走实验的代码都在 \texttt{code/rl/1\_rl\_basics/1\_1\_g1\_walk\_rl/}
 这一个目录里，下表只写目录内的文件名。本节走读前三个文件，其中前两个由三个版本共用；后三个不讲算法，但
-4.6 节起的评测数字、rollout 视频和 6.5
+5.5 节起的评测数字、rollout 视频和 7.5
 节那两张训练曲线图，都由它们产出：
 
 \begin{center}
@@ -863,8 +940,8 @@ Retargeting）{[}9{]}{[}10{]}，负责把''人的动作''翻译成''G1
 \texttt{model.py} & \texttt{ActorCritic} 网络（actor + critic 两个 MLP）与 GAE 工具函数 \\
 \texttt{train\_\allowbreak v1\_\allowbreak reinforce.py} & 本节的 REINFORCE 训练脚本 \\
 \texttt{rollout.py} & 载入训练好的权重，按 1.4 节的统一口径（16 个环境 × 400 步、确定性动作）评测并录像 \\
-\texttt{plot\_\allowbreak reward\_\allowbreak curves.py} & 画 6.5 节那张三算法训练奖励对照曲线 \\
-\texttt{plot\_\allowbreak training\_\allowbreak losses.py} & 画 6.5 节那张四面板训练损失对照图 \\
+\texttt{plot\_\allowbreak reward\_\allowbreak curves.py} & 画 7.5 节那张三算法训练奖励对照曲线 \\
+\texttt{plot\_\allowbreak training\_\allowbreak losses.py} & 画 7.5 节那张四面板训练损失对照图 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -926,7 +1003,7 @@ Lightning 把训练拆成三块（第12讲 4.6 节见过 \texttt{LightningModule
 \(R_t\)，而是先\textbf{减掉整批均值}再除以整批标准差。这是常见的方差降低与尺度归一化技巧，让数值更平稳。要说准确一点：\(b(s)\)
 那条''减去与动作无关的基线不改变梯度期望''的性质，要求基线是\textbf{固定的、不依赖当前所选动作的}；而这里的批均值恰恰是用同一批的动作和回报算出来的，除以批标准差也会引入有限样本偏差。所以它不是严格无偏，只是在实践里以一点小偏差换取稳定性------好用，但别说成''完全不改变梯度期望''。而''跟平均水平比，而不是跟零比''这个念头，正是下一节整节的种子，先按下不表。
 
-训练端的 \texttt{training\_step} 就是 4.2 节那行公式，外加一项熵：
+训练端的 \texttt{training\_step} 就是 5.2 节那行公式，外加一项熵：
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -936,7 +1013,7 @@ Lightning 把训练拆成三块（第12讲 4.6 节见过 \texttt{LightningModule
         \CommentTok{\# 每个关节维度独立采样，各维 log 概率相加 = 整个动作向量的 log π(a|s)。}
 \NormalTok{        log\_probs }\OperatorTok{=}\NormalTok{ distribution.log\_prob(batch[}\StringTok{"actions"}\NormalTok{]).}\BuiltInTok{sum}\NormalTok{(dim}\OperatorTok{={-}}\DecValTok{1}\NormalTok{)}
 \NormalTok{        entropy }\OperatorTok{=}\NormalTok{ distribution.entropy().}\BuiltInTok{sum}\NormalTok{(dim}\OperatorTok{={-}}\DecValTok{1}\NormalTok{)    }\CommentTok{\# 同理各维熵相加，衡量分布摊开的程度}
-        \CommentTok{\# 4.2 节那行公式：负号是因为梯度下降只会"下降"，而我们想让好动作的概率上升。}
+        \CommentTok{\# 5.2 节那行公式：负号是因为梯度下降只会"下降"，而我们想让好动作的概率上升。}
 \NormalTok{        policy\_loss }\OperatorTok{=} \OperatorTok{{-}}\NormalTok{(log\_probs }\OperatorTok{*}\NormalTok{ batch[}\StringTok{"advantages"}\NormalTok{]).mean()}
 \NormalTok{        entropy\_loss }\OperatorTok{=}\NormalTok{ entropy.mean()    }\CommentTok{\# 一批里所有步的熵取平均}
 \NormalTok{        loss }\OperatorTok{=}\NormalTok{ policy\_loss }\OperatorTok{{-}} \VariableTok{self}\NormalTok{.entropy\_coef }\OperatorTok{*}\NormalTok{ entropy\_loss    }\CommentTok{\# 熵前是减号：熵越大 loss 越小}
@@ -967,7 +1044,7 @@ Lightning 把训练拆成三块（第12讲 4.6 节见过 \texttt{LightningModule
 让每轮都重新采样------on-policy 的''用完即弃''由 Lightning
 的数据加载周期天然实现。
 
-\subsection{4.6 实验：G1 用 REINFORCE
+\subsection{5.5 实验：G1 用 REINFORCE
 学走路}\label{ux5b9eux9a8cg1-ux7528-reinforce-ux5b66ux8d70ux8def}
 
 按 1.4 节的统一口径评测（最终权重、确定性动作、16 环境 × 400 步）：
@@ -983,7 +1060,7 @@ Lightning 把训练拆成三块（第12讲 4.6 节见过 \texttt{LightningModule
 \end{tabular}
 \end{center}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.98\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig146-walk-v1.png}
 
@@ -1001,10 +1078,10 @@ G1
 
 再说不足，看图和数字都很明显：动作僵硬、不敢迈步，跟指令跟得很勉强，还有
 1.3\% 的评测回合以摔倒收场。训练过程也不好看------奖励爬到 700
-次迭代左右就停在 0.008 附近，剩下的两千多次迭代基本原地踏步（6.5
+次迭代左右就停在 0.008 附近，剩下的两千多次迭代基本原地踏步（7.5
 节那张训练曲线看得最清楚）。能学，但学得\textbf{又慢又浅}。
 
-\subsection{4.7
+\subsection{5.6
 毛病在哪：回报噪声淹没了学习信号}\label{ux6bdbux75c5ux5728ux54eaux56deux62a5ux566aux58f0ux6df9ux6ca1ux4e86ux5b66ux4e60ux4fe1ux53f7}
 
 病根在权重 \(R_t\)
@@ -1016,17 +1093,17 @@ G1
 
 减掉整批均值那个小动作已经暗示了出路：\textbf{别拿绝对回报当权重，找个参照物，比出相对好坏}。参照物选得越贴切，运气成分抵消得越干净。什么是最贴切的参照物？下一节的主角。
 
-\subsection{4.8 本节小结}\label{ux672cux8282ux5c0fux7ed3-2}
+\subsection{5.7 本节小结}\label{ux672cux8282ux5c0fux7ed3-2}
 
 策略梯度方法沿''期望回报的梯度''直接更新策略，REINFORCE
 是它最朴素的实现：用实际回报（reward-to-go）当权重，好动作加概率、坏动作减概率，采一批、更一步、丢数据。在
 G1 行走上它证明了这条路走得通（能站能挪，0.070 / 摔
 1.3\%），但蒙特卡洛回报里混着大量与动作无关的运气，\textbf{方差大}，学得又慢又浅。它的局限指向一个明确的改进方向：给回报找一个像样的参照物。
 
-\section{5
-A2C：请一位评分员来降方差}\label{a2cux8bf7ux4e00ux4f4dux8bc4ux5206ux5458ux6765ux964dux65b9ux5dee}
+\section{6 v2
+A2C：请一位评分员来降方差}\label{v2-a2cux8bf7ux4e00ux4f4dux8bc4ux5206ux5458ux6765ux964dux65b9ux5dee}
 
-\subsection{5.1
+\subsection{6.1
 基线的直觉：跟「平均水平」比，不是跟零比}\label{ux57faux7ebfux7684ux76f4ux89c9ux8ddfux5e73ux5747ux6c34ux5e73ux6bd4ux4e0dux662fux8ddfux96f6ux6bd4}
 
 评价一个动作，公平的问法不是''它拿了多少分''，而是''它比\textbf{这个状态下的平均水平}多拿了多少分''。同样是''后面拿到回报
@@ -1043,7 +1120,7 @@ v1
 已经偷偷用了最粗的基线：整批回报的均值，一个常数。但常数对所有状态一视同仁，显然不够贴切------烂局面和好局面的''平均水平''根本不同。\textbf{理想的基线应该因状态而异：每个状态自己的平均水平。}这个''每个状态自己的平均水平''，正是
 2.4 节预告过的那个量。
 
-\subsection{5.2 价值函数与优势：V、Q、A = Q −
+\subsection{6.2 价值函数与优势：V、Q、A = Q −
 V}\label{ux4ef7ux503cux51fdux6570ux4e0eux4f18ux52bfvqa-q-v}
 
 现在正式引入价值。先看\textbf{状态价值函数} \(V^\pi(s)\)：
@@ -1070,7 +1147,7 @@ Q^\pi(s,a)=\mathbb{E}\big[\,r_{t+1}+\gamma r_{t+2}+\gamma^2 r_{t+3}+\cdots \,\mi
 A^\pi(s,a)=Q^\pi(s,a)-V^\pi(s)
 \]
 
-它回答的问题正是 5.1
+它回答的问题正是 6.1
 节那个公平的问法：\textbf{这个动作比该状态的平均水平好多少？}
 
 \begin{itemize}
@@ -1100,7 +1177,7 @@ A^\pi(s,a)=Q^\pi(s,a)-V^\pi(s)
 \(A\)，优势为正就调高概率、为负就调低。}本讲余下的一切、以及第15讲的
 GRPO，全在围绕''怎么把 \(A\) 估得又准又稳''做文章。
 
-\subsection{5.3 从基线到 critic：Actor-Critic 与
+\subsection{6.3 从基线到 critic：Actor-Critic 与
 GAE}\label{ux4eceux57faux7ebfux5230-criticactor-critic-ux4e0e-gae}
 
 \(V^\pi(s)\)
@@ -1110,7 +1187,7 @@ GAE}\label{ux4eceux57faux7ebfux5230-criticactor-critic-ux4e0e-gae}
 
 四个方框、一个环，这套分工的骨架就说完了：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.85\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig14-5-a2c-loop-PLACEHOLDER.png}
 
@@ -1131,7 +1208,7 @@ Network（价值网络）而不是 Q 网络，与本讲 critic 估 \(V(s)\) 的�
 自己靠什么变准。把这两件事画进去，才是代码里真正在跑的那张图------也才看得出\textbf{优化主体始终是策略，critic
 只是给策略梯度当参照物}：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig-actor-critic-a2c.png}
 
@@ -1195,7 +1272,7 @@ A3C，思路相同。回看 3.3 节的地图定位就清楚了：A2C
 是''结合两类方法的混合架构''；但评分员在这里是给策略梯度打工的，\textbf{优化主体仍是策略}------A2C
 稳稳落在基于策略这一支。
 
-\subsection{5.4 代码走读：v1 到 v2
+\subsection{6.4 代码走读：v1 到 v2
 改了什么}\label{ux4ee3ux7801ux8d70ux8bfbv1-ux5230-v2-ux6539ux4e86ux4ec0ux4e48}
 
 \texttt{code/rl/1\_rl\_basics/1\_1\_g1\_walk\_rl/train\_v2\_a2c.py} 与
@@ -1205,7 +1282,7 @@ GAE：
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\CommentTok{\# 关键变化(1)：优势不再用常数基线，改用 critic 估值 + GAE（理论上降方差，见 5.1 节）}
+\CommentTok{\# 关键变化(1)：优势不再用常数基线，改用 critic 估值 + GAE（理论上降方差，见 6.1 节）}
         \ControlFlowTok{with}\NormalTok{ torch.no\_grad():    }\CommentTok{\# 采样阶段只要数值，不需要梯度}
 \NormalTok{            next\_value }\OperatorTok{=} \VariableTok{self}\NormalTok{.model.value(critic\_obs)    }\CommentTok{\# 末状态的价值：GAE 递推从它起头}
         \CommentTok{\# 一次算出每步的优势和回报：优势喂给 actor，回报当 critic 的回归目标。}
@@ -1236,7 +1313,7 @@ actor-critic）：评分员只在训练时存在，部署时只带走
 actor，所以评分员可以看仿真器里的''天眼''信息，把分打得更准，而不破坏部署的可行性。
 \end{quote}
 
-\subsection{5.5 实验：同一个任务，A2C
+\subsection{6.5 实验：同一个任务，A2C
 交出什么成绩}\label{ux5b9eux9a8cux540cux4e00ux4e2aux4efbux52a1a2c-ux4ea4ux51faux4ec0ux4e48ux6210ux7ee9}
 
 同一口径评测，先看数字，和 v1 摆在一起：
@@ -1252,7 +1329,7 @@ actor，所以评分员可以看仿真器里的''天眼''信息，把分打得�
 \end{tabular}
 \end{center}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.98\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig155-walk-v2.png}
 
@@ -1272,19 +1349,19 @@ bug，是这一讲最好的教材，值得停下来仔细读：
 \tightlist
 \item
   先说清一件容易夸大的事：方差被压低是 critic
-  基线的\textbf{理论性质}（5.1
+  基线的\textbf{理论性质}（6.1
   节那个''减掉贴合状态的基线、不改变梯度期望却降方差''的结论），\textbf{不是}这张
   rollout
   对照图或''评测平均奖励''能直接证明的------真要验证方差降没降，得去看训练时的优势/梯度方差曲线。这张图能直接读到的是另一回事：v2
   的动作幅度比 v1
   大得多、姿态更舒展------评测记录里的动作绝对值均值也对得上，v2 是
   0.56，v1 与 v3 都是
-  0.39。要当心的是，``动作更大''也不等于''探索更充分''：6.5
+  0.39。要当心的是，``动作更大''也不等于''探索更充分''：7.5
   节的策略熵曲线上 v2 反而比 v1 低（15 对
   22），也就是分布更窄、只是均值推得更远。梯度方差、动作幅度、分布宽度是三件事，别拿其中一件当另一件的证据。
 \item
   但训练过程露出了一个 v1
-  没有的故障模式：\textbf{单次更新会把刚学会的步态一脚踩塌}。看 6.5
+  没有的故障模式：\textbf{单次更新会把刚学会的步态一脚踩塌}。看 7.5
   节那张训练奖励曲线：v2 的滑动平均在 0.004
   上下的平台上晃了两千多次迭代，而\textbf{第 500 迭代之后的这 2500
   次迭代}里，有 \textbf{195 次}迭代的平均奖励掉到 −0.01
@@ -1296,7 +1373,7 @@ bug，是这一讲最好的教材，值得停下来仔细读：
 KL、更新范数、学习率扫描，以及多个随机种子的对照------这些量在单次课堂预算的运行里看不到。支持这个解释的间接证据来自
 v3：补上步长约束后，同样的优势估计立刻兑现成最高分，方向与''卡在步长''一致。
 
-\subsection{5.6
+\subsection{6.6
 毛病在哪：更新步子没人管}\label{ux6bdbux75c5ux5728ux54eaux66f4ux65b0ux6b65ux5b50ux6ca1ux4ebaux7ba1}
 
 策略梯度只给方向，不给安全步长。学习率是固定的，优势偶尔被高估时，一次更新就可能把策略推得离原来很远------高斯分布的均值猛移、标准差猛缩，策略性格突变。
@@ -1311,7 +1388,7 @@ v3：补上步长约束后，同样的优势估计立刻兑现成最高分，方
 所以下一块要补的机制已经呼之欲出：\textbf{限制每次更新的步长}------这正是
 PPO 的全部内容。
 
-\subsection{5.7 本节小结}\label{ux672cux8282ux5c0fux7ed3-3}
+\subsection{6.7 本节小结}\label{ux672cux8282ux5c0fux7ed3-3}
 
 A2C 在 REINFORCE 上补的是''参照物''：基线思想（跟平均比、不跟零比）→
 理想基线就是状态价值 \(V^\pi(s)\) → 用 critic 网络去估它。与 REINFORCE
@@ -1323,10 +1400,10 @@ critic 基线会压低梯度方差（实验里能直接看到的只是动作幅�
 0.39，这不等同于方差的证据）；本次运行中它没有步长约束，训练里有近两百次迭代被一次更新推坏，评测反而不如
 v1（0.043 对 0.070）------这指向下一块拼图：管住步子。
 
-\section{6
-PPO：给更新步子加护栏}\label{ppoux7ed9ux66f4ux65b0ux6b65ux5b50ux52a0ux62a4ux680f}
+\section{7 v3
+PPO：给更新步子加护栏}\label{v3-ppoux7ed9ux66f4ux65b0ux6b65ux5b50ux52a0ux62a4ux680f}
 
-\subsection{6.1 信赖域思想：TRPO 一句话，PPO
+\subsection{7.1 信赖域思想：TRPO 一句话，PPO
 是它的好实现}\label{ux4fe1ux8d56ux57dfux601dux60f3trpo-ux4e00ux53e5ux8bddppo-ux662fux5b83ux7684ux597dux5b9eux73b0}
 
 ``每次更新别离旧策略太远''这个思想，学名叫\textbf{信赖域（trust
@@ -1339,7 +1416,7 @@ Optimization，近端策略优化）{[}2{]}是它广为流传的简化版：``Pr
 PPO
 长期是机器人控制与大模型对齐里的默认选择------大模型那边后来的变化，第15讲会讲。
 
-\subsection{6.2 概率比值与 clip
+\subsection{7.2 概率比值与 clip
 目标}\label{ux6982ux7387ux6bd4ux503cux4e0e-clip-ux76eeux6807}
 
 要约束''离旧策略多远''，先得有个量来度量它。PPO
@@ -1362,7 +1439,7 @@ r_t(\theta)=\frac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_{\text{old}}}(a_t\mid s_t
 L^{\text{CLIP}}=\mathbb{E}\big[\min\big(r_t A_t,\ \text{clip}(r_t,1-\epsilon,1+\epsilon)\,A_t\big)\big]
 \]
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.8\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig143-ppo-clip_arxiv-1707.06347.png}
 
@@ -1401,11 +1478,11 @@ L^{\text{CLIP}}=\mathbb{E}\big[\min\big(r_t A_t,\ \text{clip}(r_t,1-\epsilon,1+\
 TRPO 那样用 KL
 硬约束新旧策略的距离，只是让越界的更新''无利可图''；实际训练中 KL
 仍可能超标，\(r_t\) 也可能被别的样本带出区间。正因为 clip
-不是铁栅栏，工业级 PPO 才要再配 6.3 节的 KL 自适应学习率兜底，并持续监控
+不是铁栅栏，工业级 PPO 才要再配 7.3 节的 KL 自适应学习率兜底，并持续监控
 KL、策略熵和梯度范数。本讲后文说''夹进信赖域''，都是这个软的意思。
 \end{quote}
 
-\subsection{6.3 数据复用与 KL
+\subsection{7.3 数据复用与 KL
 自适应}\label{ux6570ux636eux590dux7528ux4e0e-kl-ux81eaux9002ux5e94}
 
 clip 还带来一个重要副产品：\textbf{同一批数据可以多用几遍了}。没有 clip
@@ -1427,7 +1504,7 @@ epoch，样本效率大幅提高，顺手缓解了 on-policy
 \item
   用当前策略采一批 rollout；
 \item
-  critic + GAE 算每步优势 \(A_t\)（第 5 节原样保留）；
+  critic + GAE 算每步优势 \(A_t\)（第 6 节原样保留）；
 \item
   切成多个 minibatch，用 \(L^{\text{CLIP}}\) 反复更新多轮，同时用 value
   loss 更新 critic；
@@ -1435,7 +1512,7 @@ epoch，样本效率大幅提高，顺手缓解了 on-policy
   按 KL 调学习率，回到第 1 步。
 \end{enumerate}
 
-\subsection{6.4 代码走读：v2 到 v3
+\subsection{7.4 代码走读：v2 到 v3
 改了什么}\label{ux4ee3ux7801ux8d70ux8bfbv2-ux5230-v3-ux6539ux4e86ux4ec0ux4e48}
 
 \texttt{code/rl/1\_rl\_basics/1\_1\_g1\_walk\_rl/train\_v3\_ppo.py} 在
@@ -1445,7 +1522,7 @@ v2 上加三块，正好对应上两节。第一块，policy loss
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\CommentTok{\# 关键变化(1)：clip——用概率比值把更新夹在信赖域内（见 6.2 节的图）}
+\CommentTok{\# 关键变化(1)：clip——用概率比值把更新夹在信赖域内（见 7.2 节的图）}
 \NormalTok{        ratio }\OperatorTok{=}\NormalTok{ torch.exp(log\_probs }\OperatorTok{{-}}\NormalTok{ batch[}\StringTok{"log\_probs"}\NormalTok{])    }\CommentTok{\# 相减取指数 = 新旧概率之比 r}
 \NormalTok{        unclipped }\OperatorTok{=}\NormalTok{ ratio }\OperatorTok{*}\NormalTok{ batch[}\StringTok{"advantages"}\NormalTok{]    }\CommentTok{\# 不裁剪的目标：比值越大，好动作赚得越多}
         \CommentTok{\# 把比值夹进 [1{-}ε, 1+ε] 再乘优势，得到一个"越界就不再涨"的版本。}
@@ -1496,7 +1573,7 @@ clip 一脉相承。这套''clip + 多轮复用 + KL
 G1
 的动作跟踪策略走的也是同一条路子------等下我们原样把它搬去做更难的任务。
 
-\subsection{6.5
+\subsection{7.5
 实验：三个算法同台，行走任务收口}\label{ux5b9eux9a8cux4e09ux4e2aux7b97ux6cd5ux540cux53f0ux884cux8d70ux4efbux52a1ux6536ux53e3}
 
 三个版本到齐，统一口径最后对照一次：
@@ -1513,7 +1590,7 @@ v2 & A2C（+critic +GAE） & 0.043 & 1.3\% \\
 \end{tabular}
 \end{center}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.98\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig144-walk-compare.png}
 
@@ -1528,7 +1605,7 @@ REINFORCE、v2 A2C、v3 PPO；各行标题上印着该版本的评测奖励与�
 
 表格和截图给的是终点成绩，把整个训练过程画出来，三者的差别更直白：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.96\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig146-train-reward-curves.png}
 
@@ -1547,23 +1624,23 @@ v2，后 2500 次迭代里它的原始值与滑动平均平均差 0.0046，而 v
 的细线都紧贴着各自的粗线（0.0007 与
 0.0009）。这里要防一个很容易犯的误读：\textbf{REINFORCE
 的高方差大在梯度上，不在这条曲线上}------曲线画的是 4096
-个环境的平均奖励，几万条样本一平均，逐次迭代之间本来就不会抖；4.7
-节那个方差说的是同一批数据里每个动作拿到的权重有多散，这张图证不了它（5.5
+个环境的平均奖励，几万条样本一平均，逐次迭代之间本来就不会抖；5.6
+节那个方差说的是同一批数据里每个动作拿到的权重有多散，这张图证不了它（6.5
 节已经提醒过同样的陷阱，只是方向相反）。v2
 的细线之所以抖，是它每一步真的把策略推得忽左忽右。
 
 \textbf{趋势那一层才是三者的差距所在}：v1 和 v2 大约 700
 次迭代后就双双卡在 0 附近再也上不去（末段滑动平均 0.008 与 0.007），v2
-还更低一点；v3 一路爬到 0.073，把另外两条甩开近一个量级------这正是 5.6
+还更低一点；v3 一路爬到 0.073，把另外两条甩开近一个量级------这正是 6.6
 节说的''更新步子没人管''与''管住了''的区别。
 
 不过 v3 这条线在 2500 迭代前后\textbf{掉了一级}：滑动平均从 0.073 落到
-0.055，之后再没回去。这不违背 6.2 节那条备注------clip
+0.055，之后再没回去。这不违背 7.2 节那条备注------clip
 是软约束不是铁栅栏，单次运行里出现这种回落并不稀奇。本讲不替它编一个原因：要定性得靠多个随机种子和更细的诊断量，超出课堂预算。记住这个时间点，读下一张损失图时它还会再出现一次。
 
 训练时记下的各项损失，则从另一个角度说明了三版到底各自在优化什么：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.98\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig146-train-loss-curves.png}
 
@@ -1580,7 +1657,7 @@ v2/v3 有；右下新旧策略 KL 只有 v3
 41 附近往下走（策略逐渐变确定），但走的节奏差很多------v1
 降得最慢、末段仍停在 22 以上，说明它的动作分布一直很散、迟迟收不拢；v2
 收到 15 附近；v3 一路压到
-5.9（三者中最低），动作最果断。（熵说的是分布\textbf{摊得多宽}，和 5.5
+5.9（三者中最低），动作最果断。（熵说的是分布\textbf{摊得多宽}，和 6.5
 节那个''动作幅度''不是一回事------后者量的是均值有多大，所以熵最高的 v1
 反而动作最小。）注意 v3 的熵在 2500 迭代之后\textbf{又反弹回 12
 附近}，和上一张图那次回落是同一个时间点------同一件事在两张图上都留下了痕迹。
@@ -1590,7 +1667,7 @@ v2/v3 有；右下新旧策略 KL 只有 v3
 迭代前后同样跳了一级、末段停在 0.030------又是那个时间点；v2 的则从 700
 迭代时的 0.027 起起落落地涨到末段的
 0.046。价值损失升高不等于评分员变笨------它要拟合的目标（回报）本身也随策略在变------但至少可以确定一件事：这两条线\textbf{并不都是''稳定收敛''}，所以想拿它来断言''A2C
-卡住与 critic 无关''，证据是不够的，5.5
+卡住与 critic 无关''，证据是不够的，6.5
 节那个解释仍然只是解释。\textbf{新旧策略 KL} 只有 v3 记录，全程稳定在
 0.015 附近（目标值 0.01）------图上那条 50
 次迭代滑动平均的粗线整段都落在 0.013 到 0.018
@@ -1598,7 +1675,7 @@ v2/v3 有；右下新旧策略 KL 只有 v3
 偏大就压学习率、偏小就放开。
 
 v3 把两个指标同时拿下：评测奖励最高（0.097），\textbf{摔倒率归零}。它对
-5.5 节那个反常结果给出的回收是：同一套 critic + GAE
+6.5 节那个反常结果给出的回收是：同一套 critic + GAE
 的优势估计，配上步长约束之后立刻兑现成了最高分------这支持''卡脖子的主要是步长''这个方向。但按上面价值损失那条线看，也不能反过来说
 v2 的 critic 一点问题没有。
 
@@ -1617,23 +1694,45 @@ step（\textbf{单个样本约被用 5 次}，不是 20 次------每个 epoch
 \texttt{max\_iterations} 调大即可提升绝对效果，算法本身不用动。
 \end{quote}
 
-\subsection{6.6
-实验加码：把同一套算法搬去做动作跟随}\label{ux5b9eux9a8cux52a0ux7801ux628aux540cux4e00ux5957ux7b97ux6cd5ux642cux53bbux505aux52a8ux4f5cux8ddfux968f}
+\subsection{7.6 本节小结}\label{ux672cux8282ux5c0fux7ed3-4}
+
+PPO 在 A2C 之上补的是''步长安全''：用概率比值 \(r_t\) 度量策略变化，clip
+让''走太远''无利可图，软性地把更新压在旧策略附近；有 clip
+抑制过大更新才敢多轮复用数据，再加 KL
+自适应学习率自动收放步长。在同预算的行走任务对照里（7.5 节），本次运行中
+v3 同时拿下最高奖励与零摔倒，回收了 v2 的反常；动作跟随任务上 PPO
+的最终权重拿到了明显更高的跟随奖励（注意那一组训练预算不对齐，见 第 8
+节）。
+
+\section{8 更难的任务：让 G1
+跟住一段真实动作}\label{ux66f4ux96beux7684ux4efbux52a1ux8ba9-g1-ux8ddfux4f4fux4e00ux6bb5ux771fux5b9eux52a8ux4f5c}
+
+前三节在同一个入门任务上把算法从最朴素做到了工业级。这一节不再动算法，改动任务：\textbf{同一套代码原样搬去一个难得多的问题}，看这套配方离开入门任务还剩多少本事。
+
+\subsection{8.1
+任务：从''别摔就行''到''逐帧对齐''}\label{ux4efbux52a1ux4eceux522bux6454ux5c31ux884cux5230ux9010ux5e27ux5bf9ux9f50}
 
 行走任务上三版好歹都能站住，光看 rollout
 截图差距还不算触目。把同一套代码搬到一个\textbf{难得多}的任务上试试：让
 G1 \textbf{逐帧贴住一段真实武术动作}------参考动作由真人视频重定向到 G1
-得到，用的正是 4.4 节认识的那条管线：GVHMR 从视频恢复人体动作，GMR
+得到，用的正是第 4 节那条管线：GVHMR 从视频恢复人体动作，GMR
 把它重定向成 G1
-的参考轨迹。它比走路难在目标上：不再是''别摔就行''，而是每一帧都要匹配参考姿态。这一组的代码在
-\texttt{code/rl/1\_rl\_basics/1\_3\_g1\_motion\_tracking/}，三个版本与行走线一一对应，只把环境从速度指令换成了参考动作跟踪；评测摘要同样落在
+的参考轨迹。它比走路难在目标上：不再是''别摔就行''，而是每一帧都要匹配参考姿态。
+
+这一组的代码在
+\texttt{code/rl/1\_rl\_basics/1\_3\_g1\_motion\_tracking/}，三个版本与行走线\textbf{文件名一一对应}（4.5
+节那张代码地图），差异只有三处：环境从速度指令换成参考动作跟踪、多一个参考动作文件参数，权重也落在另一个目录。网络结构（\texttt{model.py}
+里的 \texttt{ActorCritic}）两条线逐字相同。评测摘要同样落在
 \texttt{code/rl/1\_rl\_basics/result/1\_3\_g1\_motion\_tracking/} 下的
 \texttt{.json} 里。
+
+\subsection{8.2
+这件事真机上有人做成过：BeyondMimic}\label{ux8fd9ux4ef6ux4e8bux771fux673aux4e0aux6709ux4ebaux505aux6210ux8fc7beyondmimic}
 
 这正是 BeyondMimic{[}4{]} 做的事情------同一套 PPO 配方，训练真实宇树 G1
 做出空中侧手翻、旋踢、翻身踢、冲刺这类敏捷动作：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.7\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig144-beyondmimic-real_arxiv-2508.08241.png}
 
@@ -1649,6 +1748,9 @@ G1 \textbf{逐帧贴住一段真实武术动作}------参考动作由真人视�
 备注：本讲借用的是 BeyondMimic
 的\textbf{动作跟随}那一半------让机器人稳稳执行给定的动捕轨迹，而不是凭空''涌现''出跑酷。这一点要说清楚，免得对强化学习的能力产生误解：难点在控制，不在动作创意。
 \end{quote}
+
+\subsection{8.3
+三版对照：先说清这组数字能支撑什么}\label{ux4e09ux7248ux5bf9ux7167ux5148ux8bf4ux6e05ux8fd9ux7ec4ux6570ux5b57ux80fdux652fux6491ux4ec0ux4e48}
 
 仿真里跑同样的三档，但要先把口径讲清楚：\textbf{这一组不是公平的算法对照。}
 v3 直接复用了原版 PPO 训到 10000 迭代的权重，而 v1/v2 只训了 3000
@@ -1667,7 +1769,7 @@ v2 & A2C（3000 迭代） & 0.046 & 1.2\% \\
 \end{tabular}
 \end{center}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 
 {\centering \includegraphics[width=0.98\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture14/ref/fig144-track-compare.png}
 
@@ -1689,11 +1791,11 @@ REINFORCE、v2 A2C、v3 PPO；各行标题上写着该版本的评测奖励与�
 PPO
 的最终权重在硬任务上拿到了明显更高的跟随奖励。想把它坐实成''任务越难、差距越大''，还得统一环境步数
 / 墙钟 / 优化 step
-再跑多个随机种子。真正预算对齐的对照是行走任务那组（6.5 节，三者同为
+再跑多个随机种子。真正预算对齐的对照是行走任务那组（7.5 节，三者同为
 3000 迭代）。
 
 \begin{quote}
-备注（本讲实验结论的效力边界）：6.5
+备注（本讲实验结论的效力边界）：7.5
 节与本节的数字都来自\textbf{单次训练、单次评测}，没有多随机种子、没有置信区间，评测回合数也有限；rollout
 截图只是定性展示，不能替代统计。要把这类对照写进正式结论，标准做法是：报告训练曲线的均值
 ± 标准差（至少 3\textasciitilde5 个种子）、评测至少 100
@@ -1701,19 +1803,9 @@ PPO
 的选取规则。本讲的目的是让你看清三个算法\textbf{机制上}的差别，教学演示的数字请按''本次运行观察到''来读。
 \end{quote}
 
-\subsection{6.7 本节小结}\label{ux672cux8282ux5c0fux7ed3-4}
+\section{9 本讲小结}\label{ux672cux8bb2ux5c0fux7ed3}
 
-PPO 在 A2C 之上补的是''步长安全''：用概率比值 \(r_t\) 度量策略变化，clip
-让''走太远''无利可图，软性地把更新压在旧策略附近；有 clip
-抑制过大更新才敢多轮复用数据，再加 KL
-自适应学习率自动收放步长。在同预算的行走任务对照里（6.5 节），本次运行中
-v3 同时拿下最高奖励与零摔倒，回收了 v2 的反常；动作跟随任务上 PPO
-的最终权重拿到了明显更高的跟随奖励（注意那一组训练预算不对齐，见 6.6
-节）。
-
-\section{7 本讲小结}\label{ux672cux8bb2ux5c0fux7ed3}
-
-\subsection{7.1
+\subsection{9.1
 一条演进链：每一步为什么发生}\label{ux4e00ux6761ux6f14ux8fdbux94feux6bcfux4e00ux6b65ux4e3aux4ec0ux4e48ux53d1ux751f}
 
 回看整条路，每个算法都是被前一个的毛病\textbf{逼}出来的：
@@ -1723,9 +1815,9 @@ v3 同时拿下最高奖励与零摔倒，回收了 v2 的反常；动作跟随�
 \toprule\noalign{}
 版本 & 算法 & 新增机制 & 解决什么毛病 & 对应章节 \\
 \midrule\noalign{}
-v1 & REINFORCE & 策略梯度 + reward-to-go & ------（起点） & 第 4 节 \\
-v2 & A2C & critic 基线 + GAE 优势 & v1 回报噪声大（方差） & 第 5 节 \\
-v3 & PPO & clip + 多轮复用 + KL 自适应 & v2 更新步长没人管 & 第 6 节 \\
+v1 & REINFORCE & 策略梯度 + reward-to-go & ------（起点） & 第 5 节 \\
+v2 & A2C & critic 基线 + GAE 优势 & v1 回报噪声大（方差） & 第 6 节 \\
+v3 & PPO & clip + 多轮复用 + KL 自适应 & v2 更新步长没人管 & 第 7 节 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
@@ -1741,11 +1833,11 @@ critic + GAE 把每步的优势估出来 → 切成 4 份 minibatch 反复训 5
 超参数 & 取值 & 在哪一节出现 \\
 \midrule\noalign{}
 折扣因子 \(\gamma\) & 0.99 & 2.3 节 \\
-GAE 系数 \(\lambda\) & 0.95 & 5.3 节 \\
-clip 范围 \(\epsilon\) & 0.2 & 6.2 节 \\
-复用轮数 × minibatch 数 & 5 × 4 & 6.3 节 \\
-目标 KL（学习率自适应） & 0.01 & 6.3 节 \\
-熵奖励系数 & 0.01 & 4.5 节 \\
+GAE 系数 \(\lambda\) & 0.95 & 6.3 节 \\
+clip 范围 \(\epsilon\) & 0.2 & 7.2 节 \\
+复用轮数 × minibatch 数 & 5 × 4 & 7.3 节 \\
+目标 KL（学习率自适应） & 0.01 & 7.3 节 \\
+熵奖励系数 & 0.01 & 5.4 节 \\
 并行环境 × 每轮步数 × 迭代 & 4096 × 24 × 3000 & 1.4 节 \\
 \bottomrule\noalign{}
 \end{tabular}
@@ -1769,16 +1861,16 @@ clip 范围 \(\epsilon\) & 0.2 & 6.2 节 \\
 策略梯度方法 & 基于策略一族中沿梯度上升的子类 & 3.2 节 \\
 actor-critic & 策略网络 + 价值网络的混合架构，横跨基于价值与基于策略两类 & 3.3 节 \\
 on-policy / off-policy & 学的策略和采数据的策略是否同一个 & 3.4 节 \\
-reward-to-go & 只算这一步之后的回报 & 4.2 节 \\
-基线 / 优势 & 参照物 / 比这个状态的平均水平好多少（\(A=Q-V\)） & 5.1 节 / 5.2 节 \\
-bootstrap（自举） & 用价值估计替代部分实际回报；REINFORCE 与 actor-critic 的分界 & 5.3 节 \\
-GAE & 多步时序差分残差的 \(\lambda\) 加权，估优势 & 5.3 节 \\
-信赖域 / clip & 更新尽量待在旧策略附近（软约束）/ 用裁剪实现它 & 6.1 节 / 6.2 节 \\
+reward-to-go & 只算这一步之后的回报 & 5.2 节 \\
+基线 / 优势 & 参照物 / 比这个状态的平均水平好多少（\(A=Q-V\)） & 6.1 节 / 6.2 节 \\
+bootstrap（自举） & 用价值估计替代部分实际回报；REINFORCE 与 actor-critic 的分界 & 6.3 节 \\
+GAE & 多步时序差分残差的 \(\lambda\) 加权，估优势 & 6.3 节 \\
+信赖域 / clip & 更新尽量待在旧策略附近（软约束）/ 用裁剪实现它 & 7.1 节 / 7.2 节 \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
 
-\subsection{7.2 回到分类地图：GRPO 与 off-policy
+\subsection{9.2 回到分类地图：GRPO 与 off-policy
 在等下两讲}\label{ux56deux5230ux5206ux7c7bux5730ux56fegrpo-ux4e0e-off-policy-ux5728ux7b49ux4e0bux4e24ux8bb2}
 
 用第 3 节的三个划分给本讲定位：我们全程走在
@@ -1793,7 +1885,7 @@ backbone、只加一个 value
 head，也可以另用一个小得多的网络），也取决于并行与 offload
 怎么实现，反正不是简单的''翻倍''。但这个场景也有个本讲没有的便利：同一道题可以让模型采样\textbf{一组}回答，组内的平均分天然就是''这个状态的平均水平''。于是
 GRPO 做了个漂亮的取舍：\textbf{保留 PPO 的 clip，请走
-critic}，用组内相对优势直接当权重。critic 在第 5 节被我们请进来、到 GRPO
+critic}，用组内相对优势直接当权重。critic 在第 6 节被我们请进来、到 GRPO
 又被请走，这不叫倒退：换了场景之后，``参照物从哪来''这个老问题有了更省的答案。你会发现本讲建立的优势、信赖域、clip
 这套直觉，原样迁移过去。
 
