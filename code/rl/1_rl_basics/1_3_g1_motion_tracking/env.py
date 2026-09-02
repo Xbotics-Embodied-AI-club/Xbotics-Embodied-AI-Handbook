@@ -4,7 +4,7 @@
 参考动作，而不是跟上一个速度指令。接口刻意保持一致，三个训练脚本才能原样搬过来，
 把「任务变难」这个变量单独隔离出来。
 
-讲义对应：第14讲 6.6 节。
+讲义对应：第14讲第 8 节。
 """
 from __future__ import annotations
 
@@ -64,6 +64,11 @@ class MjlabTrackingEnv:
         self.action_dim = int(self._env.single_action_space.shape[0])
         self.motion = self._motion_command.motion
         self.metadata = self._env.metadata
+        # 观测维度由环境说了算，不由训练脚本猜：跟踪任务的 critic 观测里带参考动作
+        # 的相对量，改一次奖励或观测项它就变，写死的数字不会跟着变。
+        obs, critic_obs = self.get_observations()
+        self.obs_dim = int(obs.shape[1])
+        self.critic_obs_dim = int(critic_obs.shape[1])
 
     @property
     def unwrapped(self) -> Any:

@@ -3,7 +3,7 @@
 结构与行走线的同名文件一致：`ActorCritic` 是普通 PyTorch 模型，`compute_gae`
 是 v2/v3 用的优势估计工具。
 
-讲义对应：第14讲 6.6 节。
+讲义对应：第14讲第 8 节。
 """
 from __future__ import annotations
 

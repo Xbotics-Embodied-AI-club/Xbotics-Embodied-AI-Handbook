@@ -1,9 +1,9 @@
 """参考动作文件的读取与校验。
 
-参考动作由 `1_2_video_to_g1_reference/` 那条管线产出（视频 → GVHMR → GMR → npz）。
+参考动作由 `1_0_video_to_g1_reference/` 那条管线产出（视频 → GVHMR → GMR → npz）。
 本文件只负责把它读进来、逐项校验形状，并提供训练前预览用的小工具。
 
-讲义对应：第14讲 4.4 节（管线）与 6.6 节（用它训练）。
+讲义对应：第14讲 4.4 节（管线）与第 8 节（用它训练）。
 """
 from __future__ import annotations
 
@@ -116,3 +116,39 @@ class MotionClip:
             body_lin_vel_w=body_lin_vel_w,
             body_ang_vel_w=body_ang_vel_w,
         )
+
+
+def describe_motion_dataset(motion_file: str | Path) -> dict[str, str | int | float | list[float]]:
+    """读一遍参考动作文件，汇总成一份可打印的概况。
+
+    Args:
+        motion_file: 参考动作 npz 路径。
+
+    Returns:
+        含帧数、帧率、时长与几帧关节角样本的字典。
+    """
+    motion = MotionClip.load(motion_file, device="cpu")
+    middle_frame = motion.num_frames // 2
+    return {
+        "motion_file": str(motion_file),
+        "frames": motion.num_frames,
+        "fps": motion.fps,
+        "duration_s": round(motion.duration_s, 2),
+        "joint_dim": int(motion.joint_pos.shape[1]),
+        "body_count": int(motion.body_pos_w.shape[1]),
+        "first_joint_pos": motion.joint_snapshot(0),
+        "middle_joint_pos": motion.joint_snapshot(middle_frame),
+        "last_joint_pos": motion.joint_snapshot(motion.num_frames - 1),
+    }
+
+
+def print_motion_dataset_preview(motion_file: str | Path) -> None:
+    """把参考动作的概况打到终端，开训前肉眼确认数据没读错。
+
+    Args:
+        motion_file: 参考动作 npz 路径。
+    """
+    preview = describe_motion_dataset(motion_file)
+    print("Motion dataset preview")
+    for key, value in preview.items():
+        print(f"{key}: {value}")

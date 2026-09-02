@@ -269,8 +269,8 @@ def run_training(motion_file, run_name, num_envs, max_iterations, num_steps_per_
 
     torch.manual_seed(seed)
     env = BeyondMimicEnv(motion_file, num_envs=num_envs, device=device, seed=seed)
-    obs, critic_obs = env.reset()
-    policy = ActorCritic(obs_dim=obs.shape[1], critic_obs_dim=critic_obs.shape[1], action_dim=env.action_dim)
+    env.reset()
+    policy = ActorCritic(obs_dim=env.obs_dim, critic_obs_dim=env.critic_obs_dim, action_dim=env.action_dim)
     policy.to(env.device)
 
     training_settings = {
@@ -279,7 +279,7 @@ def run_training(motion_file, run_name, num_envs, max_iterations, num_steps_per_
         "save_interval": save_interval, "device": device, "seed": seed,
         "checkpoint_dir": str(checkpoint_dir), "wandb_project": wandb_project, "wandb_mode": wandb_mode,
         "gamma": gamma, "lam": lam,
-        "obs_dim": obs.shape[1], "critic_obs_dim": critic_obs.shape[1], "action_dim": env.action_dim,
+        "obs_dim": env.obs_dim, "critic_obs_dim": env.critic_obs_dim, "action_dim": env.action_dim,
     }
 
     data = TrackingData(env, policy, num_steps_per_env, gamma, lam)

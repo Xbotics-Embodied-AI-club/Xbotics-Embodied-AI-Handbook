@@ -7,7 +7,7 @@
 - `marshal-arts.mp4` — 原始人类动作视频。
 - `marshal-arts.npz` — 重定向到宇树 G1 的参考动作（682 帧、50 FPS、29 个关节、30 个跟踪 body）。
 
-生成管线（见 `../../1_2_video_to_g1_reference/`）：
+生成管线（见 `../../1_0_video_to_g1_reference/`）：
 
 1. GVHMR 从 `marshal-arts.mp4` 恢复人体动作；
 2. GMR 把人体动作重定向到 Unitree G1；

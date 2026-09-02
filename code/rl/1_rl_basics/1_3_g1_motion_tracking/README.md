@@ -6,28 +6,34 @@
 
 | 脚本 | 算法 | 说明 |
 |---|---|---|
+| 脚本 | 算法 | 说明 |
+|---|---|---|
 | `train_v1_reinforce.py` | REINFORCE | 最朴素策略梯度：无 critic、无 GAE、无裁剪 |
 | `train_v2_a2c.py` | A2C | 加 critic 基线 + GAE，但不裁剪、数据只用一遍、固定学习率 |
-| `train_v3_ppo.py` | **PPO（完整版 / 原版）** | clip + 多轮 minibatch 复用 + KL 自适应 + value clip |
+| `train_v3_ppo.py` | **PPO（完整版）** | clip + 多轮 minibatch 复用 + KL 自适应 + value clip |
+
+三版**预算与超参完全一致**（4096 环境 × 24 步 × 3000 迭代、熵系数 0.01），与行走线同值，
+所以这一组的差距只反映算法机制。此前 v3 是一份单独写的 10000 迭代脚本、熵系数 0.005，
+算法差异与训练时长混在一起，那组对照只能读作"各版本最终 checkpoint 的展示"。
 
 在动作跟随这种较难的任务上，简单算法（v1/v2）会明显跟不动，凸显出 `train_v3_ppo.py` 里那套机制的必要性——这正好和 1_1 的行走对照呼应：**任务越难，朴素方法和完整 PPO 的差距越大**。
 
 ## 组件
 
-- `env.py` — `BeyondMimicEnv`：mjlab 动作跟踪环境（actor / critic 双观测，critic 含特权信息）。
-- `motion.py` — 参考动作 `MotionClip` 的读取与校验。
-- `model.py` — 共享的 `ActorCritic` 与 `compute_gae`（v1/v2 用）。
-- `train_v3_ppo.py` — 完整 PPO 训练入口（原版）。
-- `train_v1_reinforce.py` / `train_v2_a2c.py` — 简单算法对照。
-- `rollout.py` — 载 checkpoint 录制跟踪效果视频。
+- `env.py` — `BeyondMimicEnv`：mjlab 动作跟踪环境（actor / critic 双观测，critic 含特权信息），
+  并把三个观测维度暴露给训练脚本，免得维度被写死在别处。
+- `motion.py` — 参考动作 `MotionClip` 的读取与校验，以及开训前的概况预览。
+- `model.py` — 三个版本共用的 `ActorCritic` 与 `compute_gae`（与行走线逐字相同）。
+- `train_v1_reinforce.py` / `train_v2_a2c.py` / `train_v3_ppo.py` — 三级算法阶梯。
+- `rollout.py` — 按统一口径评测三版并录像。
 
 ## 怎么跑
 
 ```bash
-python rl/1_rl_basics/1_3_g1_motion_tracking/train_v3_ppo.py               # PPO（原版）
-python rl/1_rl_basics/1_3_g1_motion_tracking/train_v1_reinforce.py  # REINFORCE 对照
-python rl/1_rl_basics/1_3_g1_motion_tracking/train_v2_a2c.py        # A2C 对照
-python rl/1_rl_basics/1_3_g1_motion_tracking/rollout.py             # 录视频
+python rl/1_rl_basics/1_3_g1_motion_tracking/train_v1_reinforce.py  # REINFORCE
+python rl/1_rl_basics/1_3_g1_motion_tracking/train_v2_a2c.py        # A2C
+python rl/1_rl_basics/1_3_g1_motion_tracking/train_v3_ppo.py        # PPO
+python rl/1_rl_basics/1_3_g1_motion_tracking/rollout.py             # 三版逐个录像
 ```
 
-权重存到 `DATASETS_ROOT/models/trained/xbotics_rl_beyondmimic/<run>/`，曲线在 W&B（project `rl_class`）。参考动作来自 `rl/1_rl_basics/1_2_video_to_g1_reference/` 的“视频→G1 参考动作”预处理管线。
+权重存到 `DATASETS_ROOT/models/trained/xbotics_rl_beyondmimic/<run>/`，曲线在 W&B（project `rl_class`）。参考动作来自 `rl/1_rl_basics/1_0_video_to_g1_reference/` 的“视频→G1 参考动作”预处理管线。

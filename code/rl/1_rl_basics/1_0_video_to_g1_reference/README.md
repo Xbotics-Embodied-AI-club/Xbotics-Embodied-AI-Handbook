@@ -18,9 +18,9 @@
 ```bash
 cd code
 uv sync --extra gpu_x86    # GVHMR / GMR 依赖随该 extra 安装
-uv run python rl/1_rl_basics/1_2_video_to_g1_reference/video_to_human_motion.py
-uv run python rl/1_rl_basics/1_2_video_to_g1_reference/human_motion_to_g1_reference.py
-uv run python rl/1_rl_basics/1_2_video_to_g1_reference/build_motion_npz.py
+uv run python rl/1_rl_basics/1_0_video_to_g1_reference/video_to_human_motion.py
+uv run python rl/1_rl_basics/1_0_video_to_g1_reference/human_motion_to_g1_reference.py
+uv run python rl/1_rl_basics/1_0_video_to_g1_reference/build_motion_npz.py
 ```
 
 体积大的中间产物（GVHMR/GMR 输出）不入库，落
