@@ -31,7 +31,6 @@ lift/elbow 的**行程/净位移 = 12–144 倍**（来回摸索），方向翻�
 """
 
 import numpy as np
-
 from recipe import PITCH_CANDIDATES_DEG, SUM_GRASP_DEG, WROLL_GRASP_DEG
 from servo import dls_delta
 
@@ -50,27 +49,32 @@ from servo import dls_delta
 SUM_GRASP = np.radians(SUM_GRASP_DEG)    # lift+elbow+wflex 锁定值 ⇒ 夹爪俯仰
 WROLL_GRASP = np.radians(WROLL_GRASP_DEG)
 PITCH_CANDIDATES = np.radians(PITCH_CANDIDATES_DEG)
+# 伺服每步的关节增量上限（弧度）。限步是为了让解出来的轨迹是连续小步，而不是一跳到位。
+MAX_STEP = np.radians(2.0)
 
 
-def grasp_point(kin, q, pocket=None):
+def grasp_point(kin, q, pocket):
     """夹持口袋在**基座系**下的位置：`gripper_frame_link` 位姿 + 一个刚体偏移。
 
-    ★这个偏移是**实测标定**的，不是从 URDF 几何推的（推了三轮，三轮都被物理否掉）：
-    让 `pure_v1` 策略去抓（它实测持续抓稳 40.6%），在 `agent.is_grasping(item)` 头一次
-    为真的那一帧记下方块中心在 `gripper_frame_link` 局部系的坐标，44 次成功抓取的中位数即
-    `POCKET_LOCAL`（各轴 std 0.8–0.95cm）。顺带两个自洽旁证：抓住那一刻夹爪角中位 **17.57°**
-    （与真机 pinch 中位 17.5° 逐字吻合）、方块高度 2.06cm（在台面上）。
+    Args:
+        kin: `servo.ArmKinematics`。
+        q: 六维关节角（弧度）。
+        pocket: 口袋在 `gripper_frame_link` 局部系的偏移（m），逐场景不同，
+            由调用方从 `recipe.pocket(scene)` 取 —— 本模块不留默认值，
+            默认值会让"这批数据按哪套标定产的"变成看不出来的事。
 
-    前三轮为什么错：`finger1_tip` / `finger2_tip` **是纯 frame、没有碰撞体**
-    （碰撞体只挂在 `gripper_link` 与 `moving_jaw_so101_v1_link` 上），
-    所以"两指中点"这一类模型从一开始就没有物理依据；而且它还不是刚体点
-    —— 夹爪从合拢开到 48°，中点平移 31.6mm（`finger1_tip` 是固定指，只有 `finger2_tip` 动）。
+    Returns:
+        `(3,)` 基座系坐标。
+
+    口袋是**实测标定**值，不是从 URDF 几何推的：`finger1_tip` / `finger2_tip` 是纯 frame、
+    没有碰撞体（碰撞体只挂在 `gripper_link` 与 `moving_jaw_so101_v1_link` 上），
+    而且两指中点随张开角在夹爪开到 48° 时平移 31.6mm，不是刚体点。
     """
     p, R = kin.ee_pose_local(q)
-    return p + R @ (pocket_local() if pocket is None else np.asarray(pocket, float))
+    return p + R @ np.asarray(pocket, float)
 
 
-def pitch_locked_jacobian(kin, q, delta=1e-4, pocket=None):
+def pitch_locked_jacobian(kin, q, *, pocket, delta=1e-4):
     """抓取点对 (pan, lift, elbow) 的雅可比，**且 wflex 同步补偿以锁住俯仰**。
 
     数值差分而不是解析式：抓取点是腕上的一个偏移点、不是 link 原点，解析式还要额外补
@@ -117,7 +121,7 @@ def jaw_yaw_error(kin, q):
 
 def solve_grasp_pose(kin, base, q_seed, target_world, grip, lo, hi,
                      sum_pitch=SUM_GRASP, iters=300, tol=1e-4,
-                     max_dq=np.radians(2.0), pocket=None, wroll=None):
+                     max_dq=MAX_STEP, *, pocket, wroll=None):
     """解「抓取点落在 target_world」的关节角，俯仰与 wroll 按锁定关系走。
 
     只有 pan/lift/elbow 三个自由度对三维位置 —— 精确定解，没有零空间可漂。
@@ -140,7 +144,7 @@ def solve_grasp_pose(kin, base, q_seed, target_world, grip, lo, hi,
 
 
 def solve_approach_and_grasp(kin, base, q_seed, item_xy, item_half, approach_h,
-                             grip, lo, hi, pocket=None, wroll=None):
+                             grip, lo, hi, *, pocket, wroll=None):
     """一次解出「预抓取（正上方）」与「抓取」两个位姿，**共用同一个俯仰**。
 
     两个位姿必须同俯仰，否则下降段还要一边平移一边转腕，既不好看也容易把方块推走。
@@ -150,19 +154,19 @@ def solve_approach_and_grasp(kin, base, q_seed, item_xy, item_half, approach_h,
     for sp in PITCH_CANDIDATES:
         tgt_g = np.array([item_xy[0], item_xy[1], item_half])
         tgt_a = tgt_g + np.array([0.0, 0.0, approach_h])
-        q_a, e_a, ok_a = solve_grasp_pose(kin, base, q_seed, tgt_a, grip, lo, hi, sp,
-                                          pocket=pocket, wroll=wroll)
+        q_a, _, ok_a = solve_grasp_pose(kin, base, q_seed, tgt_a, grip, lo, hi, sp,
+                                       pocket=pocket, wroll=wroll)
         if not ok_a:
             continue
-        q_g, e_g, ok_g = solve_grasp_pose(kin, base, q_a, tgt_g, grip, lo, hi, sp,
-                                          pocket=pocket, wroll=wroll)
+        q_g, _, ok_g = solve_grasp_pose(kin, base, q_a, tgt_g, grip, lo, hi, sp,
+                                       pocket=pocket, wroll=wroll)
         if ok_g:
             return q_a, q_g, sp, True
     return None, None, None, False
 
 
 def solve_aligned_grasp(kin, base, q_seed, item_xy, item_half, approach_h, grip, lo, hi,
-                        iters=4):
+                        *, pocket, iters=4):
     """解预抓取/抓取位姿，并用 wrist_roll 把两指连线**对齐到方块的面**。
 
     不对齐的代价是硬的：偏 θ 角时两指要跨 `40/cos θ` mm，撒点区远端（pan≈−35°）
@@ -173,7 +177,8 @@ def solve_aligned_grasp(kin, base, q_seed, item_xy, item_half, approach_h, grip,
     out = None
     for _ in range(iters):
         qa, qg, sp, c = solve_approach_and_grasp(kin, base, q_seed, item_xy, item_half,
-                                                 approach_h, grip, lo, hi, wroll=wr)
+                                                 approach_h, grip, lo, hi,
+                                                 pocket=pocket, wroll=wr)
         if not c:
             return None, None, None, None, False
         out = (qa, qg, sp)

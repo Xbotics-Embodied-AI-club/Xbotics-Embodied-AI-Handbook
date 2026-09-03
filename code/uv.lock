@@ -3275,6 +3275,40 @@ wheels = [
 ]
 
 [[package]]
+name = "modelscope"
+version = "1.39.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "filelock" },
+    { name = "modelscope-hub" },
+    { name = "packaging" },
+    { name = "requests" },
+    { name = "setuptools", version = "79.0.1", source = { registry = "https://pypi.org/simple" } },
+    { name = "tqdm" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/33/ae/5118b6b8cea49c4071dc54dba80e63ed20da920bde388bf1ed7916f5cd5c/modelscope-1.39.1.tar.gz", hash = "sha256:40cc02051e4cd67931c70f1956b2a22efc1b35f2a432b5110204406d4a28e17f", size = 4548222, upload-time = "2026-08-04T08:27:03.936Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ee/c5/ff578b44a7ba5d86edfaae1ce7db9082f95477bd22ccb2514c1aee4636b7/modelscope-1.39.1-py3-none-any.whl", hash = "sha256:c1567b9d319b11d815832d13c11f71a6413b19cf6374cef6937c54d830552a97", size = 6038125, upload-time = "2026-08-04T08:27:01.121Z" },
+]
+
+[[package]]
+name = "modelscope-hub"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "filelock" },
+    { name = "requests" },
+    { name = "tqdm" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3b/d8/a61ac59ab55f4d8d6c743ac52421bbe0cd68fabf270908e68585c04deab6/modelscope_hub-0.4.0.tar.gz", hash = "sha256:5be8a9a317871e45bd34e9e82ea18b0f831e48d79763b600255b869c396025b2", size = 233483, upload-time = "2026-09-02T06:46:34.771Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/59/6e/27dbdc0a324ee7496636c033e81753ccc97dafe7480270513cb9b86359f2/modelscope_hub-0.4.0-py3-none-any.whl", hash = "sha256:deab83b5cc6991fa7889e87c1f99d61f26ba57a02ec6d5b5156afa198eaa170f", size = 200414, upload-time = "2026-09-02T06:46:33.287Z" },
+]
+
+[[package]]
 name = "more-itertools"
 version = "11.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5732,7 +5766,7 @@ wheels = [
 [[package]]
 name = "so101-sim"
 version = "0.1.0"
-source = { git = "https://github.com/Xbotics-Embodied-AI-club/Xbotics-SO101-Sim.git#730672bd730b7a5c697e47b71b2a44d46c460861" }
+source = { git = "https://github.com/Xbotics-Embodied-AI-club/Xbotics-SO101-Sim.git#6964ead320fa974630da34e454f5acd0e4560288" }
 dependencies = [
     { name = "dacite", marker = "(platform_machine != 'aarch64' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or (platform_python_implementation != 'CPython' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or (sys_platform != 'linux' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or extra == 'extra-19-xbotics-experiments-gpu-x86' or extra == 'extra-19-xbotics-experiments-rdk-s100'" },
     { name = "gymnasium", marker = "(platform_machine != 'aarch64' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or (platform_python_implementation != 'CPython' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or (sys_platform != 'linux' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or extra == 'extra-19-xbotics-experiments-gpu-x86' or extra == 'extra-19-xbotics-experiments-rdk-s100'" },
@@ -7186,6 +7220,7 @@ gpu-x86 = [
     { name = "matplotlib" },
     { name = "mediapy" },
     { name = "mjlab" },
+    { name = "modelscope" },
     { name = "mujoco" },
     { name = "mujoco-warp" },
     { name = "nbclient" },
@@ -7282,6 +7317,7 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'gpu-x86'" },
     { name = "mediapy", marker = "extra == 'gpu-x86'" },
     { name = "mjlab", marker = "extra == 'gpu-x86'", specifier = ">=1.4,<1.5" },
+    { name = "modelscope", marker = "extra == 'gpu-x86'" },
     { name = "mujoco", marker = "extra == 'gpu-x86'" },
     { name = "mujoco-warp", marker = "extra == 'gpu-x86'" },
     { name = "nbclient", marker = "extra == 'gpu-x86'" },

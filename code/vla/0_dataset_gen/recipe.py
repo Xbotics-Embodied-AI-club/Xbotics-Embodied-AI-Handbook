@@ -43,6 +43,23 @@
 
 import numpy as np
 
+# 视频编码。真机 9 份实测全是 h264；`lerobot-record` 不给 `--dataset.vcodec` 时录出 av1，
+# 而官方合并逐字比 `features`（`video.codec` 在其中）⇒ 不显式声明就合不了。
+VIDEO_CODEC = "h264"
+
+# 允许比源集少几帧。
+#
+# 重录要的是**逐集 1:1 还原源数据集**：窗口给正好 `源帧数/30`，动作逐位等于源集。
+# `lerobot-record` 按墙钟停表，只要有循环踩过 33.3ms 尾部就少几帧 —— 真机采集同样会
+# 偶尔差一两帧没跟上，所以少几帧是可接受的，**多出来则不接受**：多的全是静止帧，
+# 会把末尾静止段撑长（余量 90 帧时实测撑到 68 帧、占集长 15.9%，而真机是 16 帧 / 3.9%）。
+FRAME_TOLERANCE = 5
+
+# 一集最多录几次。超差就重录，而不是放宽判据把它收下。
+# 上限存在的意义是**不让它挂死**：始终录不进容差的集会耗尽次数、被标记作废，
+# 收口时用官方 `delete_episodes` 删掉，并在日志里留下计数 —— 而不是安静地重试到天亮。
+MAX_RECORD_RETRIES = 5
+
 # 夹持口袋的 y 分量（m）：三个场景共用，标定自策略成功抓取的中位数。
 POCKET_Y = 0.0020
 # 俯仰锁定值（lift+elbow+wflex 之和）与腕滚，度。取自真机 300 集 pinch 帧的中位数。
@@ -55,11 +72,29 @@ PITCH_CANDIDATES_DEG = (85.0, 90.0, 80.0, 95.0, 75.0, 70.0)
 
 # 三个对外分发场景。录制与渲染用同一个环境，一个场景一个环境。
 # 每个键的含义见模块 docstring 的那张表。
+#
+# ★ `task_text` **逐字抄真机数据集的 tasks.parquet**，不自己拟措辞。
+#   语言指令是模型的输入，措辞不同就是不同的任务：仿真写 "Pick up a cylinder…"
+#   而真机写 "Pick up a can…" 时，两份数据永远混不成同一条指令，
+#   模型还得额外学一层同义。真机三句实测（`$DATASETS_ROOT/datasets/public/
+#   so101-pick-place-tasks/*/meta/tasks.parquet`）：
+#     · cube      → "Pick up a cube and place in the bin"
+#     · can       → "Pick up a can and place in the bin"
+#     · 小方块    → 真机侧**没有**抓放任务，只有 "Stack the smaller cube on the
+#                   larger one"（那是堆叠，不是抓放）⇒ cube20 无真机对应指令
+#
+#   ⇒ cube20 是唯一的例外：没有可抄的真机指令，沿用仿真源数据集自己那句
+#     "Pick up a small cube and place in the bin"。它与真机任何一句都不同名，
+#     合并后是独立的一条指令，不会与真机 cube 那条混成同一个 task_index。
+# `real_task` 是**验收时拿来当尺子的那份真机数据**，不是"混训要配哪一份"。
+# 真机 9 份的规格签名实测完全相同（distinct-signatures = 1），所以拿哪一份当尺子都一样；
+# 有同名任务的就用同名那份，cube20 真机侧没有抓放小方块的任务，借 cube 那份当尺子。
 SCENES = {
     "cube40": {
         "env_id": "SO101PickPlaceCube40-v1",
         "source_name": "pick_place_cube_40mm",
         "task_text": "Pick up a cube and place in the bin",
+        "real_task": "pick_up_a_cube_and_place_in_the_bin",
         "item_half": 0.020,
         "pocket_x": -0.0217,
         "pocket_z": -0.016,
@@ -71,6 +106,7 @@ SCENES = {
         "env_id": "SO101PickPlaceCube20-v1",
         "source_name": "pick_place_cube_20mm",
         "task_text": "Pick up a small cube and place in the bin",
+        "real_task": "pick_up_a_cube_and_place_in_the_bin",
         "item_half": 0.010,
         "pocket_x": -0.0120,
         "pocket_z": 0.0,
@@ -81,7 +117,8 @@ SCENES = {
     "cylinder40": {
         "env_id": "SO101PickPlaceCylinder40-v1",
         "source_name": "pick_place_cylinder_40mm",
-        "task_text": "Pick up a cylinder and place in the bin",
+        "task_text": "Pick up a can and place in the bin",
+        "real_task": "pick_up_a_can_and_place_in_the_bin",
         "item_half": 0.020,
         "pocket_x": -0.0217,
         "pocket_z": -0.012,

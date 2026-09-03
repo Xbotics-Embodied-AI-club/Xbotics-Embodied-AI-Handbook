@@ -51,7 +51,6 @@ from pathlib import Path
 
 import numpy as np
 import pyarrow.parquet as pq
-
 import recipe
 
 # 夹爪那一维；六维里恒为最后一维。
@@ -230,7 +229,7 @@ def main(argv) -> int:
         #   状态文件必须就是 ManiSkill `get_state_dict()` 那个形状，不多不少。
         #   录制要按帧数算 `episode_time_s`（lerobot-record 只认秒数、不认帧数）。
         (out_dir / "meta" / f"ep{ep}.json").write_text(json.dumps(
-            {"scene": scene, "episode": ep, "n_frames": int(len(action)),
+            {"scene": scene, "episode": ep, "n_frames": len(action),
              "grasp_frame": grasp_at, "release_frame": int(release_at)},
             ensure_ascii=False))
         done += 1

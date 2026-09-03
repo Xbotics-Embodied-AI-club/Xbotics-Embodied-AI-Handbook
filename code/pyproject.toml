@@ -35,6 +35,11 @@ gpu_x86 = [
     # lerobot 全量（含 pi0 / libero / smolvla / aloha …；all 因 flash-attn 故意不含 groot）
     # 走我们的 fork，so101_sim 由它作核心依赖一并带入。
     "lerobot[all]",
+    # 第9讲 2_6 的 download_dataset.py 从 ModelScope 取那 9 个公开任务，
+    # 而仿真的相机标定就是照那批真机数据标的 ⇒ 对齐画面口径必须拿它当基准。
+    # 此前只在脚本里 import、没在这里声明 ⇒ 换机器就 ModuleNotFoundError。
+    # 数据不在机器之间拷，每台机各自从源头下，所以这个依赖每台都要有。
+    "modelscope",
     "transformers==5.3.0",
     # vla0_smol policy 在 factory.py 顶层被 eager import，其 modeling 顶层
     # `import xgrammar`（整数串动作约束解码）。缺它则任何 get_policy_class（含 pi0）都会
