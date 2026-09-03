@@ -30,6 +30,12 @@ import numpy as np
 import recipe
 from expert import plan
 
+# 等物体落定最多空转几帧，以及判"停住了"的逐帧位移门槛（m）。
+# 30 帧 = 1 秒，足够 40mm 刚体在台面上停稳；停不下来的场景会带着残余速度进规划，
+# 那种场景本来就不该产。
+SETTLE_MAX_STEPS = 30
+SETTLE_TOL_M = 1e-5
+
 
 def sample_scene(env_id, seed):
     """复位一次，取整份状态、物体的 xy 与自旋角、料箱 xy、home 位形、机器人基座位姿。
@@ -39,7 +45,8 @@ def sample_scene(env_id, seed):
         seed: 这一集的种子。
 
     Returns:
-        `(状态字典, 物体 xy, 物体自旋角, 料箱 xy, home 位形 (6,), 基座位置, 基座四元数)`。
+        `(状态字典, 物体 xy, 物体自旋角, 料箱 xy, home 位形 (6,), 基座位置, 基座四元数)`；
+        物体或料箱在 `SETTLE_MAX_STEPS` 帧内没停稳时给 `None`。
 
     物体的自旋角必须取出来传给规划：复位时它是随机的，而两指要对齐的是**物体的面**。
     偏航只锁在 z 轴上，所以从 (w, z) 就能解出来。
@@ -53,6 +60,31 @@ def sample_scene(env_id, seed):
                    domain_randomization=False, reconfiguration_freq=1)
     env.reset(seed=seed)
     inner = env.unwrapped
+
+    # 先让物体落定再取状态。复位那一瞬物体还在沉降/滑动：实测 ep1 到抓取帧自己漂了
+    # 7.8mm（那时手臂还在离开 home 的路上、没碰到它），而下降开度 52mm、方块 40mm，
+    # 两侧净空各 6mm ⇒ 这点漂移足以让指尖撞在角上，表现为两指合到底而中间无物。
+    # **落定之后**才拍强制初始状态，回放的起点因此就是规划瞄的那个点，漂移从源头消失。
+    #
+    # ★ 料箱也要等。实测有一集料箱从第 7 帧起被推动 177.7mm —— 那不是沉降、是被弹开
+    #   （生成时与别的几何相交）。早先只判物体，于是带着穿模的料箱被拍进强制初始状态。
+    home_action = np.asarray(inner.agent.robot.get_qpos()[0].cpu(), float)
+
+    def _poses():
+        return np.stack([np.asarray(inner.item.pose.p[0].cpu(), float),
+                         np.asarray(inner.bin.pose.p[0].cpu(), float)])
+
+    last, settled = _poses(), False
+    for _ in range(SETTLE_MAX_STEPS):
+        env.step(home_action)
+        now = _poses()
+        if float(np.abs(now - last).max()) < SETTLE_TOL_M:
+            settled = True
+            break
+        last = now
+    if not settled:
+        env.close()
+        return None
     state = {group: {name: [float(v) for v in tensor[0].cpu()]
                      for name, tensor in items.items()}
              for group, items in inner.get_state_dict().items()}
@@ -83,14 +115,19 @@ def main(argv) -> int:
     made, skipped = 0, []
     seed = first_seed
     while made < count:
-        state, item_xy, item_yaw, bin_xy, home, base_p, base_q = sample_scene(
-            spec["env_id"], seed)
-        actions = plan(scene, item_xy, item_yaw, bin_xy, home, base_p, base_q,
-                       SO101.urdf_path)
+        sampled = sample_scene(spec["env_id"], seed)
+        if sampled is None:
+            skipped.append({"seed": seed, "why": "场景没停稳（物体或料箱仍在动）"})
+            print(f"    种子 {seed}：场景没停稳，跳过")
+            seed += 1
+            continue
+        state, item_xy, item_yaw, bin_xy, home, base_p, base_q = sampled
+        actions, why = plan(scene, item_xy, item_yaw, bin_xy, home, base_p, base_q,
+                            SO101.urdf_path)
         if actions is None:
-            skipped.append({"seed": seed, "why": "抓取或放置位姿解不出来",
+            skipped.append({"seed": seed, "why": why,
                             "item_xy": item_xy.tolist(), "bin_xy": bin_xy.tolist()})
-            print(f"    种子 {seed}：解不出来，跳过（物体 {item_xy.round(4).tolist()}）")
+            print(f"    种子 {seed}：{why}，跳过（物体 {item_xy.round(4).tolist()}）")
             seed += 1
             continue
         episode = made
@@ -112,6 +149,12 @@ def main(argv) -> int:
     (out_dir / "meta" / "skipped.json").write_text(json.dumps(skipped, ensure_ascii=False))
     print(f"\n  {scene}：备好 {made} 集，跳过 {len(skipped)} 个槽位（种子 "
           f"{first_seed}~{seed - 1}）")
+    tally = {}
+    for row in skipped:
+        key = str(row["why"]).split("（")[0]
+        tally[key] = tally.get(key, 0) + 1
+    for key, n in sorted(tally.items(), key=lambda kv: -kv[1]):
+        print(f"    {key}: {n} 个（{n / max(1, len(skipped)) * 100:.0f}% 的弃用）")
     print(f"  {out_dir}")
     print("PREPARE_EPISODES_END")
     return 0

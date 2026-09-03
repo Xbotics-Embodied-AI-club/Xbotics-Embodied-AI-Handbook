@@ -208,10 +208,12 @@ def plan(scene, item_xy, item_yaw, bin_xy, home_qpos, base_p, base_q, urdf_path)
         urdf_path: 机器人 URDF，用来建 CPU 运动学副本。
 
     Returns:
-        `(帧数, 6)` 真机口径动作（臂五关节度、夹爪行程百分比）；解不出抓取位姿、
-        或两指对不齐方块侧面时给 `None`。
+        `(动作 (帧数, 6), 弃用理由)`。成功时理由为 `None`；弃用时动作为 `None`、
+        理由是那道门的名字。
 
-    ★ 解不出来就**如实返回 None**，让调用方弃掉这一集，而不是拿一个没收敛的位姿往下跑。
+    ★ 解不出来就**如实弃掉**，不拿一个没收敛的位姿往下跑。
+      理由必须带出来 —— 92 个种子里跳过 52 个（57%）时，若只知道"跳过了"而不知道
+      是哪道门挡的，就无从判断该放宽哪一道；而放宽错的那道会直接把成功率拉低。
     """
     from so101_sim.robots.so101_base.so101 import gripper_limit_rad
 
@@ -235,15 +237,16 @@ def plan(scene, item_xy, item_yaw, bin_xy, home_qpos, base_p, base_q, urdf_path)
         kin, frame, np.asarray(home_qpos, float), item_xy, spec["item_half"],
         APPROACH_H, approach_rad, limits_lo, limits_hi, pocket=pocket, item_yaw=item_yaw)
     if not ok:
-        return None
+        return None, "抓取逆解不收敛"
     yaw_err = abs(np.degrees(jaw_yaw_error(kin, q_grasp, item_yaw)))
     if yaw_err > MAX_JAW_YAW_DEG:
-        return None
+        return None, f"两指对不齐方块的面（{yaw_err:.2f}° > {MAX_JAW_YAW_DEG}°）"
     # 逆解真把口袋送到物体中心了吗 —— 自己再量一次，别信 `ok`。
     p_local, rot_local = kin.ee_pose_local(q_grasp[:5])
     aim = frame.to_world(p_local + rot_local @ pocket)
-    if np.linalg.norm(aim - np.array([*item_xy, spec["item_half"]])) * 1000.0 > MAX_AIM_MM:
-        return None
+    aim_mm = float(np.linalg.norm(aim - np.array([*item_xy, spec["item_half"]]))) * 1000.0
+    if aim_mm > MAX_AIM_MM:
+        return None, f"瞄点残差过大（{aim_mm:.2f}mm > {MAX_AIM_MM}mm）"
 
     # 放置位姿：物体中心要落到「箱底 + 物体半高 + 余量」，而不是搬运高度 ——
     # `solve_aligned_grasp` 解的是"夹持口袋落在目标点"，而物体就握在口袋上，
@@ -254,7 +257,7 @@ def plan(scene, item_xy, item_yaw, bin_xy, home_qpos, base_p, base_q, urdf_path)
         kin, frame, q_grasp, bin_xy, drop_z,
         APPROACH_H, low, limits_lo, limits_hi, pocket=pocket, item_yaw=item_yaw)
     if not ok:
-        return None
+        return None, "放置逆解不收敛"
 
     home = np.asarray(home_qpos, float)
     open_a, open_d = spec["open_approach_pct"], spec["open_descent_pct"]
@@ -312,4 +315,4 @@ def plan(scene, item_xy, item_yaw, bin_xy, home_qpos, base_p, base_q, urdf_path)
     qpos = np.vstack([f for f in frames if len(f)])
     out = np.degrees(qpos)
     out[:, 5] = (qpos[:, 5] - low) / (high - low) * 100.0
-    return out
+    return out, None
