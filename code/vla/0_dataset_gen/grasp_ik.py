@@ -105,17 +105,21 @@ def apply_pitch_lock(q, grip=None, sum_pitch=SUM_GRASP, wroll=None):
     return q
 
 
-def jaw_yaw_error(kin, q):
+def jaw_yaw_error(kin, q, item_yaw=0.0):
     """两指连线在水平面内相对**方块的面**偏了多少（弧度，取到最近的 90° 倍数）。
 
-    方块是世界轴对齐的 40mm 立方，而两指连线随 shoulder_pan 一起转 —— 偏 θ 角时，
-    两指要跨越的宽度是 `40/cos θ`：偏 31.9° 就要跨 47.1mm，恰好等于张 26° 时的指尖间距
-    ⇒ **夹不住**。实测撒点区 y≥10cm（pan≤−25°）的方块几乎全部因此抓失败，
-    数据里 y 的覆盖被截在 8.1cm，而撒点区到 14.5cm。
+    两指连线随 shoulder_pan 一起转 —— 相对方块的面偏 θ 角时，两指要跨越的宽度是
+    `40/cos θ`：偏 31.9° 就要跨 47.1mm，恰好等于张 26° 时的指尖间距 ⇒ **夹不住**。
+
+    ★ `item_yaw` 不可省。早先这里默认"方块是世界轴对齐的"，于是本函数量的是两指连线
+      相对**世界 x/y 轴**的偏角 —— 而方块复位时是带随机自旋的。对齐世界轴等于对方块的面
+      偏了方块自身那个自旋角，越接近 45° 越夹不住：实测 10 集里「离面对齐」>28° 的四集
+      全部失败（方块被指尖撞角推走、从没抬起来过），<10.3° 的全部成功。
+      而那五集的瞄点残差只有 0.01~0.09mm、俯仰角与成功组逐位相同 —— 错的只有朝向。
     """
     t = kin.tips_local(q)
     d = t["finger2_tip"] - t["finger1_tip"]
-    a = np.degrees(np.arctan2(d[1], d[0]))
+    a = np.degrees(np.arctan2(d[1], d[0])) - np.degrees(item_yaw)
     return np.radians(((a + 45.0) % 90.0) - 45.0)
 
 
@@ -166,12 +170,14 @@ def solve_approach_and_grasp(kin, base, q_seed, item_xy, item_half, approach_h,
 
 
 def solve_aligned_grasp(kin, base, q_seed, item_xy, item_half, approach_h, grip, lo, hi,
-                        *, pocket, iters=4):
+                        *, pocket, item_yaw=0.0, iters=4):
     """解预抓取/抓取位姿，并用 wrist_roll 把两指连线**对齐到方块的面**。
 
     不对齐的代价是硬的：偏 θ 角时两指要跨 `40/cos θ` mm，撒点区远端（pan≈−35°）
     偏到 31.9° ⇒ 要跨 47.1mm，而张 26° 只有 47mm。迭代把偏角打到 0 之后，
     整个撒点区都只需要跨 40mm。返回 (q_above, q_grasp, pitch, wroll, ok)。
+
+    `item_yaw` 是方块绕 z 的自旋角（弧度）；对齐的目标是**方块的面**，不是世界轴。
     """
     wr = 0.0
     out = None
@@ -182,7 +188,7 @@ def solve_aligned_grasp(kin, base, q_seed, item_xy, item_half, approach_h, grip,
         if not c:
             return None, None, None, None, False
         out = (qa, qg, sp)
-        e = jaw_yaw_error(kin, qg)
+        e = jaw_yaw_error(kin, qg, item_yaw)
         if abs(e) < np.radians(1.0):
             break
         wr = float(np.clip(wr - e, lo[4] + 0.02, hi[4] - 0.02))

@@ -52,12 +52,13 @@ from pathlib import Path
 import numpy as np
 import pyarrow.parquet as pq
 import recipe
+from so101_sim.robots.so101_base.so101 import gripper_limit_rad
 
 # 夹爪那一维；六维里恒为最后一维。
 GRIP = 5
-# 夹爪 0~100 行程的两端，就是 URDF 里夹爪关节的限位。
-GRIPPER_LO_DEG = -10.0
-GRIPPER_HI_DEG = 100.0
+# 夹爪 0~100 行程的两端从 URDF 现读，**不在这里抄一份数** —— 抄的那份不会随 URDF 变，
+# 而它算的正是决定反解成不成的那个 `descent_pct`。真值是 -10.000004285756797° / +100°。
+GRIPPER_LO_RAD, GRIPPER_HI_RAD = gripper_limit_rad()
 # 判「张开块」的余量（行程百分比），吸收控制器跟随误差。
 OPEN_MARGIN_PCT = 3.0
 # 料箱的台面高度（m）。箱底贴着台面放，这个值是环境自己的常量。
@@ -105,8 +106,8 @@ def to_sim_rad(values):
         六维弧度。
     """
     out = np.deg2rad(np.asarray(values, float))
-    out[GRIP] = np.deg2rad(GRIPPER_LO_DEG
-                           + values[GRIP] / 100.0 * (GRIPPER_HI_DEG - GRIPPER_LO_DEG))
+    out[GRIP] = (GRIPPER_LO_RAD
+                 + values[GRIP] / 100.0 * (GRIPPER_HI_RAD - GRIPPER_LO_RAD))
     return out
 
 
@@ -182,8 +183,9 @@ def main(argv) -> int:
     kin = ArmKinematics(SO101.urdf_path)
     frame = BaseFrame(base_p, base_q)
     pocket = recipe.pocket(scene)
-    descent_pct = ((spec["open_descent_deg"] - GRIPPER_LO_DEG)
-                   / (GRIPPER_HI_DEG - GRIPPER_LO_DEG) * 100.0)
+    # 配方里已经是行程百分比，不再换算 —— 旧版存的是"被当成度数的百分比"，
+    # 那次换算正是那个 bug 的补偿，见 recipe.py 的张开量三条坑。
+    descent_pct = spec["open_descent_pct"]
 
     def pocket_world(qpos_real):
         """某一帧的夹持口袋在世界系下的位置。"""
