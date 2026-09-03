@@ -153,6 +153,33 @@ SCENES = {
 }
 
 
+# 判「已经张开」的开度门槛（行程百分比）。
+#
+# ★ 不能用「夹爪指令首次 ≤ CLOSE_PCT」来定抓取帧：home 位形复位后稳定下来是 −0.742%
+#   （名义 1.9% 本就贴着下限），于是那个判据在某些集上命中**第 0 帧** —— 拿 home 的臂位形
+#   当抓取位姿，量出 45.21mm 的假瞄点残差、2 帧的假夹住窗口。真值都不是那样。
+#   正确的判据是「张开之后的首次合拢」，与量真机夹爪时用的同一套（真机 9 源 265 集验过）。
+OPENED_PCT = 15.0
+
+
+def close_frame(actions):
+    """抓取帧：夹爪**张开之后**首次合到底的那一帧。
+
+    Args:
+        actions: `(帧数, 6)` 真机口径动作，第 6 列是夹爪行程百分比。
+
+    Returns:
+        帧号；这一集没有「先张开再合到底」就给 `None`。
+    """
+    import numpy as np
+    grip = np.asarray(actions, float)[:, 5]
+    opened = np.flatnonzero(grip > OPENED_PCT)
+    if not len(opened):
+        return None
+    closed = np.flatnonzero(grip[opened[0]:] <= CLOSE_PCT + 1e-6)
+    return int(opened[0] + closed[0]) if len(closed) else None
+
+
 def pocket(scene):
     """某场景的夹持口袋（`gripper_frame_link` 局部系，米）。
 

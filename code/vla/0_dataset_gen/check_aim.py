@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 import recipe
-from grasp_ik import jaw_yaw_error
+from grasp_ik import jaw_midpoint, jaw_yaw_error
 from servo import ArmKinematics, BaseFrame
 
 
@@ -65,7 +65,6 @@ def main(argv) -> int:
     scene, prep = argv[0], Path(argv[1])
     bad = {int(x) for x in argv[2].split(",")} if len(argv) == 3 else set()
     spec = recipe.SCENES[scene]
-    pocket = np.asarray(recipe.pocket(scene), float)
 
     plans = sorted((prep / "plans").glob("ep*.npy"),
                    key=lambda p: int(p.stem.removeprefix("ep")))
@@ -74,30 +73,42 @@ def main(argv) -> int:
 
     frame, urdf = base_and_urdf(spec["env_id"])
     kin = ArmKinematics(urdf)
+    # 与 `expert.plan` 同一个瞄点 —— 各写一套就会量到另一个东西。
+    pocket = np.asarray(recipe.pocket(scene), float)
 
     # 下降那一段的指尖间距：两指要跨的宽度超过它就夹不住。
     open_pct = spec["open_descent_pct"]
     low, high = _gripper_limits()
-    tips = kin.tips_local(np.r_[np.zeros(5), low + open_pct / 100.0 * (high - low)])
+    descent_rad = low + open_pct / 100.0 * (high - low)
+    tips = kin.tips_local(np.r_[np.zeros(5), descent_rad])
     span = float(np.linalg.norm(tips["finger2_tip"] - tips["finger1_tip"])) * 1000.0
 
+    # 瞄点相对「张开后两指尖中点」偏了多少 —— 目审读出「方块没在两指中间」，这一行就是它的
+    # 量化版。纯几何量、与集无关，所以只报一次。
+    off = (pocket - jaw_midpoint(kin, descent_rad)) * 1000.0
     print(f"  下降开度 {open_pct:.1f}% 时指尖间距 {span:.2f}mm，"
-          f"方块边长 {spec['item_half'] * 2000:.0f}mm\n")
+          f"方块边长 {spec['item_half'] * 2000:.0f}mm")
+    print(f"  瞄点相对两指尖中点偏 ({off[0]:+.2f}, {off[1]:+.2f}, {off[2]:+.2f}) mm\n")
     print("  集    口袋瞄点残差 (dx, dy, dz) mm       模长   对齐残余  要跨   成败")
     rows = []
     for path in plans:
         ep = int(path.stem.removeprefix("ep"))
         meta = json.loads((prep / "meta" / f"{path.stem}.json").read_text())
         actions = np.load(path)
-        grasp = int(np.flatnonzero(actions[:, 5] <= recipe.CLOSE_PCT + 1e-6)[0])
+        grasp = recipe.close_frame(actions)
+        if grasp is None:
+            sys.exit(f"★ {path.stem} 里找不到「张开后首次合到底」的帧")
         qpos = np.radians(actions[grasp, :5])
+        # 夹爪那一维要给**规划里那一帧的实际开度** —— 指尖位置随它变，给 0 会量到另一个
+        # 两指连线，于是这里的偏角与 `expert.plan` 判的不是同一个数。
+        grip_rad = low + actions[grasp, 5] / 100.0 * (high - low)
         p_local, rot_local = kin.ee_pose_local(qpos)
         aim = frame.to_world(p_local + rot_local @ pocket)
         want = np.array([*meta["item_xy"], spec["item_half"]])
         d = (aim - want) * 1000.0
         norm = float(np.linalg.norm(d))
         resid = abs(np.degrees(jaw_yaw_error(
-            kin, np.r_[qpos, 0.0], np.radians(meta["item_yaw_deg"]))))
+            kin, np.r_[qpos, grip_rad], np.radians(meta["item_yaw_deg"]))))
         need = spec["item_half"] * 2000.0 / np.cos(np.radians(resid))
         rows.append((ep, norm, ep not in bad))
         tag = "" if not bad else ("成功" if ep not in bad else "★失败")

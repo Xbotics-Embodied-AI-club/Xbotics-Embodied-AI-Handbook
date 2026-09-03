@@ -52,10 +52,10 @@ def held_pocket(env_id, state_path, actions):
     from so101_sim.config_lerobot_robot import SO101SimRobotConfig
     from so101_sim.lerobot_robot import JOINT_NAMES, SO101SimRobot
 
-    closing = np.flatnonzero(actions[:, 5] <= recipe.CLOSE_PCT + 1e-6)
-    if not len(closing):
+    closing = recipe.close_frame(actions)
+    if closing is None:
         return None
-    stop = min(int(closing[0]) + CLOSE_FRAMES, len(actions))
+    stop = min(closing + CLOSE_FRAMES, len(actions))
 
     robot = SO101SimRobot(SO101SimRobotConfig(
         task=env_id, episode_length=len(actions) + 10,

@@ -112,6 +112,8 @@ def judge(spec, max_z, end_xy, bin_xy, bin_yaw, half, z_track):
     cos, sin = np.cos(-bin_yaw), np.sin(-bin_yaw)
     local = np.array([cos * offset[0] - sin * offset[1],
                       sin * offset[0] + cos * offset[1]])
+    centered = (f"落点离箱心 {local[0] * 1000:+.1f},{local[1] * 1000:+.1f}mm"
+                f"（开口半尺寸 {half[0] * 1000:.0f},{half[1] * 1000:.0f}mm）")
     if np.any(np.abs(local) > half):
         # 定位什么时候掉的：峰值之后 z 首次回落到"贴台面"的那一帧。
         peak = int(np.argmax(z_track))
@@ -121,7 +123,9 @@ def judge(spec, max_z, end_xy, bin_xy, bin_yaw, half, z_track):
         return False, (f"没落进箱口（料箱系里偏 {local[0] * 1000:.1f},{local[1] * 1000:.1f}mm，"
                        f"开口半尺寸 {half[0] * 1000:.0f},{half[1] * 1000:.0f}mm；"
                        f"最高点在第 {peak} 帧 / 共 {len(z_track)} 帧，掉落于 {lost}）")
-    return True, "成功"
+    # 成功也要报落点：「进了箱口」与「落在箱子正中」是两件事，目审读出过放偏
+    # （ep4 放物体时没对准盒子中心），而只报成败看不出偏多少。
+    return True, f"成功　{centered}"
 
 
 def main(argv) -> int:

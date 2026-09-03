@@ -123,6 +123,45 @@ def jaw_yaw_error(kin, q, item_yaw=0.0):
     return np.radians(((a + 45.0) % 90.0) - 45.0)
 
 
+# 腕滚的偏好值（弧度）。等价解里离它最近的那个胜出。
+#
+# 取 −20°：实测稳定簇覆盖 −40~+24°、打滑簇 +26~+30°，−20° 是稳定簇负半区的中点。
+#
+# ★ 取 0 是**无效**的：腕滚限位 −67.2~+252.8°，+29.3° 的 90° 等价解是
+#   −60.7 / +119.3 / +209.3°，而 +29.3 本身离 0 最近 ⇒ 原解恒胜，那个实验从构造上
+#   不可能改变任何东西（实测三集数字逐位不变）。这是同义反复判据，本仓反复抓过。
+#   取 −20° 后逐集验算：只有打滑的 ep0/ep2/ep7（+29.3/+29.8/+26.1 → −60.7/−60.2/−63.9）
+#   与空抓的 ep1（+45.9 → −44.1）改用等价解，6 集稳定的全部保留原解
+#   （ep9 在 +24.4 与 −65.6 之间以 1.2° 之差保留）⇒ 这个实验能证伪。
+PREFERRED_WROLL = np.radians(-20.0)
+
+
+def jaw_midpoint(kin, grip_rad):
+    """两指尖中点在**夹爪坐标系**里的位置（米）。
+
+    Args:
+        kin: `ArmKinematics`。
+        grip_rad: 夹爪关节角（弧度）—— 取**下降段的开度**，那才是两指围住物体时的宽度。
+
+    Returns:
+        `(3,)` 中点在 `gripper_frame_link` 局部系的坐标。
+
+    这就是抓取该瞄的点：物体中心要落在张开后的两指中点上。结果只与夹爪开度有关、
+    与手臂位形无关（从腕到指是一条固定链），所以手臂那五维给零即可。
+
+    ★ 早先瞄的是 `recipe` 里 `pocket_x` / `pocket_z` 那对**实测**值 —— 它们量的是
+      「堵转之后物体实际停在哪」，而那个位置正是被要修的缺陷（楔形指把刚体方块挤偏）
+      决定的。拿被污染的结果当瞄点，等于把偏差固化进产线：目审逐帧看到方块整个偏在
+      画面一侧、左边缘压在指面上，而不是被两指居中围住。
+    """
+    q = np.zeros(6)
+    q[5] = grip_rad
+    tips = kin.tips_local(q)
+    mid = 0.5 * (tips["finger1_tip"] + tips["finger2_tip"])
+    p_ee, rot = kin.ee_pose_local(q)
+    return rot.T @ (mid - p_ee)
+
+
 def solve_grasp_pose(kin, base, q_seed, target_world, grip, lo, hi,
                      sum_pitch=SUM_GRASP, iters=300, tol=1e-4,
                      max_dq=MAX_STEP, *, pocket, wroll=None):
@@ -193,4 +232,24 @@ def solve_aligned_grasp(kin, base, q_seed, item_xy, item_half, approach_h, grip,
             break
         wr = float(np.clip(wr - e, lo[4] + 0.02, hi[4] - 0.02))
     qa, qg, sp = out
+
+    # 方块 90° 对称 ⇒ 腕滚加减 90° 仍然对齐同一组面，但**夹持稳定性不同**：实测打滑的 3 集
+    # 腕滚都在 +26~+30°，稳定的 6 集在 −40~+24°（bd 记录：滑与腕滚强相关）。机制是两指尖
+    # 沿插入方向错开 7.6mm、合拢形成力偶，腕滚决定这个力偶相对重力的朝向。
+    # 所以在等价解里挑离 `PREFERRED_WROLL` 最近、且在限位内、且逆解仍收敛的那一个。
+    best = (abs(wr - PREFERRED_WROLL), wr, qa, qg, sp)
+    for k in (-2, -1, 1, 2):
+        cand = wr + k * np.pi / 2.0
+        if not (lo[4] + 0.02 <= cand <= hi[4] - 0.02):
+            continue
+        score = abs(cand - PREFERRED_WROLL)
+        if score >= best[0]:
+            continue
+        ca, cg, csp, ok2 = solve_approach_and_grasp(
+            kin, base, q_seed, item_xy, item_half, approach_h, grip, lo, hi,
+            pocket=pocket, wroll=cand)
+        if not ok2 or abs(jaw_yaw_error(kin, cg, item_yaw)) > np.radians(2.0):
+            continue
+        best = (score, cand, ca, cg, csp)
+    _, wr, qa, qg, sp = best
     return qa, qg, sp, wr, True
