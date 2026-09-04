@@ -2,8 +2,33 @@
 
 从机器人基础到具身前沿的 **21 讲实践课程**。
 
+[![MIT 许可证](https://img.shields.io/badge/License-MIT-0052cc?style=for-the-badge&labelColor=1a1a2e)](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-AI-Handbook/blob/main/LICENSE)
+[![Xbotics 具身智能社区](https://img.shields.io/badge/社区-Xbotics%20Embodied-4ecdc4?style=for-the-badge&labelColor=1a1a2e)](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide)
+![21 讲](https://img.shields.io/badge/讲次-21_讲-ff6b6b?style=for-the-badge&labelColor=1a1a2e)
+
+《Xbotics 具身智能教程（21 讲）》是 [Xbotics 具身智能社区](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide) 出品的**系统实践教程**：不是论文综述，也不是纯科普，而是一套围绕真实机器人任务、可跑通 Demo、可复盘失败的工程实践课程。
+
+本仓库包含 **21 讲**书稿正文、每讲代码、配图资料与协作规范（**六大部分**），与社区 [Xbotics-Embodied-Guide](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide) 互补——Guide 帮你看全局，**本教程**带你动手跑完整闭环。
+
+> 课程已从原「十八讲」扩展为 **二十一讲**，新增两讲 VLN，并将世界模型与前沿进展分为两讲。
+
 这套教程围绕真实机器人任务展开：先讲清概念，再跑通实验，最后分析失败。
 六大部分依次覆盖机器人系统基础、视觉操作、端到端操作、强化学习、视觉语言导航，以及 Agent 与世界模型。
+
+## 社区与交流
+
+<!-- 原 README 社区海报：https://github.com/user-attachments/assets/054c89b9-d114-4477-b751-a01f2e7a6376 -->
+<p align="center">
+  <img src="../assets/community/xbotics-community-qr-poster.jpg" alt="Xbotics 社区资讯与联系方式" width="600">
+</p>
+
+上图与 [Embodied-Guide](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide) 共用社区视觉素材；各讲专用配图见 [assets/figures](https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-AI-Handbook/tree/main/assets/figures)。
+
+<p align="center">
+  <img src="../assets/community/xbotics-talk-qr-poster.png" alt="欢迎加入内测交流群" width="600">
+</p>
+
+*欢迎加入内测交流群 · 扫码关注官方公众号*
 
 ## 从这里开始
 

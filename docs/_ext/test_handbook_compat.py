@@ -32,6 +32,32 @@ def headings(text):
             if token.type == "heading_open" and token.level == 0]
 
 
+class HomepageTests(unittest.TestCase):
+    def test_all_formal_documents_are_in_homepage_navigation(self):
+        docs = Path(__file__).resolve().parents[1]
+        homepage = (docs / 'index.md').read_text()
+        entries = set()
+        for token in MarkdownIt().parse(homepage):
+            if token.type == 'fence' and token.info == '{toctree}':
+                entries.update(re.findall(r'<([^>]+)>', token.content))
+        expected = {'SUMMARY', 'style-guide'}
+        for pattern in ('00-preface/*.md', 'part[1-6]-*/*.md', 'appendix/*.md'):
+            expected.update(path.relative_to(docs).with_suffix('').as_posix()
+                            for path in docs.glob(pattern))
+        self.assertEqual(entries, expected)
+
+    def test_community_posters_and_links_are_present(self):
+        docs = Path(__file__).resolve().parents[1]
+        homepage = (docs / 'index.md').read_text()
+        for name in ('xbotics-community-qr-poster.jpg', 'xbotics-talk-qr-poster.png'):
+            relative = f'../assets/community/{name}'
+            with self.subTest(poster=name):
+                self.assertIn(f'src="{relative}"', homepage)
+                self.assertTrue((docs / relative).is_file())
+        self.assertIn('https://github.com/Xbotics-Embodied-AI-club/Xbotics-Embodied-Guide', homepage)
+        self.assertIn('/blob/main/LICENSE', homepage)
+
+
 class SourceTests(unittest.TestCase):
     def test_existing_title_is_not_duplicated(self):
         source = '---\ntitle: "第 3 讲：旧标题"\nauthor: 作者\n---\n\n# 第 3 讲：完整标题\n\n## 内容\n'
