@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # 全量微调 SmolVLA → SO-101 仿真抓取（ReachCube）。
-# 从社区预训练权重 lerobot/smolvla_base 出发，用 rl/3_2 生成的 SO-101 仿真数据集
+# 从社区预训练权重 lerobot/smolvla_base 出发，用一份 SO-101 仿真数据集
 # 做全参数微调（无 LoRA / 无 PEFT），产出一个能在同一仿真里评测的策略。
 # 在 code/ 目录运行：bash vla/5_vla_finetune/5_2_smolvla_full_sft/train_smolvla.sh
 set -euo pipefail
 
-# 数据集：rl/3_offpolicy/3_2_so101_offpolicy/datagen/gen_dataset.py 的产物，
+# 数据集：已存在于共享存储上的 SO-101 仿真 LeRobotDataset，
 # 一个标准 LeRobotDataset（单目相机 base_camera + 6 维关节状态/动作）。
 DATASET_ROOT="$DATASETS_ROOT/so101_sim/_gen/SO101ReachCube-v1/dataset"
 

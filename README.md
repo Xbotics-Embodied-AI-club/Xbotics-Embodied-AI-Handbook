@@ -387,18 +387,15 @@ python simulation/minimal_reach.py
 [📖 文稿](docs/part4-reinforcement-learning/16-真机强化学习.md) · [📄 PDF](docs/part4-reinforcement-learning/pdf/第16讲_真机强化学习.pdf) · [💻 代码](code/rl/3_offpolicy/)
 
 <details>
-<summary>本讲子目录（10）</summary>
+<summary>本讲子目录（7）</summary>
 
 - 1 上一讲留下的账：真机上样本有多贵
 - 2 价值方法与 off-policy：把稀疏的成功传播开
-- 3 DDPG：把确定性策略带进连续动作
-- 4 TD3：用两个 Critic 治高估
-- 5 SAC：把探索变成一条原则
-- 6 squint：从像素学会，顺手把数据也生成了
-- 7 同一个 G1，换 off-policy 再走一遍：15 分钟学会走路
-- 8 真机压轴：HIL-SERL 让 SO-101 学会接触型任务
-- 9 结课全景：三种强化学习，与一条完整的链路
-- 10 本讲小结
+- 3 连续动作的 off-policy：DDPG → TD3 → SAC
+- 4 同一个 G1，换 off-policy 再走一遍：15 分钟学会走路
+- 5 真机压轴：HIL-SERL 让 SO-101 学会接触型任务
+- 6 结课全景：三种强化学习，与一条完整的链路
+- 7 本讲小结
 
 </details>
 

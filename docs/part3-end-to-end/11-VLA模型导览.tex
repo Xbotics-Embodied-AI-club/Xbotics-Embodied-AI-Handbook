@@ -107,7 +107,6 @@
 \newcommand{\WarningTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
 
 \usepackage{longtable,booktabs,array}
-\newcounter{none} % for unnumbered tables
 \usepackage{calc} % for calculating minipage widths
 % Correct order of tables after \paragraph or \subparagraph
 \usepackage{etoolbox}
@@ -136,13 +135,13 @@
 
 
 \ifLuaTeX
-\usepackage[bidi=basic,shorthands=off,provide=*]{babel}
+\usepackage[bidi=basic,provide=*]{babel}
 \else
-\usepackage[bidi=default,shorthands=off,provide=*]{babel}
+\usepackage[bidi=default,provide=*]{babel}
 \fi
-\ifLuaTeX
-  \usepackage{selnolig} % disable illegal ligatures
-\fi
+% get rid of language-specific shorthands (see #6817):
+\let\LanguageShortHands\languageshorthands
+\def\languageshorthands#1{}
 
 
 \setlength{\emergencystretch}{3em} % prevent overfull lines
@@ -221,10 +220,6 @@
 \usepackage{bookmark}
 \IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
 \urlstyle{same}
-% fallback for those not using the hyperref driver hyperxmp:
-\makeatletter
-\@ifundefined{xmpquote}{\newcommand{\xmpquote}[1]{#1}}{}
-\makeatother
 \hypersetup{
   pdftitle={第11讲 VLA 模型导览：从 OpenVLA 到 \textbackslash pi\_0 家族},
   pdflang={zh-CN},
@@ -244,6 +239,7 @@
 
 \renewcommand*\contentsname{目录}
 {
+\hypersetup{linkcolor=}
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
@@ -3195,7 +3191,7 @@ OpenVLA 的 7B 降到 \(\pi_0\)-FAST 的 3.3B，连续一路从 \(\pi_0\) 的 3.
 落在两列之间：它是全图唯一不属于单一类别的模型，因为它的动作表示在训练的两个阶段里是不同的。凡是想问``\(\pi_{0.5}\)
 到底算离散还是连续''的，答案就是那两条虚线------两边都算。
 
-这张图原来把动作表示画成一条从''纯离散''到''纯连续''的连续横轴，六个模型按各自的
+这张图原来把动作表示画成一条从``纯离散''到``纯连续''的连续横轴，六个模型按各自的
 x
 值落位。那根轴立不住：离散与连续是两个类别，中间不存在可度量的距离，那些
 x 值不对应任何真实量。最能说明问题的恰好是

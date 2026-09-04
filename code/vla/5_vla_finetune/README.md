@@ -5,7 +5,7 @@
 
 | 模块 | 数据来源 | 微调对象 | 评测方式 |
 |---|---|---|---|
-| `5_2_smolvla_full_sft/` | SO-101 仿真：RL 专家自己练成后 rollout 出来的演示（组 `rl/3_offpolicy/3_2_so101_offpolicy` 的产物） | SmolVLA，全参数微调 | `lerobot-eval` 在同一仿真里报 `pc_success` |
+| `5_2_smolvla_full_sft/` | SO-101 仿真：已有的仿真演示数据集 | SmolVLA，全参数微调 | `lerobot-eval` 在同一仿真里报 `pc_success` |
 | `5_4_so101_real_sft/` | 公开的 SO-101 真机遥操数据 | π0 / SmolVLA / ACT，全参数微调 | 离线验收（`verify_checkpoint.py`）+ 可选真机部署（`deploy/`） |
 
 两条路线都走 lerobot 官方的 `lerobot-train` 入口，不自写训练循环——全参微调、图像增强、

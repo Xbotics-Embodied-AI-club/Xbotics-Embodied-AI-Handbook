@@ -1,10 +1,10 @@
 # 5_2 全量微调 SmolVLA → SO-101 仿真抓取（讲12）
 
-用 `rl/3_offpolicy/3_2_so101_offpolicy` 生成的 **SO-101 仿真数据集**，从社区预训练权重
+用一份 **SO-101 仿真数据集**，从社区预训练权重
 `lerobot/smolvla_base`（SmolVLM2-500M 底座 + flow-matching 动作专家）出发做**全参数微调**
 （无 LoRA / 无 PEFT），再在同一仿真里评测成功率。这样就合上一整条闭环：
 
-**仿真环境 → RL 训专家 → 专家 rollout 生成数据集 → VLA 全量微调 → 仿真评测**，全程无需真机。
+**仿真数据集 → VLA 全量微调 → 仿真评测**，全程无需真机。
 
 ## 文件
 
@@ -18,19 +18,14 @@
 
 ## 数据准备
 
-数据集是一个标准 `LeRobotDataset`，由 `rl/3_offpolicy/3_2_so101_offpolicy/datagen/gen_dataset.py`
-产出（SAC 专家在 ReachCube 上 rollout，转成 LeRobot 格式），落
-`$DATASETS_ROOT/so101_sim/_gen/SO101ReachCube-v1/dataset`。
+数据集是一个标准 `LeRobotDataset`，落 `$DATASETS_ROOT/so101_sim/_gen/SO101ReachCube-v1/dataset`。
 
-> `SO101ReachCube-v1` 是 `so101_sim` 重构前 vendored squint 的单相机任务，现已下线（换成了
-> KIT 双相机的 `SO101PickPlaceCube40-v1` 等三个分发场景）。这份数据集与训出的 checkpoint
-> 是**已存在于共享存储上的历史产物**，路径按原样保留，不随环境改名——重新生成数据集需要先在
-> 现存场景上把 `rl/3_offpolicy/3_2_so101_offpolicy` 的 RL 阶梯重新训通（该模块正等待整训，
-> 见其 README）。
+> `SO101ReachCube-v1` 是 `so101_sim` 重构前的单相机任务，现已下线（换成了 KIT 双相机的
+> `SO101PickPlaceCube40-v1` 等三个分发场景）。这份数据集与训出的 checkpoint 是**已存在于
+> 共享存储上的历史产物**，路径按原样保留、不随环境改名。仿真数据集的生成管线正在重组，
+> 要重新生成得走新的造数据模块。
 
 - 单目相机 `observation.images.base_camera`（128×128），6 维关节 `observation.state` / `action`，20 fps。
-- 想要更多集数：改 `gen_dataset.py` 里的 `N_EPISODES` 重跑一条命令即可（前提是 `SO101ReachCube-v1`
-  仍能注册；重构后的 `so101_sim` 已不再提供它，见上）。
 
 ## 训练
 
