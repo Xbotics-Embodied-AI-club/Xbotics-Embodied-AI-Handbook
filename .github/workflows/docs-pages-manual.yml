@@ -1,0 +1,78 @@
+name: 手动发布文档到 GitHub Pages
+
+# 仅在 Actions 页面点击 Run workflow 时运行；推送、PR 和定时任务均不触发。
+# 首次使用前：将配置合入默认分支，并在 Settings > Pages 中选择 GitHub Actions。
+# 运行时请选择 main 分支。此工作流不会自动开启或修改 Pages 发布来源。
+"on":
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-pages-manual
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 检查并生成文档
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - name: 读取所选提交
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: 准备文档构建环境
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+
+      - name: 安装网站依赖（不安装或运行机器人实验）
+        run: |
+          python -m pip install -r docs/requirements.txt
+          python -m pip check
+
+      - name: 检查文档兼容层
+        run: python -B -m unittest discover -s docs/_ext -v
+
+      - name: 检查已启用的 GitHub Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        with:
+          enablement: false
+
+      - name: 生成网页
+        # 保留原稿缺海报等警告，不使用 -W；真正的构建错误仍会终止发布。
+        run: >-
+          python -m sphinx -E -a -b html
+          -d docs/_build/doctrees
+          -w docs/_build/pages-warnings.log
+          docs docs/_build/html
+
+      - name: 上传生成的网页（不上传整个仓库）
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        with:
+          path: docs/_build/html
+
+  deploy:
+    name: 发布到 GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 发布网页
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

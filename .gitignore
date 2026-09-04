@@ -17,6 +17,9 @@ venv/
 dist/
 build/
 
+# Sphinx 本地预览产物（不影响现有 Quarto / PDF 流程）
+/docs/_build/
+
 # ROS2
 install/
 log/

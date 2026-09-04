@@ -831,7 +831,9 @@ def move_pose(self, target: Pose, speed: float,
 
 ManiSkill 的动作维度和语义由所选控制器决定。示例使用关节增量控制创建环境，随后由 pose_to_actions() 将状态机给出的绝对动作位姿转换为一段控制器动作。若改用末端增量位姿控制，则应按照环境 action_space 的顺序构造平移、旋转和夹爪动作。运行前必须打印 observation_space 和 action_space，不能根据其他机器人或其他控制器的维度直接复制动作向量。
 
-适配器完整实现见 [`backends/maniskill_adapter.py`](../../code/lecture07/robot_pick_place/backends/maniskill_adapter.py)。接入时最关键的是先固定环境、观测模式和控制模式，再检查空间定义：
+> **仓库实现说明**：当前仓库尚未提供 `backends/maniskill_adapter.py`。下方代码仅展示 ManiSkill 环境的创建与空间检查，不是完整的抓取放置适配器。现有无硬件实验提供 Mock 与 MuJoCo 两条路径，具体入口见[第 7 讲仿真实验说明](../../code/lecture07/simulation/README.md)。
+
+若自行接入 ManiSkill，最关键的是先固定环境、观测模式和控制模式，再检查空间定义：
 
 ```python
 import gymnasium as gym

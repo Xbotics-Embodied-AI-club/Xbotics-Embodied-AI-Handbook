@@ -1,0 +1,7 @@
+# 网站构建使用 Python 3.12 或更高版本；与各讲实验依赖分开安装。
+# 固定直接依赖版本；完整构建与页面效果在本地预览步骤验证。
+Sphinx==9.1.0
+myst-parser==5.1.0
+sphinx-book-theme==1.4.0
+sphinx-copybutton==0.5.2
+sphinxcontrib-mermaid==2.1.1

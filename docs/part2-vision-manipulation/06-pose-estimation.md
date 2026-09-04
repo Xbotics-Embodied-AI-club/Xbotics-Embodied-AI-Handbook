@@ -764,7 +764,7 @@ $\boldsymbol{p}_{cam} = \boldsymbol{T}_{cam \leftarrow obj} \cdot \boldsymbol{p}
 
 ### 图 4\-3 ICP 点云配准迭代过程示意图
 
-![image\.png](../../assets/figures/lecture06/image%2043.png)
+![image\.png](../../assets/figures/lecture06/image%204_3.png)
 
 #### 4\.2\.2 模板匹配法：基于三维模型的姿态对齐
 
