@@ -46,7 +46,7 @@
 
 import numpy as np
 import recipe
-from grasp_ik import jaw_yaw_error, solve_aligned_grasp
+from grasp_ik import solve_aligned_grasp, span_fits
 from servo import ArmKinematics, BaseFrame
 
 # 巡航速度（度/帧）与全局加速度上限（度/帧²）。取自真机 `pick_up_a_cube` 300 集的
@@ -78,16 +78,12 @@ DENSE_STEP_DEG = 0.05
 # ★ 早先是**一帧**从 36.4% 砸到 0%。那一下把刚体方块猛地夹住，画面上就是「被吸上来」。
 GRIP_RATE_PCT = 12.0
 
-# 两指连线与方块侧面的最大容许偏角（度）。
+# 「两指跨不过方块」这道门的判据在 `grasp_ik.span_fits`：要跨的宽度 2·半宽/cosθ
+# 必须落在该开度下的指尖间距之内（再留 6mm 余量）。
 #
-# ★ `solve_aligned_grasp` 的 `ok` **不代表对齐收敛**：它迭代 `iters` 次调腕滚，
-#   跑完就 `return ..., True`，哪怕偏角还很大。而偏角大意味着两指斜着面对方块 ——
-#   40mm 方块的对角是 56.6mm，而 36.4% 开度只有 52mm 间距，指头必然撞在角上把方块推走。
-#   实账：不查这一条时 10 集里 5 集失败，且失败集与场景一一绑定、参数怎么调都是那几集
-#   （口袋改 3~4mm、投放高度改 5cm、速度减半，失败集的末位置逐位不变）。
-#   所以这里自己再量一次偏角，超了就**弃掉这个场景**，而不是拿一个抓不住的位姿去录。
-MAX_JAW_YAW_DEG = 1.5
-
+# ★ 早先这里是 `MAX_JAW_YAW_DEG = 1.5`，一个随手取的角度阈值。它与"夹不夹得住"没有
+#   物理关系，而且与择优循环里那道 2.0° 的门取值不同 —— 同一件事两个数，会出现
+#   "择优放行、plan 又挡掉"的自相矛盾。现在两处共用一个判据。
 # 瞄点最大容许残差（毫米）：解出来的抓取位姿要真把夹持口袋送到物体中心。
 #
 # ★ `solve_aligned_grasp` 的 `ok` 也**不代表逆解收敛到目标点**。实账：某一集的瞄点残差
@@ -225,6 +221,8 @@ def plan(scene, item_xy, item_yaw, bin_xy, home_qpos, base_p, base_q, urdf_path)
     limits_hi = np.array([1.9199, 1.7453, 1.69, 1.8326, 4.4120, high])
 
     approach_rad = low + spec["open_approach_pct"] / 100.0 * (high - low)
+    # 判"跨得过"要用**下降段**的开度 —— 两指是在那个宽度上围住方块的。
+    descent_rad = low + spec["open_descent_pct"] / 100.0 * (high - low)
     # 瞄点用**实测**的夹持口袋：它是老版那批（9/9、用户认可为稳定）稳定夹住时方块在
     # 夹爪局部系的位置中位。
     #
@@ -238,9 +236,8 @@ def plan(scene, item_xy, item_yaw, bin_xy, home_qpos, base_p, base_q, urdf_path)
         APPROACH_H, approach_rad, limits_lo, limits_hi, pocket=pocket, item_yaw=item_yaw)
     if not ok:
         return None, "抓取逆解不收敛"
-    yaw_err = abs(np.degrees(jaw_yaw_error(kin, q_grasp, item_yaw)))
-    if yaw_err > MAX_JAW_YAW_DEG:
-        return None, f"两指对不齐方块的面（{yaw_err:.2f}° > {MAX_JAW_YAW_DEG}°）"
+    if not span_fits(kin, q_grasp, item_yaw, spec["item_half"], descent_rad):
+        return None, "两指跨不过方块（宽度/cosθ 超出该开度的指尖间距）"
     # 逆解真把口袋送到物体中心了吗 —— 自己再量一次，别信 `ok`。
     p_local, rot_local = kin.ee_pose_local(q_grasp[:5])
     aim = frame.to_world(p_local + rot_local @ pocket)
@@ -261,6 +258,11 @@ def plan(scene, item_xy, item_yaw, bin_xy, home_qpos, base_p, base_q, urdf_path)
 
     home = np.asarray(home_qpos, float)
     open_a, open_d = spec["open_approach_pct"], spec["open_descent_pct"]
+    # ★ 「下降开度太窄才蹭到方块」这条已被单变量试验否证：把下降段放宽到进场开度后，
+    #   三集受害集的前置位移与帧号几乎逐位不变（9.1→9.1 / 8.4→8.4 / 10.4→9.7mm，
+    #   起始帧 94/101/98 与抓取帧 107/111/108 全同）⇒ 碰到方块的不是两指内侧面。
+    #   总数 34/40→35/40 只差一集、在 n=40 上不可归因，所以按单变量纪律退回原状，
+    #   免得后续改动叠在一个来路不明的改动上。
     closed_grasp = _with_grip(q_grasp, recipe.CLOSE_PCT, low, high)
     closed_above = _with_grip(q_above, recipe.CLOSE_PCT, low, high)
     closed_carry = _with_grip(q_carry, recipe.CLOSE_PCT, low, high)

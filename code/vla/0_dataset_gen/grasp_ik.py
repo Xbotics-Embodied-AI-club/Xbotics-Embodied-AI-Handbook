@@ -135,6 +135,35 @@ def jaw_yaw_error(kin, q, item_yaw=0.0):
 #   （ep9 在 +24.4 与 −65.6 之间以 1.2° 之差保留）⇒ 这个实验能证伪。
 PREFERRED_WROLL = np.radians(-20.0)
 
+# 两指跨过物体所需的富余（m）。判据是**物理的**：偏 θ 角时两指要跨 `宽度/cos θ`，
+# 它必须落在该开度下的指尖间距之内、再留这么多余量。
+#
+# ★ 早先这里是一个随手取的角度阈值（2.0°）。它挡错过：某集的负腕滚候选残余 2.37°、
+#   要跨 40.03mm，而下降开度给出的指尖间距是 52.19mm —— 余量 12mm 却被判不可用，
+#   于是产线只能采用落在危险侧的正腕滚。角度阈值与"夹不夹得住"之间没有直接关系，
+#   真正决定它的是宽度与间距之比。
+SPAN_MARGIN_M = 0.006
+
+
+def span_fits(kin, q, item_yaw, item_half, grip_rad):
+    """这个位形下两指跨得过物体吗。
+
+    Args:
+        kin: `ArmKinematics`。
+        q: `(6,)` 抓取位形（弧度）。
+        item_yaw: 物体绕 z 的自旋角（弧度）。
+        item_half: 物体半宽（m）。
+        grip_rad: 判间距用的夹爪开度（弧度）。
+
+    Returns:
+        `bool`。
+    """
+    err = abs(jaw_yaw_error(kin, q, item_yaw))
+    need = 2.0 * item_half / max(np.cos(err), 1e-6)
+    tips = kin.tips_local(np.r_[np.zeros(5), grip_rad])
+    have = float(np.linalg.norm(tips["finger2_tip"] - tips["finger1_tip"]))
+    return need <= have - SPAN_MARGIN_M
+
 
 def jaw_midpoint(kin, grip_rad):
     """两指尖中点在**夹爪坐标系**里的位置（米）。
@@ -245,10 +274,13 @@ def solve_aligned_grasp(kin, base, q_seed, item_xy, item_half, approach_h, grip,
         score = abs(cand - PREFERRED_WROLL)
         if score >= best[0]:
             continue
+        # ★ 种子换成已收敛的 qa **已被实测否证**：ep12/ep27 的负腕滚候选照样不收敛，
+        #   逐位不变。那两个位姿是真的解不出来 —— 腕滚 −49.6/−43.5° 时锁俯仰的三自由度
+        #   逆解在限位内无法把口袋送到方块中心，是运动学硬限制，不是种子问题。
         ca, cg, csp, ok2 = solve_approach_and_grasp(
             kin, base, q_seed, item_xy, item_half, approach_h, grip, lo, hi,
             pocket=pocket, wroll=cand)
-        if not ok2 or abs(jaw_yaw_error(kin, cg, item_yaw)) > np.radians(2.0):
+        if not ok2 or not span_fits(kin, cg, item_yaw, item_half, grip):
             continue
         best = (score, cand, ca, cg, csp)
     _, wr, qa, qg, sp = best
