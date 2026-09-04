@@ -91,6 +91,17 @@ GRIP_RATE_PCT = 12.0
 #   那是蒙进箱口的。正常集的残差是 0.01~0.09mm，所以 1mm 的门槛离两边都很远。
 MAX_AIM_MM = 1.0
 
+# 腕滚的安全上界（度）。超过它就弃掉该场景。
+#
+# 取自 n=40 的实测分界：以落点成败为因变量做单阈值分离，腕滚是唯一超过基线的判别量
+# （95.0% vs 全判成功的 87.5% 基线），成功组区间 [−63.95, +24.94]、失败组中位 +40.09。
+# 另一条独立测量同向：以夹持打滑为因变量时，打滑集腕滚 +26~+30°、稳定集 −40~+24°。
+# 两个不同因变量指向同一个自变量，分界都落在 +25° 附近。
+#
+# 机制：两指尖沿插入方向错开 7.6mm，合拢时形成力偶；腕滚决定该力偶相对重力的朝向，
+# 正向滚过 +25° 后它与重力同向，把方块往外推。
+MAX_SAFE_WROLL_DEG = 25.0
+
 # 抓取前悬停高度（m，物体中心之上）。真机进场是从物体正上方压下来的。
 APPROACH_H = 0.06
 # 料箱内底的高度（m）。箱底贴着台面放，这是环境自己的常量。
@@ -231,13 +242,17 @@ def plan(scene, item_xy, item_yaw, bin_xy, home_qpos, base_p, base_q, urdf_path)
     #   地方 —— 合拢过程本身会把方块推走。居中与否改成量出来再修（见 `check_aim.py` 报的
     #   「方块中心 vs 两指尖中点」那一列），不靠换定义猜。
     pocket = recipe.pocket(scene)
-    q_above, q_grasp, _, _, ok = solve_aligned_grasp(
+    q_above, q_grasp, _, wroll, ok = solve_aligned_grasp(
         kin, frame, np.asarray(home_qpos, float), item_xy, spec["item_half"],
         APPROACH_H, approach_rad, limits_lo, limits_hi, pocket=pocket, item_yaw=item_yaw)
     if not ok:
         return None, "抓取逆解不收敛"
     if not span_fits(kin, q_grasp, item_yaw, spec["item_half"], descent_rad):
         return None, "两指跨不过方块（宽度/cosθ 超出该开度的指尖间距）"
+    # 只剩危险侧的腕滚就弃掉这个场景 —— 产一集注定抓不稳的数据没有意义。
+    wroll_deg = float(np.degrees(wroll))
+    if wroll_deg > MAX_SAFE_WROLL_DEG:
+        return None, f"只有危险侧的腕滚解（{wroll_deg:+.1f}° > {MAX_SAFE_WROLL_DEG}°）"
     # 逆解真把口袋送到物体中心了吗 —— 自己再量一次，别信 `ok`。
     p_local, rot_local = kin.ee_pose_local(q_grasp[:5])
     aim = frame.to_world(p_local + rot_local @ pocket)
