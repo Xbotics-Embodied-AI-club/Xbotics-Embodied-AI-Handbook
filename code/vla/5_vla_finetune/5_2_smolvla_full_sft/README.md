@@ -14,7 +14,19 @@
 | `smolvla_eval.sh` | 评测入口：`lerobot-eval --env.type=so101_sim` 跑 20 episode，报 pc_success + 录像 |
 | `plot_loss.py` | 从训练日志抓 loss 画收敛曲线到 `result/loss_curve.png` |
 | `smolvla_finetune.ipynb` | 逐行走读：命令 + 机制讲解 + 结果展示 |
+| `train_smolvla_sim_real.sh` | **2.4 节那一轮实际用的入口**：三个仿真任务 + 九个真机任务一次合成 3698 集，再全参微调 |
+| `eval_3scene.sh` | 三个仿真场景各跑 50 局出结论，三项分别报 |
+| `record_full_rollout.py` | 录一段跑满全过程的 rollout（含放手入箱后的回家段）。`lerobot-eval` 的录像在判成功那一刻就断了 |
+| `plot_rollout_strip.py` | 把三个任务的整回合拼成连拍图（讲义图 10） |
+| `plot_sim_real_sft.py` | 收敛曲线与途中成功率（讲义图 11） |
 | `result/` | 训练与评测的产物落点（loss 曲线、成功率、rollout 抽帧）；跑完上面两个脚本才会生成 |
+
+## 两个入口的分别
+
+`train_smolvla.sh` 是**只用仿真数据**的最小闭环，用来把流程跑通；
+`train_smolvla_sim_real.sh` 是 2.4 节那一轮，**仿真与真机混成一份**训练集。
+后者要说明的是：只要格式、量纲、单位、归一化对齐了，仿真数据就能当作一种真机录制来用，
+一个模型、一套权重同时覆盖仿真独有的任务与真机独有的任务。
 
 ## 数据准备
 

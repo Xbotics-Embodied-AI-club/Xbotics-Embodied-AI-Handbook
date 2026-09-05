@@ -91,7 +91,7 @@ export CUDA_VISIBLE_DEVICES="$GPU"
   --job_name=act-sim-real-cube \
   --wandb.enable=true \
   --wandb.mode=online \
-  --wandb.project=EAI-exp-002 \
+  --wandb.project="${WANDB_PROJECT:-so101}" \
   --wandb.disable_artifact=true \
   "$@"
 
