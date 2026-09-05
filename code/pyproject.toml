@@ -112,9 +112,19 @@ gpu_x86 = [
     "general-motion-retargeting",
     # GRPO 后训练（rl/2_1 Unsloth VLM 数数 + rl/2_2 VLA-0 LIBERO）
     "unsloth",
-    # unsloth-zoo 会拉最新 torchao，但 lerobot 钉 diffusers<0.36，而 diffusers 0.35 的
-    # torchao quantizer 遇 torchao>=0.16 import 即炸（内部 logger 未定义）；压回兼容区间。
-    "torchao<0.16",
+    # torchao 由 unsloth-zoo 硬拉进来（RL 两讲要用）。**下界 0.16 是 LoRA 的前置条件**：
+    # peft 的 LoRA dispatcher 调 `is_torchao_available()`，该函数在「装了但 <0.16」时
+    # 抛 ImportError 而不是返回 False ⇒ 任何 LoRA 注入都撞上。
+    # ★ 旧值是 `<0.16`，理由是 diffusers 0.35 的 torchao quantizer 遇 torchao>=0.16
+    #   import 即炸（`logger` 在 110 行才定义、92 行就被调用）。那条理由**已经消解**：
+    #   lerobot fork 把 diffusers 上界放到了 0.41，而 0.40 已修好这个 bug。
+    #   两处要一起改，只改一处会退回原来那个死结。
+    # ★ 上界 0.18 也是硬的：torchao 0.18 的
+    #   `quantize_/workflows/float8/float8_tensor.py` 在模块级 import
+    #   `torch.nn.functional.ScalingType`，那是 torch 2.9 才有的符号，而本项目钉 torch 2.8.0
+    #   ⇒ import torchao 直接 ImportError。0.16 / 0.17 的同一个文件不引用它，可用。
+    #   所以窗口只有 [0.16, 0.18)：下界由 peft 定，上界由 torch 2.8 定。
+    "torchao>=0.16,<0.18",
     "trl",
     "datasets",
     "peft",
