@@ -210,7 +210,7 @@
 \IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
 \urlstyle{same}
 \hypersetup{
-  pdftitle={第12讲 VLA 微调实战：从全量 SFT 到 LoRA 上真机},
+  pdftitle={``第12讲 VLA 微调实战：从全量 SFT 到 LoRA 上真机''},
   pdflang={zh-CN},
   colorlinks=true,
   linkcolor={blue},
@@ -220,7 +220,7 @@
   pdfcreator={LaTeX via pandoc}}
 
 
-\title{第12讲 VLA 微调实战：从全量 SFT 到 LoRA 上真机}
+\title{``第12讲 VLA 微调实战：从全量 SFT 到 LoRA 上真机''}
 \author{}
 \date{}
 \begin{document}
@@ -1118,27 +1118,187 @@ SO-101}\label{ux5b9eux9a8cux5728ux4effux771fux91ccux628a-smolvla-ux5168ux91cfux5
 
 \textbf{该盯什么。} loss
 下降只说明拟合在进行，不说明任务做得成，真正要读的是评测报出的
-\texttt{pc\_success}。但这一版还读不出一个有意义的成功率：训练数据所在的
-ReachCube 任务在 \texttt{so101\_sim}
-重构后已经下线，\texttt{smolvla\_eval.sh} 只能把 checkpoint 放进现存的
-PickPlaceCube40 场景里评，属于任务不匹配，\texttt{pc\_success} 接近 0
-是预期结果、不代表微调失败，脚本注释与 \texttt{5\_2} 的 README
-都写明了这一点。想拿到一个真能读的成功率，训练与评测得落在同一个任务上；这一步等新版
-SO-101 仿真器就位后补齐，届时本节会换上完整的收敛曲线与成功率。
+\texttt{pc\_success}。上面这条流程跑通了训练，但训练与评测不在同一个任务上（数据出自已下线的
+ReachCube，只能放进 PickPlaceCube40 场景里评），\texttt{pc\_success}
+接近 0 是任务不匹配的预期结果，读不出微调的好坏。新版 SO-101
+仿真器就位之后，我们把这条线重做了一遍，让训练与评测落在同一批任务上------那一轮的结果就是下一节。
 
-\subsection{2.4 实物实验：把 SmolVLA 全量微调到 SO-101
+\subsection{2.4 实验：把 SmolVLA 全量微调到
+SO-101}\label{ux5b9eux9a8cux628a-smolvla-ux5168ux91cfux5faeux8c03ux5230-so-101}
+
+2.3
+节把流程跑通了，但训练与评测不在同一个任务上，读不出成功率。这一节补上那个数字。
+
+\textbf{数据。} 仿真三个抓放任务 1498 集，加上公开的 SO-101 真机遥操数据
+9 个任务 2200 集， 合成一份 3698 集 / 128 万帧 / 10
+个任务的训练集。两侧共有的 \texttt{Pick\ up\ a\ cube} 与
+\texttt{Pick\ up\ a\ can} 指令文本逐字相同，落在同一个任务号下。
+
+\textbf{训练。} 从 \texttt{lerobot/smolvla\_base}
+出发，全参数更新，不挂适配器。
+
+\subsubsection{2.4.1
+一个必须亲眼确认的地方}\label{ux4e00ux4e2aux5fc5ux987bux4eb2ux773cux786eux8ba4ux7684ux5730ux65b9}
+
+\texttt{smolvla\_base} 的 \texttt{config.json} 里
+\texttt{freeze\_vision\_encoder} 与 \texttt{train\_expert\_only}
+\textbf{默认都是 \texttt{true}}，lerobot 的 \texttt{SmolVLAConfig}
+默认值也是。不显式覆盖，跑出来的是 2.2
+节说的\textbf{模块级}全参数微调，不是全模型全参数微调：
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{{-}{-}policy.freeze\_vision\_encoder=false} \DataTypeTok{\textbackslash{}}
+\NormalTok{{-}{-}policy.train\_expert\_only=false}
+\end{Highlighting}
+\end{Shaded}
+
+判据不是``我传了参数''，是训练日志第一屏那一行：
+
+\begin{verbatim}
+num_learnable_params=402737376 (403M)
+\end{verbatim}
+
+不加那两个开关时这个数是 \textbf{99,880,992（100M）}，占 4.5 亿总参数的
+22\%------视觉塔全程冻着。
+微调要跨的正是新机器人带来的视觉差异，冻着视觉塔等于让动作专家一个人扛。
+\textbf{这一行不看，就分不清``我以为在做全参微调''和``真的在做''。}
+
+\subsubsection{2.4.2 结果}\label{ux7ed3ux679c}
+
+微调后的策略在仿真里执行任务：
+
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=0.92\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/fig12-2-rollout-strip.png}
+
+}
+
+\caption{三个任务各占两行（自上而下：方块、小方块、易拉罐），每个任务八帧走完一整个回合：初始位姿、夹爪降向物体、合拢夹住、抬起进入搬运、停在料箱上方、松手让物体落进箱、手臂退回、回到起始位姿}
+
+\end{figure}%
+
+最后两帧值得单看：成功判据只问``物体在不在箱内''，松手那一刻就已经满足了，回家那一段一分不给。策略照样把它走完了------模仿学习照单全收示教里的一切，包括与判据无关的部分。这也意味着\textbf{想看完整回合得自己录}：评测程序一判成功就结束这一集，录出来的像永远停在松手那一帧。
+
+训练收敛与途中成功率：
+
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/fig12-2-sim-real-sft-convergence.png}
+
+}
+
+\caption{左轴红线是 flow-matching 损失（对数轴），从 0.56 降到
+0.05；右轴蓝线是训练途中每 5000 步一次的成功率，六个点依次为
+60\%、100\%、90\%、90\%、90\%、90\%}
+
+\end{figure}%
+
+两条线的走向不一样：损失一路降到底，成功率在第二个评测点就到顶、之后一直在
+90\%
+附近横着。\textbf{训练损失不是验收指标}------它衡量的是动作序列拟合得多准，而任务成不成只看物体最后在不在箱里。靠
+loss 判断``还该不该继续训''会一直得到``该''，得看右边那条线。
+
+最终 checkpoint 在三个仿真任务上各跑 50 局：
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.6719\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2500\linewidth - 2\tabcolsep\relax}@{}}
+\toprule\noalign{}
+任务 & 成功率 \\
+\midrule\noalign{}
+\texttt{Pick\ up\ a\ cube\ and\ place\ in\ the\ bin} & 94.0\%（47/50） \\
+\texttt{Pick\ up\ a\ small\ cube\ and\ place\ in\ the\ bin} & 90.0\%（45/50） \\
+\texttt{Pick\ up\ a\ can\ and\ place\ in\ the\ bin} & 96.0\%（48/50） \\
+\bottomrule\noalign{}
+\end{tabular}
+\end{center}
+
+数据集与权重都公开了，配套代码在
+\texttt{code/vla/5\_vla\_finetune/5\_2\_smolvla\_full\_sft/}：
+
+\begin{itemize}
+\item
+  仿真数据集与产线源码：\url{https://huggingface.co/datasets/Harrysunshine/so101-sim-pickplace-v2}
+\item
+  微调后的权重：\url{https://huggingface.co/Harrysunshine/so101-smolvla-sim-real-10task}
+\item
+  真机 9
+  个任务的数据：\url{https://modelscope.cn/datasets/zhuzhuangtian/so101-pick-place-tasks}
+\end{itemize}
+
+\subsection{2.5 实物实验：把 SmolVLA 全量微调到 SO-101
 真机}\label{ux5b9eux7269ux5b9eux9a8cux628a-smolvla-ux5168ux91cfux5faeux8c03ux5230-so-101-ux771fux673a}
 
-真机这条线还没开展，本节先只立题。仿真那条线上的流程在真机上原样适用：数据集格式、相机键映射、\texttt{pc\_success}
-的读法都不变，真机额外多出来的只有两件事：数据来路，以及闭环里误差会一步步累积、开环逐帧比对读不出来的那部分风险。
+真机走的是同一套流程：同一个 \texttt{lerobot-train} 入口，同样把
+\texttt{freeze\_vision\_encoder} 与 \texttt{train\_expert\_only}
+关掉，同样拿 \texttt{num\_learnable\_params}
+核对。换到真机之后有三件事不一样。
 
-\subsection{2.5 本节小结}\label{ux672cux8282ux5c0fux7ed3-1}
+\textbf{一是数据来路。} 训练用的是公开的 SO-101
+遥操数据，九个任务。它出自别人的机位，光照与白平衡跟自己这条臂必然不同，所以图像增强里的光度扰动要开得比官方默认宽------亮度与对比度从
+0.8--1.2 放到 0.7--1.3，白平衡靠 hue 与 saturation
+模拟色温漂移（torchvision 没有独立的白平衡算子，这是标准做法）。
+
+\textbf{二是验收判据不能用相关系数。} 这批数据里 \texttt{action}
+是主臂的目标位姿、\texttt{observation.state}
+是从臂的实测位姿，两者天然贴在一起。实测过：什么都不学、把
+\texttt{state} 原样抄成预测，逐关节 \texttt{corr(pred,\ action)} 就有
+0.936--0.995，全部能过
+0.9------这条门槛没有任何区分力。换成三个相对量，基线由数据自己定义，不用外部拍阈值：
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1675\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6207\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2118\linewidth - 2\tabcolsep\relax}@{}}
+\toprule\noalign{}
+指标 & 定义 & 它抓什么 \\
+\midrule\noalign{}
+\texttt{ratio} & \texttt{MAE(pred,\ action)\ /\ MAE(state,\ action)} & 照抄基线恒为 1，模型要明显低于 1 \\
+\texttt{delta\_\allowbreak corr} & \texttt{corr(pred\ −\ state,\ action\ −\ state)} & ``下一步往哪挪''学到没有 \\
+\texttt{delta\_\allowbreak std} & \texttt{std(pred\ −\ state)\ /\ std(action\ −\ state)} & 抓``输出≈state''这种坍缩 \\
+\bottomrule\noalign{}
+\end{tabular}
+\end{center}
+
+这三个量算的都是\textbf{开环逐帧比对}：每帧独立预测，不接上一帧的结果。真机上动作是连续下发的，误差会一步步累积，所以它们过了只说明模型学到了非平凡的东西，闭环还得真跑。
+
+\textbf{三是推理与执行分家。}
+大多数边缘端设备都没有足够的算力和内存把一个 VLA 跑起来------\(\pi_0\)
+权重就有 3 GB 多、SmolVLA 也有 900
+MB，板上加载完再推理，内存和延迟都撑不住。所以让板子只干必须在现场干的事，模型推理放
+x86 GPU 机上，中间过 gRPC：
+
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/fig12-2-real-deploy-split.png}
+
+}
+
+\caption{左边是边缘端部署板，负责读舵机、开相机、把观测打包发出去、收到动作块下发舵机；右边是
+x86 GPU 机，负责加载
+checkpoint、跑策略推理、回一个动作块；两者之间一条蓝色箭头向右标注观测（gRPC），一条红色箭头向左标注动作块}
+
+\end{figure}%
+
+服务端起的时候\textbf{不指定模型}：加载哪个 checkpoint
+是客户端握手时告诉它的，所以同一个服务端可以先后接 \(\pi_0\) / ACT /
+SmolVLA 三种客户端，换模型不用重启。相机与舵机的设备名由 udev
+规则固定，不靠 \texttt{/dev/video0} 这种会随插拔重排的号。
+
+真机九任务的权重也公开了：\url{https://huggingface.co/Harrysunshine/so101-smolvla-9task}
+
+\subsection{2.6 本节小结}\label{ux672cux8282ux5c0fux7ed3-1}
 
 \textbf{核心创新：} 全量 SFT
 解冻模型的全部参数，在新机器人的数据上一起更新视觉-语言骨干与动作头，给出最高的参数更新自由度；对
 VLA-0、SmolVLA 这类小体量
-VLA，单卡就能把整模型适配到新本体上，是最直接、最不绕弯子的微调路线。2.3
-节那条仿真闭环还说明了一件事：微调命令本身只有一行，真正会把人挡在门外的是\textbf{观测特征对齐}。
+VLA，单卡就能把整模型适配到新本体上，是最直接、最不绕弯子的微调路线。2.4
+节那一轮把这条线跑到底：仿真与真机 3698
+集混成一份训练集，一个模型在三个仿真任务上拿到 94 / 90 / 96\% 的成功率。
+
+这两节各留下一个不写下来就会重犯的教训。一是\textbf{观测特征对齐}：微调命令本身只有一行，真正把人挡在门外的是相机键对不上（2.3
+节）。二是\textbf{默认值不等于你以为的那档}：\texttt{smolvla\_base}
+默认冻结视觉编码器，不显式关掉这两个开关，跑出来的是模块级全参微调而非全模型全参微调，可训参数
+100M 与 403M 之差全在这里------判据是训练日志里的
+\texttt{num\_learnable\_params}，不是命令行里传了什么（2.4 节）。
 
 \textbf{局限性：}
 自由度的代价是显存、训练与存储成本都最高：每个任务都要存一份完整权重；一旦模型放大到
@@ -2109,12 +2269,38 @@ LoRA}{3.9 在 LeRobot 里给 \textbackslash pi\_0 挂 LoRA}}\label{ux5728-lerobo
 接进了训练入口，2.3 节那条 \texttt{lerobot-train} 命令加几个
 \texttt{-\/-peft.*} 参数就切换成 LoRA 微调。
 
-命令面上只多三样东西：\texttt{-\/-policy.use\_peft=true}
-打开适配器路径，\texttt{-\/-peft.method\_type=LORA}
+命令面上只多两样东西：\texttt{-\/-peft.method\_type=LORA}
 选方法，\texttt{-\/-peft.r} 给秩（默认 16，正好落在 3.5.1
-节说的那个常用区间）。\textbf{注意 \texttt{use\_peft=true} 必须配
-\texttt{-\/-policy.path} 一起用}：LeRobot 明确拒绝``从零初始化 +
-挂适配器''这种组合，因为 LoRA 的前提就是有一个值得冻结的基座。
+节说的那个常用区间）。触发适配器包装的判据是
+\texttt{cfg.peft\ is\ not\ None}（\texttt{lerobot\_train.py:246}），所以\textbf{给了
+\texttt{-\/-peft.*} 就已经挂上了}，日志里会打印一行
+\texttt{Using\ PEFT!\ Wrapping\ model.}。
+
+\begin{quote}
+⚠️ \textbf{别把 \texttt{-\/-policy.use\_peft=true} 加进训练命令。} 它和
+\texttt{-\/-peft.*} 不是一回事，名字像而已：
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3034\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5740\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1226\linewidth - 2\tabcolsep\relax}@{}}
+\toprule\noalign{}
+参数 & 含义 & 什么时候用 \\
+\midrule\noalign{}
+\texttt{-\/-peft.method\_\allowbreak type} / \texttt{-\/-peft.r} \ldots{} & 给一个干净基座\textbf{挂上新的适配器} & \textbf{开始 LoRA 训练} \\
+\texttt{-\/-policy.use\_\allowbreak peft=true} & \texttt{-\/-policy.path} 指向的是一份\textbf{已经训好的适配器目录}，先读适配器 config、再据此加载它的基座 & 推理、续训 \\
+\bottomrule\noalign{}
+\end{tabular}
+\end{center}
+
+判据在 \texttt{policies/factory.py:550-567}：\texttt{use\_peft=true} 时
+LeRobot 会把 \texttt{pretrained\_path}
+当成\textbf{适配器}去解析。训练时若写成
+\texttt{-\/-policy.use\_peft=true\ -\/-policy.path=lerobot/smolvla\_base}，它会去把
+\texttt{smolvla\_base} 当适配器目录读------那是基座，不是适配器。
+
+\texttt{use\_peft}
+在训练流程里唯一的作用点是收尾推送（\texttt{lerobot\_train.py:548}，\texttt{push\_to\_hub}
+那一支）。
+\end{quote}
 
 真正值得读一眼的是 LoRA 挂在哪。LeRobot
 给每个策略预置了默认的注入位置，\texttt{lerobot/policies/pi0/modeling\_pi0.py}
@@ -2145,15 +2331,113 @@ LoRA}{3.9 在 LeRobot 里给 \textbackslash pi\_0 挂 LoRA}}\label{ux5728-lerobo
 论文{[}2{]}那套做法），也可以给一个自己的模块名列表。改完之后先确认可训练参数量确实降下来了，这是
 LoRA 有没有真正生效的最直接证据。
 
-\subsection{\texorpdfstring{3.10 实物实验：给 \(\pi_0\) 挂 LoRA 微调到
-SO-101
-真机}{3.10 实物实验：给 \textbackslash pi\_0 挂 LoRA 微调到 SO-101 真机}}\label{ux5b9eux7269ux5b9eux9a8cux7ed9-pi_0-ux6302-lora-ux5faeux8c03ux5230-so-101-ux771fux673a}
+\subsection{3.10 实验：把 SmolVLA 用 LoRA 微调到
+SO-101}\label{ux5b9eux9a8cux628a-smolvla-ux7528-lora-ux5faeux8c03ux5230-so-101}
 
-和 2.4
-节一样，真机这条线还没开展，本节先只立题。上面那份默认注入名单、\texttt{-\/-peft.*}
-那几个参数、以及``先确认可训练参数量降下来''这个检查，在真机上都不变；要现场定的是秩取多少、以及动作专家之外还要不要覆盖别的层。
+和 2.4 节\textbf{同一份训练集、同一套评测}：仿真三个抓放任务 1498
+集加真机 9 个任务 2200 集， 合成 3698 集 / 10 个任务；30000 步、warmup
+2000、六个图像增强、六卡 effective batch 96、
+评测环境参数逐字相同。两轮之间\textbf{唯一的差别就是怎么改权重} ------
+只有这样，差出来的东西才 归因得到 LoRA 本身。
 
-\subsection{3.11 本节小结}\label{ux672cux8282ux5c0fux7ed3-2}
+\subsubsection{3.10.1
+挂在哪些层：默认名单不够用}\label{ux6302ux5728ux54eaux4e9bux5c42ux9ed8ux8ba4ux540dux5355ux4e0dux591fux7528}
+
+3.3.6 节说过 LoRA 通常只挂注意力的 \(W_q\) 与 \(W_v\)。上游 SmolVLA
+的默认名单正是这么定的
+（\texttt{\_get\_default\_peft\_targets}），但它只挂\textbf{动作专家}那一族，外加五个具身投影：
+
+照默认跑，可训练参数是 742,656，占全模型 4.5 亿的 \textbf{0.16\%}。跑到
+8000 步， 三个途中评测点\textbf{全是 0.0\%}，而全参微调在第一个点就有
+60\%。
+
+判据不是成功率，是 loss 对读：\textbf{LoRA 在 7000 步是 0.198，全参在
+1000 步已经 0.194}。 差的不是方向，是进度 ------ 欠拟合，不是学歪。
+
+回到基座去数，能挂 \(q/v\) 的一共三族：
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.4844\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1562\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1875\linewidth - 2\tabcolsep\relax}@{}}
+\toprule\noalign{}
+位置 & \(q/v\) 个数 & 默认挂了吗 \\
+\midrule\noalign{}
+动作专家 \texttt{lm\_\allowbreak expert} & 32 & 挂了 \\
+文本塔 \texttt{vlm.model.text\_\allowbreak model} & 32 & \textbf{没有} \\
+视觉塔 \texttt{vlm.model.vision\_\allowbreak model} & 48 & \textbf{没有} \\
+\bottomrule\noalign{}
+\end{tabular}
+\end{center}
+
+而 2.4.1
+节的结论恰恰是「解冻视觉塔才跨得过新机器人的视觉差异」。默认名单把视觉塔和
+文本塔整个冻着，等于让动作专家一个人扛同一件事。三族一起挂、\(r\) 提到
+64、五个具身投影
+改成全量训练（低秩近似一个本来就不大的投影没有意义）、学习率随之提到
+3e-4 ------ 可训练参数 变成 9,851,728，占 \textbf{2.1\%}。
+
+\begin{quote}
+\textbf{秩要按基座大小取，不能两个模型共用一个数。} 同样 \(r=64\) 挂到
+\(\pi_0\)（40 亿参数、 180 个 \(q/v\)）上只摊到
+0.58\%，比这里薄了近四倍。参数占比才是要对齐的量。
+\end{quote}
+
+\subsubsection{3.10.2 结果}\label{ux7ed3ux679c-1}
+
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/fig12-3-lora-vs-full.png}
+
+}
+
+\caption{两条 flow-matching
+损失曲线（对数轴）与两组途中成功率：红色是全参 403M、橙色是 LoRA 10M，
+LoRA 的损失全程高一截、末点 0.099 对 0.052；深浅两色的方点与圆点是每
+5000 步一次的途中成功率， 两者最后都落在 80\textasciitilde90\% 一带}
+
+\end{figure}%
+
+最终 checkpoint 在三个仿真任务上各跑 50 局，与 2.4 节那轮并排：
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.6587\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1707\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.1707\linewidth - 2\tabcolsep\relax}@{}}
+\toprule\noalign{}
+任务 & LoRA 10M & 全参 403M \\
+\midrule\noalign{}
+\texttt{Pick\ up\ a\ cube\ and\ place\ in\ the\ bin} & 94.0\%（47/50） & 94.0\%（47/50） \\
+\texttt{Pick\ up\ a\ small\ cube\ and\ place\ in\ the\ bin} & 84.0\%（42/50） & 90.0\%（45/50） \\
+\texttt{Pick\ up\ a\ can\ and\ place\ in\ the\ bin} & 98.0\%（49/50） & 96.0\%（48/50） \\
+\bottomrule\noalign{}
+\end{tabular}
+\end{center}
+
+可训练参数是全参的 1/40，三项里一项低 6 个点、一项高 2 个点、一项持平。
+
+\textbf{这张图里最该记住的是那两条线的分叉。}
+损失全程差着一截、到最后也没收敛到一处，
+成功率却追平了。\textbf{损失差不等于能力差} ------ 2.4.2
+节说过训练损失不是验收指标， 那里是纵向的（同一轮里 loss
+还在降而成功率早已横住），这里是横向的：两个不同的模型， loss
+差了近一倍，任务表现一样。要判断一个微调方案行不行，只能去跑任务。
+
+适配器权重公开在
+\url{https://huggingface.co/Harrysunshine/so101-smolvla-lora-sim-real-10task}，
+配套代码在 \texttt{code/vla/5\_vla\_finetune/5\_3\_smolvla\_lora/}。
+
+\subsection{3.11 实物实验：把适配器部署到 SO-101
+真机}\label{ux5b9eux7269ux5b9eux9a8cux628aux9002ux914dux5668ux90e8ux7f72ux5230-so-101-ux771fux673a}
+
+真机这条线上，LoRA 与全参的\textbf{部署路径完全一样} ------ 2.5
+节那张分工图原样适用：板子只读舵机、 开相机、下发动作，模型推理放 x86
+GPU 机上，中间过 gRPC。唯一的差别在客户端握手时告诉服务端
+加载什么：全参给的是一份完整权重，LoRA
+给的是\textbf{适配器仓}，这时才轮到 3.9 节那个
+\texttt{-\/-policy.use\_peft} 出场 ------
+它的用途正是「加载一个已经训好的适配器」，而不是开启 LoRA 训练。
+
+要现场定的仍是两件：秩取多少（按基座大小定占比，见 3.10.1 节末那条），
+以及动作专家之外还要覆盖哪些层。
+
+\subsection{3.12 本节小结}\label{ux672cux8282ux5c0fux7ed3-2}
 
 \textbf{核心创新：} LoRA
 抓住``微调时的有效权重变化是低秩的''这一观察，用
@@ -2164,8 +2448,13 @@ SO-101
 节）；QLoRA 再叠加 NF4 量化、双重量化、分页优化器三件套，把基座以 4-bit
 装下，让大模型微调走进消费级硬件。
 
+3.10 节把这条线跑到底：同一份 3698 集训练集、同一套评测，LoRA 用全参
+1/40 的可训练参数拿到 94 / 84 / 98\% 的成功率，与全参的 94 / 90 / 96\%
+基本打平。
+
 \textbf{局限性：} 低秩是一种近似，当任务与预训练分布差异极大、或秩 \(r\)
-取得过低时，旁路的表达力可能不够，效果不及全量微调；而且
+取得过低时，旁路的表达力可能不够，效果不及全量微调 ------ 3.10.1 节那次
+0.16\% 的默认名单就是活的反例，三个评测点全 0；而且
 \(r\)、\(\alpha\)、学习率都需要按任务调。QLoRA 用量化与 offload
 换显存，代价是训练变慢，精度则多出一层不确定（3.6.5
 节：可能略有损失，但不是必然，要用验证集确认）。显存够时优先用
@@ -2198,7 +2487,7 @@ VLA 小数据微调 & LoRA（\(r=16\sim32\)） & 过拟合风险低，也保留�
 LoRA，单张卡大多还扛得住；可一旦要全量微调 \(\pi_0\) 这种 3B
 量级、甚至更大的
 VLA，单卡立刻开始吃紧：配套代码里那条真机微调脚本（跑的是一批\textbf{公开的}
-SO-101 遥操作数据，我们自己的真机数据见 2.4
+SO-101 遥操作数据，我们自己的真机数据见 2.5
 节，还没采齐）默认还是单卡在训 \(\pi_0\)，代价是权重压到
 bf16、批量只敢给
 8；想把批量放大、想再换大一档的模型，或者手上的卡再小一号，就会直接撞墙。这一节把多卡训练从头讲到尾：先算清训练显存被谁吃掉，再依次讲数据并行、省显存四件套、ZeRO/FSDP
@@ -4338,9 +4627,10 @@ lerobot-train 的（控制训什么）：
 配套代码里那条真机微调脚本
 \texttt{code/vla/5\_vla\_finetune/5\_4\_so101\_real\_sft/train\_so101\_real.sh}
 里就有这个分支（提醒一句：它用的是公开的 SO-101
-遥操作数据，本讲的实验主线在仿真那一侧，见 2.3 节）：脚本顶部一个
-\texttt{NUM\_GPUS} 变量，填 1 时直接调 \texttt{lerobot-train}，大于 1
-时换成上面这条 \texttt{accelerate\ launch\ -\/-multi\_gpu}
+遥操作数据，本讲的实验主线在仿真那一侧，见 2.3\textasciitilde2.4
+节）：脚本顶部一个 \texttt{NUM\_GPUS} 变量，填 1 时直接调
+\texttt{lerobot-train}，大于 1 时换成上面这条
+\texttt{accelerate\ launch\ -\/-multi\_gpu}
 的写法，训练参数一个字都不用改------单卡与多卡的差别只在最外面那层启动器。
 
 \paragraph{（3）混合精度交给 accelerate

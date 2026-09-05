@@ -107,7 +107,6 @@
 \newcommand{\WarningTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
 
 \usepackage{longtable,booktabs,array}
-\newcounter{none} % for unnumbered tables
 \usepackage{calc} % for calculating minipage widths
 % Correct order of tables after \paragraph or \subparagraph
 \usepackage{etoolbox}
@@ -136,13 +135,13 @@
 
 
 \ifLuaTeX
-\usepackage[bidi=basic,shorthands=off,provide=*]{babel}
+\usepackage[bidi=basic,provide=*]{babel}
 \else
-\usepackage[bidi=default,shorthands=off,provide=*]{babel}
+\usepackage[bidi=default,provide=*]{babel}
 \fi
-\ifLuaTeX
-  \usepackage{selnolig} % disable illegal ligatures
-\fi
+% get rid of language-specific shorthands (see #6817):
+\let\LanguageShortHands\languageshorthands
+\def\languageshorthands#1{}
 
 
 \setlength{\emergencystretch}{3em} % prevent overfull lines
@@ -203,10 +202,6 @@
 \usepackage{bookmark}
 \IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
 \urlstyle{same}
-% fallback for those not using the hyperref driver hyperxmp:
-\makeatletter
-\@ifundefined{xmpquote}{\newcommand{\xmpquote}[1]{#1}}{}
-\makeatother
 \hypersetup{
   pdftitle={第10讲 模仿学习实战：ACT、Diffusion 与 Flow Matching},
   pdflang={zh-CN},
@@ -226,6 +221,7 @@
 
 \renewcommand*\contentsname{目录}
 {
+\hypersetup{linkcolor=}
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
@@ -1160,28 +1156,178 @@ ACT}\label{ux5b9eux9a8cux8badux7ec3ux90e8ux7f72ux5e76ux89e3ux6790-act}
 60\% 和 100\% 两个结果。真正能比的是中位线：这次 run 的 83\%
 才是它的成绩。
 
-\subsection{3.2 在 SO-101 Leader--Follower 臂上训练
-ACT（无真机用仿真器替代）}\label{ux5728-so-101-leaderfollower-ux81c2ux4e0aux8badux7ec3-actux65e0ux771fux673aux7528ux4effux771fux5668ux66ffux4ee3}
+\subsection{3.2 在 SO-101 上训练
+ACT：把仿真数据和真机数据混成一份}\label{ux5728-so-101-ux4e0aux8badux7ec3-actux628aux4effux771fux6570ux636eux548cux771fux673aux6570ux636eux6df7ux6210ux4e00ux4efd}
 
-把同一套 ACT 搬到真机几乎不用改算法，只换数据来源：
+3.1 节用的是 LIBERO ------
+别人做好的数据集、别人定好的成功判据。这一节换成我们自己的机器人，
+并且要回答第9讲 4.5 节末尾留下的那个问题。
+
+那一节采过两份数据：真机 Leader--Follower
+臂遥操一份，仿真里键盘遥操一份。它们\textbf{形状一样}
+（都是六维动作、两路相机、同样的落盘结构），\textbf{口径不一样} ------
+真机的 \texttt{action} 是主臂读到的
+关节目标角度（绝对），仿真那份是归一化到 \([-1,1]\)
+的关节增量（相对）。第9讲把话说到了这里：
+容器格式一致不等于语义一致，混之前必须逐项核对。
+
+这一节把这件事做完：产一份\textbf{从一开始就照着能混来做}的仿真数据，和真机数据合成一个训练集，
+训一个 ACT。
+
+\subsubsection{3.2.1 SO-101
+仿真器与它的三个任务}\label{so-101-ux4effux771fux5668ux4e0eux5b83ux7684ux4e09ux4e2aux4efbux52a1}
+
+仿真器是 \texttt{so101\_sim}，跑在 ManiSkill / SAPIEN
+上，装的是与实物同一副 SO-101 的 URDF ------
+同样五个臂关节加一个夹爪，同样的关节限位与连杆长度。三样东西都公开：
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{有真机}：用第9讲 4 节采的 SO-101 Leader--Follower
-  臂遥操作数据（例如``抓方块放盘子''），同样用 \texttt{lerobot-train} 训
-  ACT，训练命令封在
-  \texttt{code/vla/3\_imitation\_learning/3\_1\_act/train\_act\_cuboid.sh}
-  里；训完把策略部署回 SO-101 做闭环执行，动作维度 \(d_a\)、状态维度
-  \(d_s\)、相机路数都会由数据集自动对上，超参沿用默认；
+  仿真器：\url{https://github.com/Xbotics-Embodied-AI-club/Xbotics-SO101-Sim}
 \item
-  \textbf{无真机}：用 SO-101
-  仿真器跑同样的流程------键盘或手柄采一份格式一致的数据，训练同一个
-  ACT，在仿真器里做闭环评估。
+  本课用的 LeRobot
+  分支：\url{https://github.com/Xbotics-Embodied-AI-club/lerobot}
+\item
+  仿真数据集与产线源码：\url{https://huggingface.co/datasets/Harrysunshine/so101-sim-pickplace-v2}
 \end{itemize}
 
-无论真机还是仿真，ACT 的训练目标、网络结构、推理时的 \(z=0\)
-与动作队列执行都完全一致；变的只是数据集的维度和相机数量。
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/fig10-3-sim-stack.png}
+
+}
+
+\caption{四层自上而下：SAPIEN / ManiSkill
+负责刚体物理与渲染、并行环境；so101\_sim 场景包提供与实物同一副 SO-101
+的 URDF、三个抓放场景与成功判据；So101SimEnv 是 lerobot 封装，给出 gym
+接口并把观测与动作换成真机口径（臂关节用度、夹爪用 0\textasciitilde100
+的行程百分比）；最下面是 lerobot 官方的 record / train / eval 三条命令}
+
+\end{figure}%
+
+它是一个\textbf{薄封装}，不是另一套训练框架 ------
+所以录数据、训练、评测三条官方命令原样可用。它注册了三个抓放场景，三个都是「把桌上的物体放进料箱」，只换物体
+------ 40 mm 方块、20 mm 方块、40 mm 易拉罐：
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.3971\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6029\linewidth - 2\tabcolsep\relax}@{}}
+\toprule\noalign{}
+场景 id & 指令文本 \\
+\midrule\noalign{}
+\texttt{SO101PickPlaceCube40-v1} & \texttt{Pick\ up\ a\ cube\ and\ place\ in\ the\ bin} \\
+\texttt{SO101PickPlaceCube20-v1} & \texttt{Pick\ up\ a\ small\ cube\ and\ place\ in\ the\ bin} \\
+\texttt{SO101PickPlaceCylinder40-v1} & \texttt{Pick\ up\ a\ can\ and\ place\ in\ the\ bin} \\
+\bottomrule\noalign{}
+\end{tabular}
+\end{center}
+
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/fig10-3-sim-scenes.png}
+
+}
+
+\caption{三个仿真场景的初始画面并排，自左向右分别是 40 mm 方块、20 mm
+方块、40 mm
+易拉罐；每格里机械臂在右侧起始位姿，物体在爪前，料箱在桌面靠前处}
+
+\end{figure}%
+
+成功判据是\textbf{物体最终落在料箱内}：把物体位置换算进料箱自己的坐标系再比半尺寸------料箱每集
+随机绕 z 转一个角，按世界轴比会在箱口边界附近判反。
+
+\subsubsection{3.2.2
+数据不是遥操出来的，是脚本化专家产的}\label{ux6570ux636eux4e0dux662fux9065ux64cdux51faux6765ux7684ux662fux811aux672cux5316ux4e13ux5bb6ux4ea7ux7684}
+
+第9讲那份仿真数据是人按键盘采的。这一节换成\textbf{脚本化专家}：直接用逆运动学算出一条轨迹，
+批量跑。理由是量 ------
+键盘一集一集地采，采到几百集就是几十个小时；脚本化能在多进程里并行跑，
+而且每一集都可复现（给定随机种子，物体位置、料箱朝向、轨迹全都定死）。
+
+轨迹分五段，中间只在真正该停的地方停：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{取物} ------
+  一条落地曲线，从起始位姿斜着下来，下降与平移重叠着走，最后 5 cm
+  才转成垂直下插
+\item
+  \textbf{合拢} ------
+  夹爪按真机速率渐变到底，手臂不动，保持若干帧让堵转建立
+\item
+  \textbf{搬运} ------ 一条弧线，抬起与平移融成一段
+\item
+  \textbf{松手} ------ 渐变张开，物体自由落体进箱
+\item
+  \textbf{回家} ------ 一段回到起始位姿
+\end{enumerate}
+
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/fig10-3-demo-phases.png}
+
+}
+
+\caption{一集示教的六条曲线：五个臂关节角（左轴，度）与夹爪行程（右轴，虚线，百分比），背景按五个阶段着色
+------
+取物、合拢、搬运、松手、回家；夹爪只在合拢与松手两处动，关节曲线全程平滑没有折角}
+
+\end{figure}%
+
+\subsubsection{3.2.3
+能混成一份的前提：逐项对齐，一项都不能少}\label{ux80fdux6df7ux6210ux4e00ux4efdux7684ux524dux63d0ux9010ux9879ux5bf9ux9f50ux4e00ux9879ux90fdux4e0dux80fdux5c11}
+
+第9讲要求核对的那几项，这里逐一给出取值。\textbf{每一项配错都不报错，只会安静地训出一个更差的
+策略}，所以这张表是这一节最该记住的东西：
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1646\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4231\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4123\linewidth - 2\tabcolsep\relax}@{}}
+\toprule\noalign{}
+要对齐的 & 取值 & 配错会怎样 \\
+\midrule\noalign{}
+动作口径 & 绝对关节角（\texttt{control\_\allowbreak mode=pd\_\allowbreak joint\_\allowbreak pos}） & 相对当绝对训，手臂以包线最大速度朝错误方向走 \\
+臂关节单位 & 度 & 与弧度差 57.3 倍，观测偏小让归一化输出远离训练分布 \\
+夹爪单位 & 行程百分比 \(0\sim100\) & 与度数\textbf{量级恰好撞车}（物理行程约 0--100 度），看数值看不出来，只表现为抓取这一环学不动 \\
+相机键名 & \texttt{observation.images.top} / \texttt{.wrist} & 键对不上，策略拿不到那一路画面 \\
+分辨率 & 两路都 \(640\times480\) & 与训练时不同分辨率，等于换了个观测 \\
+控制频率 & 30 Hz & 动作块覆盖的物理时长变了 \\
+视频编码 & \texttt{h264} & 官方合并第一步逐字比 features，不等直接抛错 \\
+\texttt{robot\_\allowbreak type} & \texttt{so\_\allowbreak follower} & 同上 \\
+指令文本 & 与真机那份\textbf{逐字相同} & 差一个字就落成两个任务号，混不成一份 \\
+\bottomrule\noalign{}
+\end{tabular}
+\end{center}
+
+最后一项容易被忽略。真机九个任务里有
+\texttt{Pick\ up\ a\ cube\ and\ place\ in\ the\ bin}，仿真这边的 40 mm
+方块场景用的是\textbf{同一句话}，于是合并之后它们落在同一个任务号下，模型看到的是
+「同一个任务的两种画风」，而不是两个任务。
+
+合并走官方命令（\texttt{code/vla/0\_dataset\_gen/merge\_dataset.py}
+是它的薄封装），不自己拼 parquet： 自己拼要同时改 \texttt{episodes} /
+\texttt{tasks} / \texttt{stats}
+三张表，漏一张不报错，只在训练时表现为某些集
+读不到任务文本。合并的第一步 \texttt{validate\_all\_metadata} 逐字比
+\texttt{fps} / \texttt{robot\_type} / \texttt{features}, 任一不等就抛错
+------ 所以这一步同时也是上面那张表的自动检查。
+
+\subsubsection{3.2.4 实验：仿真 498 集 + 真机 300 集，一个
+ACT}\label{ux5b9eux9a8cux4effux771f-498-ux96c6-ux771fux673a-300-ux96c6ux4e00ux4e2a-act}
+
+只取方块这一个任务：仿真 498 集，加上公开的 SO-101 真机遥操 300 集，合成
+798 集 / 273,889 帧 / \textbf{1 个任务}。训练脚本
+\texttt{code/vla/3\_imitation\_learning/3\_1\_act/train\_act\_so101\_sim.sh}
+在合并后断言「只有 1 个任务」------
+多于一个就说明两侧指令文本没对上，直接停下来，不让它安静
+地训成两个任务。
+
+ACT 从随机初始化开始训，52M 参数。和 3.1 节 LIBERO
+那轮相比，算法、网络、超参一个没动 ------
+动作维度、状态维度、相机路数都由数据集自己的 \texttt{features}
+描述决定，这正是本节要说明的事。
 
 \subsection{3.3 代码解析：LeRobot
 源码逐层拆解}\label{ux4ee3ux7801ux89e3ux6790lerobot-ux6e90ux7801ux9010ux5c42ux62c6ux89e3}

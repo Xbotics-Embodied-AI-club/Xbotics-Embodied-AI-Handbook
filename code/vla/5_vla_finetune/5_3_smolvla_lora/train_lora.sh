@@ -41,10 +41,33 @@ DATA=$BASE/datasets/sim-real-10task
 ROOT="${FAST_ROOT-/dev/shm/so101-sft/sim-real-10task}"
 OUT="$BASE/outputs/lora-$MODEL"
 
+# 两个基座各自可挂 q/v 的家族。**上游默认只挂动作专家那一族**，换机器人本体时学不动
+# （SmolVLA 上实测：三个评测点全 0.0%）。两边都是同一个毛病，所以都三族全挂。
 case "$MODEL" in
-  smolvla) PRETRAINED=lerobot/smolvla_base ;;
-  pi0)     PRETRAINED=lerobot/pi0 ;;
-  *)       echo "★ 只支持 smolvla / pi0，收到 $MODEL"; exit 1 ;;
+  smolvla)
+    PRETRAINED=lerobot/smolvla_base
+    # 动作专家 32 · 文本塔 32 · 视觉塔 48，共 112 个 q/v
+    TARGETS='(model\.vlm_with_expert\.(lm_expert|vlm\.model\.text_model|vlm\.model\.vision_model\.encoder)\..*\.(q|v)_proj)'
+    RANK="${RANK:-64}"      # ⇒ 可训练 9,851,728 / 460M = 2.1%
+    ;;
+  pi0)
+    # ★ `lerobot/pi0` 的 config.json 落后于本版 lerobot，先用 fix_pi0_config.py 补成新格式。
+    #   全参那份脚本会自动建这个目录；这里直接用它建好的。
+    PRETRAINED="${PI0_DIR:-$BASE/models/pi0-base}"
+    [ -f "$PRETRAINED/config.json" ] || {
+      echo "★ $PRETRAINED 不在 —— 先跑一次 5_2 那份 train_sim_real_full_sft.sh 建基座，"
+      echo "  或手动：hf download lerobot/pi0 --local-dir <RAW> && python ../fix_pi0_config.py <RAW> $PRETRAINED"
+      exit 1; }
+    # 动作专家 36 · 语言塔 36 · 视觉塔 108，共 180 个 q/v
+    TARGETS='(model\.paligemma_with_expert\.(gemma_expert|paligemma\.model\.language_model|paligemma\.model\.vision_tower\.vision_model\.encoder)\..*\.(q|v)_proj)'
+    # ★ 秩要按**基座大小**调，不能两个模型共用一个数。pi0 是 4B、SmolVLA 是 460M，
+    #   而挂的矩阵只从 112 个涨到 180 个 ⇒ 同样 r=64 在 pi0 上只摊到
+    #   23,597,088 / 4.05B = 0.58%，比 SmolVLA 那轮的 2.1% 薄了近四倍。
+    #   0.58% 这个量级在换本体这件事上已经被证明不够（SmolVLA 的 0.16% 版三个评测点全 0）。
+    #   取 256 ⇒ 约 94M / 4.05B ≈ 2.3%，与 SmolVLA 那轮同档，两条线才对得起来。
+    RANK="${RANK:-256}"
+    ;;
+  *) echo "★ 只支持 smolvla / pi0，收到 $MODEL"; exit 1 ;;
 esac
 
 export CUDA_VISIBLE_DEVICES="${GPUS:-2,3,4,5,6,7}"
@@ -81,8 +104,8 @@ rm -rf "$OUT"
   --policy.device=cuda \
   --policy.push_to_hub=false \
   --peft.method_type=LORA \
-  --peft.r=64 \
-  --peft.target_modules='(model\.vlm_with_expert\.(lm_expert|vlm\.model\.text_model|vlm\.model\.vision_model\.encoder)\..*\.(q|v)_proj)' \
+  --peft.r="$RANK" \
+  --peft.target_modules="$TARGETS" \
   --peft.full_training_modules='["state_proj","action_in_proj","action_out_proj","action_time_mlp_in","action_time_mlp_out"]' \
   --dataset.repo_id="xbotics/so101-sim-real-10task" \
   --dataset.root="$ROOT" \
