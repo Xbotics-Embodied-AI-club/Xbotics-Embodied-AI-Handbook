@@ -102,8 +102,8 @@ for ax, (key, title, note) in zip(axes.flat, PANELS):
     if drawn:
         ax.legend(fontsize=9)
 
-fig.suptitle(f"G1 行走：三个算法的训练损失（细线为原始值，粗线为 {WINDOW} 次迭代滑动平均）",
-             fontsize=14, fontweight="bold")
-fig.tight_layout(rect=(0, 0.02, 1, 0.96))
+# 整张图不写总标题：标题由讲义正文的图注给出，图里再写一遍 Quarto 会渲成「图 N: 图：…」。
+# 四个面板各自的小标题保留——那是在给面板命名，不是图的标题，没有它读者认不出哪格是哪项损失。
+fig.tight_layout(rect=(0, 0.02, 1, 1))
 fig.savefig(out_path, dpi=200, metadata={"Font": FONT_NAME})
 print(f"图已保存到 {out_path}")

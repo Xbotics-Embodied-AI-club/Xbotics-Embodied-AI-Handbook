@@ -19,7 +19,7 @@
 
 每个脚本都是标准的 Lightning 结构：`Dataset`（在线采一段 rollout）→ `LightningDataModule` → `LightningModule`（算 loss）→ `trainer.fit(model, data)`。要改的超参就近写成变量，没有命令行参数层。
 
-## 第四版（进阶）：换成 off-policy 的 SAC（讲16 §7.3）
+## 第四版（进阶）：换成 off-policy 的 SAC（讲16 §4.3）
 
 前三版是一条 **on-policy** 演进链——每轮采一段数据、算完梯度就扔。`train_v4_sac.py` 在**同一个任务、同一份奖励、同一套四件套**下把算法换成 **off-policy 的 SAC**，专门看清 on-policy → off-policy 的分水岭。差异集中在三件事：
 
@@ -39,7 +39,7 @@
 两张对照曲线在 `result/1_1_g1_walk_rl/`（`sac-vs-ppo-envsteps.png` / `sac-vs-ppo-walltime.png`）。要点：
 
 - **样本效率**：SAC 用约 2–7M 环境步就到 10⁻² 的 reward 水平并稳定行走，而 PPO 的确定性策略到**最早存档的** 20M 步才测到相当水平（20M 步之前没有 checkpoint，PPO 实际何时越过这一水平未知，故这里只作定性结论"起步阶段更省交互"，不给倍数）——off-policy「每条经验反复用」在起步阶段确实更省。
-- **绝对高度**：SAC 停在 10⁻² 量级（和 v1/v2 评测同档），**没追上 PPO 的 0.097**。原因有二：这套奖励是给 PPO 调的，off-policy 品味不同（讲义 §7.2 已点明"原样搬不一定最优"）；课堂版只保留最核心三件，没上 FastSAC 的 n-step / 分布式 critic 等提速件。
+- **绝对高度**：SAC 停在 10⁻² 量级（和 v1/v2 评测同档），**没追上 PPO 的 0.097**。原因有二：这套奖励是给 PPO 调的，off-policy 品味不同（讲义 §4.2 已点明"原样搬不一定最优"）；课堂版只保留最核心三件，没上 FastSAC 的 n-step / 分布式 critic 等提速件。
 - **过训**：后期 SAC 动作会慢慢顶大、reward 从峰值回落（off-policy 常见不稳），所以取"会走"的最佳 checkpoint（约 iter 900）作证据。
 
 ## 怎么跑

@@ -107,7 +107,6 @@
 \newcommand{\WarningTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
 
 \usepackage{longtable,booktabs,array}
-\newcounter{none} % for unnumbered tables
 \usepackage{calc} % for calculating minipage widths
 % Correct order of tables after \paragraph or \subparagraph
 \usepackage{etoolbox}
@@ -136,13 +135,13 @@
 
 
 \ifLuaTeX
-\usepackage[bidi=basic,shorthands=off,provide=*]{babel}
+\usepackage[bidi=basic,provide=*]{babel}
 \else
-\usepackage[bidi=default,shorthands=off,provide=*]{babel}
+\usepackage[bidi=default,provide=*]{babel}
 \fi
-\ifLuaTeX
-  \usepackage{selnolig} % disable illegal ligatures
-\fi
+% get rid of language-specific shorthands (see #6817):
+\let\LanguageShortHands\languageshorthands
+\def\languageshorthands#1{}
 
 
 \setlength{\emergencystretch}{3em} % prevent overfull lines
@@ -206,10 +205,6 @@
 \usepackage{bookmark}
 \IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
 \urlstyle{same}
-% fallback for those not using the hyperref driver hyperxmp:
-\makeatletter
-\@ifundefined{xmpquote}{\newcommand{\xmpquote}[1]{#1}}{}
-\makeatother
 \hypersetup{
   pdftitle={第8讲 端到端策略导论：从 Pipeline 到 Policy},
   pdflang={zh-CN},
@@ -229,6 +224,7 @@
 
 \renewcommand*\contentsname{目录}
 {
+\hypersetup{linkcolor=}
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
@@ -485,7 +481,7 @@ shift），指的正是``策略自己走出来的状态分布''和``示教数据
 等人提出的 \textbf{DAgger}{[}9{]}（数据聚合，Dataset
 Aggregation：让策略先跑，再请专家对跑出来的状态补标正确动作，把这批数据加回训练集重训）就是冲它去的。第10讲
 1.2 节会从生成式策略的角度再碰一次这个问题，DAgger
-这条交互式纠正的路，则留到第16讲 8.6 节的人在环方法展开。
+这条交互式纠正的路，则留到第16讲 5.6 节的人在环方法展开。
 
 \textbf{策略到底行不行，得让它在环境里真正跑一遍（rollout）、看任务成没成。离线指标做不了这个判决。}
 离线指标仍然有它的位置：粗筛

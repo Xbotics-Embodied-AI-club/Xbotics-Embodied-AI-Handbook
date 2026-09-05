@@ -17,10 +17,12 @@ rl/
 │   ├── 2_1_grpo_vlm_counting/       #   GRPO 微调小 VLM 学数数
 │   ├── data/
 │   └── result/
-└── 3_offpolicy/            # 组3 Off-policy：值学习地基→连续控制→真机落地，六级依次提升
-    ├── 3_1_cartpole_value_rl/       #   值学习入门：Q-learning→DQN（CartPole 贯穿两级）
-    └── 3_3_hilserl_so101/           #   SO-101 真机人在环 HIL-SERL（待建）
+└── 3_offpolicy/            # 组3 Off-policy：值学习地基→连续控制→真机落地
+    └── 3_1_cartpole_value_rl/       #   值学习入门：Q-learning→DQN（CartPole 贯穿两级）
 ```
+
+组3 的真机人在环模块（`3_3_hilserl_so101/`，HIL-SERL）**尚未建立**，目录树里没有它；
+讲16 §5 的 HIL-SERL 目前只讲机制，不配套代码。
 
 > 组1 与组3 编号例外：组内序号 = **教学顺序**（非建立顺序）。
 > 组3 是为体现"由简到繁"的算法递进；组1 是因为 `1_0` 只产数据、不产结论，
@@ -46,7 +48,7 @@ rl/
 | `1_rl_basics/1_3_g1_motion_tracking` | 同三算法对照 · G1 动作跟随 | 讲14 §8 |
 | `2_grpo_posttraining/2_1_grpo_vlm_counting` | GRPO 微调小 VLM 学数数 | 讲15 |
 | `3_offpolicy/3_1_cartpole_value_rl` | 值学习入门 Q-learning→DQN（CartPole 贯穿） | 讲16 |
-| `3_offpolicy/3_3_hilserl_so101`（待建） | 真机人在环学接触型任务（HIL-SERL） | 讲16 |
+| `3_offpolicy/3_3_hilserl_so101`（尚未建立） | 真机人在环学接触型任务（HIL-SERL） | 讲16 |
 
 > 讲次调整只改这张表，不动目录。
 

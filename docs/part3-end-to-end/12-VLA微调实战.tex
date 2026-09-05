@@ -107,7 +107,6 @@
 \newcommand{\WarningTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
 
 \usepackage{longtable,booktabs,array}
-\newcounter{none} % for unnumbered tables
 \usepackage{calc} % for calculating minipage widths
 % Correct order of tables after \paragraph or \subparagraph
 \usepackage{etoolbox}
@@ -136,13 +135,13 @@
 
 
 \ifLuaTeX
-\usepackage[bidi=basic,shorthands=off,provide=*]{babel}
+\usepackage[bidi=basic,provide=*]{babel}
 \else
-\usepackage[bidi=default,shorthands=off,provide=*]{babel}
+\usepackage[bidi=default,provide=*]{babel}
 \fi
-\ifLuaTeX
-  \usepackage{selnolig} % disable illegal ligatures
-\fi
+% get rid of language-specific shorthands (see #6817):
+\let\LanguageShortHands\languageshorthands
+\def\languageshorthands#1{}
 
 
 \setlength{\emergencystretch}{3em} % prevent overfull lines
@@ -210,10 +209,6 @@
 \usepackage{bookmark}
 \IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
 \urlstyle{same}
-% fallback for those not using the hyperref driver hyperxmp:
-\makeatletter
-\@ifundefined{xmpquote}{\newcommand{\xmpquote}[1]{#1}}{}
-\makeatother
 \hypersetup{
   pdftitle={第12讲 VLA 微调实战：从全量 SFT 到 LoRA 上真机},
   pdflang={zh-CN},
@@ -233,6 +228,7 @@
 
 \renewcommand*\contentsname{目录}
 {
+\hypersetup{linkcolor=}
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
@@ -485,7 +481,7 @@ LLaMA-Adapter，并有一条连线把 Prefix-tuning 与 LLaMA-Adapter
 
 \end{figure}%
 
-三堆分别对应``新参数进输入端''\,``新参数进层内''\,``不插新模块、改写权重更新量的表示形式''。要留神的是\textbf{第一堆里混着一个不属于
+三堆分别对应``新参数进输入端''\,``新参数进层内''``不插新模块、改写权重更新量的表示形式''。要留神的是\textbf{第一堆里混着一个不属于
 PEFT 的成员}：
 
 \begin{itemize}
@@ -717,7 +713,7 @@ loss，反向传播更新权重，多轮迭代直到收敛。
 \textbf{SFT 的局限在哪？} SFT
 能教模型``做什么''，但很难教``什么更好''。比如，对于同一个问题，可能有多个语法正确但质量不同的回答，而
 SFT
-没法告诉模型哪个更好。对于``有用性''\,``安全性''\,``幽默感''这些抽象品质，更是难以通过标注数据直接传达。
+没法告诉模型哪个更好。对于``有用性''\,``安全性''``幽默感''这些抽象品质，更是难以通过标注数据直接传达。
 
 这就引出了下一个阶段。
 
@@ -897,7 +893,7 @@ LLM 来说，一个常见的后训练流程是：
 \end{center}
 
 表里``用什么方法''和``参数更新方式''这两列可以自由配对：``用 LoRA 做
-SFT''\,``用 LoRA 做 DPO''这类说法，``用 LoRA''那半交代的是只训练 LoRA
+SFT''``用 LoRA 做 DPO''这类说法，``用 LoRA''那半交代的是只训练 LoRA
 适配器，``做 SFT / 做 DPO''那半交代的是训练目标取监督学习还是偏好优化。
 
 但 VLA 的流程要单独看。VLA
@@ -974,8 +970,7 @@ VLA
 适配到某个新机器人或新任务时，常见数据是几百到几千条机器人操作轨迹。每条轨迹包含一系列的（图像观测，语言指令，动作）三元组。
 
 数据来源主要有三种：遥操作采集（人类操控机器人录制）、仿真环境生成、跨机器人迁移。其中``仿真环境生成''这一路，除了在仿真里遥操作，还能\textbf{完全不靠人}：由仿真器自己跑出成功轨迹当数据。本讲用来微调
-SO-101 的那批仿真数据就是这么来的，第16讲 6.3
-节会把这条生成流程从头讲透。
+SO-101 的那批仿真数据随课程一并提供，不必自己采集。
 
 正因为下游适配数据通常较少，LoRA 等 PEFT 方法在 VLA
 微调中经常出现：可训练参数少通常能降低过拟合风险（但仍要靠验证集和早停把住，见
@@ -1094,7 +1089,7 @@ trainable / frozen：
 SO-101}\label{ux5b9eux9a8cux5728ux4effux771fux91ccux628a-smolvla-ux5168ux91cfux5faeux8c03ux5230-so-101}
 
 数据全部出自我们自己的 SO-101 仿真器：仿真里跑出来的成功轨迹转成 LeRobot
-数据集，这条生成流程见第16讲 6.3 节。配套代码在
+数据集，这批数据随课程一并提供。配套代码在
 \texttt{code/vla/5\_vla\_finetune/5\_2\_smolvla\_full\_sft/}。微调从社区预训练权重
 \texttt{lerobot/smolvla\_base}
 出发，全参数更新，不挂任何适配器。三个入口分别是：
@@ -5466,7 +5461,7 @@ VLA 和扩散 / flow matching
 部署后的策略能不能在真实世界继续学？RMA
 提供了``在线快速适应''的雏形（靠适应模块在线估计环境隐变量，见 5.1.7
 节）；真机在线纠正这一路的代表是 TRANSIC{[}38{]}、DAgger 及 HIL-SERL
-一类人在环方法（第16讲第 8
+一类人在环方法（第16讲第 5
 节会展开）。但持续学习不忘旧、避免奖励黑客仍是难题。
 
 顺带把一个容易混的归类说清：\(\pi_{0.5}\)（第11讲第 5
@@ -5688,7 +5683,7 @@ rules）或已有的真实扫描数据。ProcTHOR、RoboCasa、OmniGibson、BEHA
 这类平台提供大量房间、厨房、家居任务。它们的价值在于场景可以被智能体走动、抓取、打开、移动和重置。
 
 结构驱动方法通常依赖场景图（scene
-graph，用节点和边表示物体及其关系）或布局先验。场景图里的节点是物体，边表示支撑、相邻、包含、可交互关系。例如``杯子在桌子上''\,``抽屉属于柜子''\,``盘子靠近水槽''。这种结构比单纯的三角网格更接近机器人任务。
+graph，用节点和边表示物体及其关系）或布局先验。场景图里的节点是物体，边表示支撑、相邻、包含、可交互关系。例如``杯子在桌子上''\,``抽屉属于柜子''``盘子靠近水槽''。这种结构比单纯的三角网格更接近机器人任务。
 
 \paragraph{（2）可控场景生成}\label{ux53efux63a7ux573aux666fux751fux6210}
 

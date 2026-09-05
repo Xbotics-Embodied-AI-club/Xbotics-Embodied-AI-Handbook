@@ -396,7 +396,7 @@ GRPO 是对 PPO
 \end{itemize}
 
 \begin{quote}
-备注：别把这条 KL 和上一讲 PPO 里的 KL 混了。第14讲 6.3 节那版 PPO
+备注：别把这条 KL 和上一讲 PPO 里的 KL 混了。第14讲 7.3 节那版 PPO
 也量新旧策略的
 KL，但那只是用来\textbf{自适应调学习率}的旁路，真正约束单步步长的是
 clip；GRPO 新增的这条 KL
@@ -463,8 +463,9 @@ Rewards）：数学题比对最终答案、代码跑测试用例、机器人任�
 }
 
 \caption{多模态 GRPO
-训练管线：策略对同一输入采样多条带推理过程的回答，可验证奖励（如检测的
-IoU、分类的正确性）逐条打分，组内比较后更新策略}
+训练管线：策略对同一输入采样多条带推理过程的回答（图中上下两例分别演示检测的
+IoU
+奖励与分类的正确性奖励，用的是两个不同的问题），可验证奖励逐条打分，组内比较后更新策略}
 
 \end{figure}%
 
@@ -548,7 +549,11 @@ IoU、分类的对错，都可以写成判分规则。
 
 }
 
-\caption{视觉指令微调与视觉强化微调的对比：指令微调依赖大量标注数据教模型模仿；强化微调只需少量样本，用可验证奖励驱动模型自己试错变好}
+\caption{视觉指令微调与视觉强化微调的对比：(a)
+指令微调依赖大量标注数据教模型模仿；(b)
+强化微调只需少量样本，用可验证奖励驱动模型自己试错变好；下方 (c) 列出
+Visual-RFT
+的三类应用------检测、指代定位、细粒度分类，各配一个带推理过程的样例}
 
 \end{figure}%
 
@@ -735,8 +740,7 @@ GRPO step。完整代码在
 \caption{VLM 数数后训练前后对照：数数准确率从 0.095 提升到
 0.44，答案格式合规率从 0.22 提升到 0.79（SuperCLEVR 固定 200
 题；数据来源是
-\texttt{code/rl/2\_grpo\_posttraining/result/2\_1\_grpo\_vlm\_counting/base\_vs\_adapter\_summary.json}，图上柱标把
-0.095 印成了 0.10）}
+\texttt{code/rl/2\_grpo\_posttraining/result/2\_1\_grpo\_vlm\_counting/base\_vs\_adapter\_summary.json}）}
 
 \end{figure}%
 
@@ -975,7 +979,7 @@ r_{i,t}(\theta) = \frac{\pi_\theta(a_{i,t}|s_{i,t})}{\pi_{\theta_{\text{old}}}(a
 符号 & 含义 \\
 \midrule\noalign{}
 \(\tau_i\) & 同一初始状态下采出的第 \(i\) 条轨迹，其 token 数记作 \(\lvert\tau_i\rvert\) \\
-\(r_{i,t}(\theta)\) & 新旧策略在第 \(t\) 个 token 上的概率比值（第14讲 6.2 节那个 ratio 的原样搬运） \\
+\(r_{i,t}(\theta)\) & 新旧策略在第 \(t\) 个 token 上的概率比值（第14讲 7.2 节那个 ratio 的原样搬运） \\
 \(R_i\) & 第 \(i\) 条轨迹的总奖励（结果奖励下为 0 或 1） \\
 \(\hat{A}_i\) & 组内归一化优势，整条轨迹共享 \\
 \(\epsilon\) & clip 裁剪范围 \\
@@ -983,7 +987,7 @@ r_{i,t}(\theta) = \frac{\pi_\theta(a_{i,t}|s_{i,t})}{\pi_{\theta_{\text{old}}}(a
 \end{tabular}
 \end{center}
 
-把它和第14讲 6.2 节的 clip
+把它和第14讲 7.2 节的 clip
 目标并排放，会发现只有一处不同：优势换成了组相对优势。少掉的那个价值网络，连带它的梯度与优化器状态一起省了；而组内比较算出来的优势，天然适合结果奖励（成功/失败）这种只有
 0 和 1 的场景。
 
@@ -1111,8 +1115,9 @@ GRPO）在组内所有轨迹获得相同奖励时会产生零梯度------优势�
 
 }
 
-\caption{动态采样的消融实验（LIBERO-Long）：开启动态采样（红）比关闭（蓝）最终成功率高出约
-15 个百分点，且全程爬升更快}
+\caption{动态采样的消融实验（LIBERO-Long）：开启动态采样（红）的平台比关闭（蓝）高出图上标注的
+15 个百分点（那 15 是两条水平参考虚线之间的差；在横轴终点 300
+步处两条曲线实测差约 18 个百分点），且绝大部分区间爬升更快}
 
 \end{figure}%
 
@@ -1233,7 +1238,10 @@ SimpleVLA-RL
 在三个维度上评估了泛化能力：空间泛化（LIBERO-Spatial）、物体泛化（LIBERO-Object）和任务泛化（LIBERO-Goal）。
 
 实验设置：每个任务套件的 10 个任务中，9 个用于训练，1
-个保留为未见任务进行分布外评估。
+个保留为未见任务进行分布外评估。\textbf{这样的 9/1
+划分每个套件做了三组}，各留一个不同的任务当未见任务，所以论文的图 4
+每个套件是三张子图（Unseen Task
+1/2/3），下面的结论是在三组划分上都成立的，不是单个样本的观察。
 
 \begin{figure}[htbp]
 
@@ -1242,10 +1250,11 @@ SimpleVLA-RL
 }
 
 \caption{泛化分析示例，Goal
-套件的一个未见任务``把酒瓶放到柜子顶上''：横轴是已见的 9
-个训练任务的成功率、纵轴是这个未见任务的成功率。红线（RL）全程在 70\%
-上下起伏、中途最高到 83\%，始终没有塌陷；蓝线（SFT）在训练任务刚过 65\%
-时就一头栽到 0，此后再没起来}
+套件三组划分里的一组，未见任务是``把酒瓶放到柜子顶上''：横轴是已见训练任务的成功率（即上面说的那
+9 个，图上只标 Seen Tasks
+SR，任务数出自论文的实验设置）、纵轴是这个未见任务的成功率。红线（RL）全程在
+70\% 上下起伏、中途最高到 83\%，始终没有塌陷；蓝线（SFT）在训练任务刚过
+65\% 时就一头栽到 0，此后再没起来}
 
 \end{figure}%
 
@@ -1262,7 +1271,7 @@ SimpleVLA-RL
   在未见任务上也持续改善，在所有三个维度上都优于 SFT
 \item
   \textbf{LIBERO-Goal 最具挑战性}：SFT
-  在训练开始时就立即在未见任务上降至 0\%，因为 Goal
+  在训练开始时就立即在三个未见任务上全部降至 0\%，因为 Goal
   任务涉及多样化的物体和操作策略，跨任务可迁移的成分很少；而 RL
   不仅避免了性能下降，还实现了 5\%-15\% 的提升
 \end{itemize}
@@ -1317,7 +1326,7 @@ shortcut，推动捷径）。在 RoboTwin 2.0 的 \textbf{move can pot}
 \caption{Pushcut 现象（RoboTwin 2.0 的 Place A2B Right 任务）：上排 SFT
 模型照示教先把方块抓起来再搬（图中蓝色 Grasp 箭头），下排 RL
 训练后的模型直接把方块推向目标位（红色 Push
-箭头），两排各取动作前后两帧}
+箭头），两排各取动作前后两帧；两排取自该任务下不同的初始布置，桌面与周边物件因此并不相同}
 
 \end{figure}%
 
@@ -1455,7 +1464,9 @@ Reinforcement Learning of Vision-Language-Action Models}{[}10{]}，2025
 
 \caption{RLinf-VLA 总览，自上而下三层：统一接口层把仿真器、VLA 模型、RL
 算法三个维度都做成可插拔的；中间一层并排比较三种 GPU
-分配编排；最下一层是三个基准上的成功率面板}
+分配编排，右半的吞吐柱状图给出混合模式相对基线 2.27×
+的提速；最下一层是三个基准上的结果面板（LIBERO 与 RoboTwin
+是成功率条形图，中间的 ManiSkill 是 GRPO 与 PPO 的训练曲线）}
 
 \end{figure}%
 
@@ -1479,10 +1490,13 @@ GPU 分配模式}：
 \end{itemize}
 
 图上那个大大的 \textbf{2.27×} 是混合模式相对 SimpleVLA-RL
-那套实现的吞吐加速上限（LIBERO + OpenVLA-OFT，随 GPU 数变化，最低一档是
-1.34 倍）；论文摘要另给了一个整体口径：在 ManiSkill 上端到端训练提速
-1.61 到 1.88
-倍。底层的性能面板给出算法侧的结果：同一套系统训练出的\textbf{单一统一模型}，在
+那套实现的吞吐加速上限（OpenVLA-OFT 在 LIBERO 与 RoboTwin 这两个 CPU
+并行仿真器上，随 GPU 数变化，最低一档是 1.34
+倍）；论文摘要另给了一个口径：混合式细粒度流水线相对\textbf{分置模式}提速
+1.61 到 1.88 倍------这个数的出处是 §5.2 的 ManiSkill + OpenVLA，8 卡时
+1.88 倍，扩到更多卡后仍保持 1.61 到 1.69
+倍。\textbf{两个数的分母不同}：2.27× 比的是另一套框架，1.88×
+比的是本框架自己的分置编排。底层的性能面板给出算法侧的结果：同一套系统训练出的\textbf{单一统一模型}，在
 130 个 LIBERO 任务上取得 98.11\% 成功率、25 个 ManiSkill 任务上
 97.66\%、六个 RoboTwin 任务平均 84.63\%。面板里每根柱子的实心段是 SFT
 起点、斜线段是 RL 补上的增量，不同任务的增量宽窄差得很远------这本身就是
@@ -1522,8 +1536,8 @@ Experience}{[}11{]}，Physical Intelligence，2025 年 11 月（arXiv:
 }
 
 \caption{RECAP
-总览：左侧三类进料（机器人数据、子任务指令、多模态网络数据）同时喂给上方的
-\(\pi^{*}_{0.6}\) 策略和下方的价值函数；中间的 Recap
+总览：左侧三类进料（机器人数据、子任务指令、多模态网络数据）分别汇入上方的
+\(\pi^{*}_{0.6}\) 策略与下方的价值函数；中间的 Recap
 圆环把两者接成闭环------策略部署出去跑
 rollout，人在旁边接管纠偏并打标，数据回流去更新价值函数，价值函数给出的
 advantage
@@ -1563,11 +1577,11 @@ cloning）：给模型看专家示教，让它模仿每一步动作。
 模型和真实世界部署上，还面临几个特殊挑战：
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1989\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.8011\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.2005\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.7995\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 挑战 & 具体表现 \\
 \midrule\noalign{}
-模型规模 & \(\pi_{0.6}\) 的 VLM 骨干是 SigLIP 400M 视觉塔配 Gemma 3 4B，另挂 860M 参数的 action expert，直接用 PPO 等在线策略梯度方法训练成本极高 \\
+模型规模 & \(\pi_{0.6}\) 的基座 VLM 是 Gemma 3 4B，另挂 860M 参数的 action expert，直接用 PPO 等在线策略梯度方法训练成本极高 \\
 动作表示 & \(\pi_{0.6}\) 使用 flow matching 生成连续动作，不像离散 token 那样有现成的 log-likelihood，传统策略梯度方法难以直接应用 \\
 数据异构 & 真实部署中的数据来源多样：专家示教、自主 rollout、人类纠正干预，需要一个统一框架处理 \\
 真实世界部署 & 不是仿真环境，每次数据收集都有成本，需要高效利用所有数据 \\
@@ -1965,10 +1979,14 @@ V^{\pi_\text{ref}}(\mathbf{o}_t, \ell) = \sum_{b=1}^{B} p_\phi(V = b | \mathbf{o
 bin 的概率，再全部加起来。
 
 \textbf{价值函数架构}。价值函数沿用与 VLA
-相同的架构设计，但骨干小得多：VLA 那边是 SigLIP 400M 视觉塔配 Gemma
-4B，价值函数这边视觉塔照旧、语言塔换成 Gemma 270M，合起来约
-670M。它接收与 VLA
-相同的输入（图像、语言指令），输出价值分布。为防止过拟合，价值函数也会在少量多模态网络数据上联合训练。
+相同的架构设计，但换了个小得多的骨干：VLA 那边的基座是 Gemma 3
+4B，价值函数这边是一个约 670M 参数、同样从 Gemma 3 初始化的
+VLM。它接收与 VLA
+相同的输入（图像、语言指令），输出价值分布。（论文正文只给到``670M 的
+VLM 骨干''这一层；下面那张架构图上另标了两边各自的构成------策略是
+SigLIP 400M 配 Gemma 4B，价值函数是 SigLIP 400M 配 Gemma
+270M，两项相加正好约
+670M。图比正文细，引用时按各自的出处读。）为防止过拟合，价值函数也会在少量多模态网络数据上联合训练。
 
 \begin{figure}[htbp]
 
@@ -2077,15 +2095,25 @@ I_t = \mathbf{1}\!\left(A^{\pi_\text{ref}}(\mathbf{o}_t, \mathbf{a}_t, \ell) > \
 权重更稳定。
 
 \begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1213\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3813\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.4973\linewidth - 2\tabcolsep\relax}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1165\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.3676\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.5159\linewidth - 2\tabcolsep\relax}@{}}
 \toprule\noalign{}
 参数 & 预训练阶段 & 微调阶段 \\
 \midrule\noalign{}
-\(\epsilon_\ell\) & 约 30\% 的示教数据为 positive & 通常约 40\% 的 rollout 数据为 positive；最难的叠衣服任务约 10\% \\
+\(\epsilon_\ell\) & 约 30\% 的示教数据为 positive & 通常约 40\% 的 rollout 数据为 positive；T 恤与短裤折叠这个任务约 10\% \\
 \(N\)（前瞻步数） & 用整条 episode 总回报减当前价值作高方差估计 & \(N = 50\) \\
 \bottomrule\noalign{}
 \end{tabular}
 \end{center}
+
+\begin{quote}
+\textbf{关于那个 30\%}：论文自己的两处写法并不一致------正文 §5.4
+说的是把 \(\epsilon_\ell\) 取成价值函数对该任务预测值的\textbf{30\%
+分位}，附录 F 说的是把阈值选到\textbf{约 30\% 的示教数据 advantage
+为正}。两种取法在分布上并不等价。上表取的是附录那个口径，因为它更贴近这里要表达的意思：\(\epsilon_\ell\)
+控制的是有多少数据被标成 positive。表里 40\% 与 10\% 两个数也都出自附录
+F。另外，10\%
+那一档论文给的理由是这个任务的高质量示教会训出成功率高但动作慢的策略，所以要把阈值调高、只留最好的一成------不是因为它难。
+\end{quote}
 
 为什么要二值化而不是直接用连续
 advantage？因为二值化后，条件输入就变成了一个简单的文本标记（``Advantage:
@@ -2325,9 +2353,11 @@ advantage conditioning
 
 \subsubsection{8.4.3 实验对比}\label{ux5b9eux9a8cux5bf9ux6bd4}
 
-论文在最难的叠衣服任务上，把 advantage conditioning 与 AWR、PPO
-摆在一起比。结论不必记完整图表：advantage conditioning 最稳------它把
-positive 和 negative
+论文在 T 恤与短裤折叠这个任务上，把 advantage conditioning 与 AWR、PPO
+摆在一起比。（这是三个叠衣变体里较容易的一个------最难的是下一节要说的``多样叠衣''，那才是唯一没能进
+90\%
+区间的任务。这组对比挑的是容易的那个，所以它比的是三种方法谁把同一个任务做得更好、更快，不是谁扛得住最难的场面。）结论不必记完整图表：advantage
+conditioning 最稳------它把 positive 和 negative
 数据一起用上，既提成功率、又不牺牲执行速度，吞吐量因此最高。AWR
 输在速度上：它会过滤或降权大量低 advantage
 的数据，学出来的策略偏保守，吞吐量跟不上。PPO 则受限于 8.4.1
@@ -2352,7 +2382,7 @@ RECAP：叠衣服、制作咖啡和组装箱子。它们共同覆盖了变形物
 }
 
 \caption{实验任务与各自的成功判据：五列依次是叠 T
-恤短裤、多样叠衣、叠衣消融（判据多一条``领口朝上''）、组装箱子、制作浓缩咖啡；每列上两行是任务开始与完成时的画面，最下一行的色块逐条列出``算成功''要满足什么}
+恤短裤、多样叠衣、叠衣消融（判据多一条``领口朝上''）、组装箱子、制作浓缩咖啡；每列上两行是该任务过程中的两帧画面（第三列取的是摊开与叠好的前后对照，其余几列两帧同属一次执行、不必读成严格的开始与完成），最下一行的色块逐条列出``算成功''要满足什么}
 
 \end{figure}%
 
@@ -2392,10 +2422,12 @@ RECAP：叠衣服、制作咖啡和组装箱子。它们共同覆盖了变形物
 
 \caption{四个任务上的吞吐量对比（纵轴为每小时成功完成数，柱子带误差棒）：四张子图依次是叠
 T
-恤/短裤、最难的多样叠衣服、制作浓缩咖啡、组装箱子。每组柱子从左到右是逐级加强的一条链------\(\pi_{0.6}\)
+恤/短裤、最难的多样叠衣服、制作浓缩咖啡、组装箱子。每组柱子从左到右按训练配方由弱到强排列------\(\pi_{0.6}\)
 预训练、\(\pi^{*}_{0.6}\) 离线 RL 预训练、\(\pi^{*}_{0.6}\) 离线 RL +
-SFT，最右的黄柱是加了真机经验的完整 RECAP；前两组另在最左多一根
-\(\pi_{0.5}\) 预训练作为更早一代的参照}
+SFT，最右的黄柱是加了真机经验的完整
+RECAP；配方变强不等于每一档都往上走，多样叠衣与组装箱子这两张子图的中间档位都有回落。前两组另在最左多一根
+\(\pi_{0.5}\) 预训练作为更早一代的参照，其中多样叠衣那组的 \(\pi_{0.5}\)
+柱高基本为零}
 
 \end{figure}%
 
@@ -2470,8 +2502,11 @@ RECAP 与前面方法的关键区别：
 Advantage conditioning 并非 RECAP 首创。把 RL
 问题改写成``以某个期望回报为条件的序列建模''，这条思路早有前身：Decision
 Transformer{[}18{]} 以 return-to-go 为条件，Upside-Down RL{[}19{]}
-直接把期望回报当输入条件训练策略，而 CFGRL{[}16{]} 把 classifier-free
-guidance 引进 RL------那是 RECAP 最直接的理论基础。
+直接把期望回报当输入条件训练策略。RECAP 自己在论文里把 advantage
+conditioning 这个做法本身归给了 Kumar 等人的 Reward-Conditioned
+Policies{[}20{]}，说自己用的是它的一个变体；而具体公式形式上最接近的是
+CFGRL{[}16{]}，它把 classifier-free guidance 引进 RL------那是 RECAP
+最直接的理论基础。
 
 RECAP
 的贡献不在于提出这个条件化的想法，而在于\textbf{把它铺满了整条流水线}：从大规模
@@ -2634,6 +2669,10 @@ Reinforcement learning via sequence modeling{[}EB/OL{]}.
 {[}19{]} SCHMIDHUBER J. Reinforcement learning upside down: Don't
 predict rewards --- just map them to actions{[}EB/OL{]}.
 (2019-12-05){[}2026-08-29{]}. https://arxiv.org/abs/1912.02875.
+
+{[}20{]} KUMAR A, PENG X B, LEVINE S. Reward-conditioned
+policies{[}EB/OL{]}. (2019-12-31){[}2026-08-29{]}.
+https://arxiv.org/abs/1912.13465.
 
 本讲中的 VLM 数数前后对照图为本课程实验渲染。
 

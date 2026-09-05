@@ -4,8 +4,11 @@
 （SuperCLEVR 固定 200 题，训练前后各评一遍），这里只负责画图，不重跑评测。
 
 原来这张图是有的，但出图脚本没跟着进仓。本文件按留存的 summary JSON 把它补回来，
-同时接上全书统一字体。柱标按两位小数印，与讲义正文表格里的原始值（0.095）差在四舍五入，
-讲15 的图注已经写明这一点，所以这里保持原样不动。
+同时接上全书统一字体。
+
+轴标题、图例、刻度一律中文（这是我们自己渲的图，按全书规范走中文宋体 + 西文 Times），
+图内不写标题——标题由讲义正文的图注给出，图里再写一遍会被 Quarto 渲成「图 N: 图：…」。
+柱标印三位有效数字，直接落 0.095，不再出现「印成 0.10」这种要靠图注去补的四舍五入。
 """
 
 import json
@@ -25,8 +28,8 @@ summary = json.loads(
 out_path = here.parents[3] / "assets" / "figures" / "lecture15" / "ref" / "fig154-vlm-counting-before-after.png"
 out_path.parent.mkdir(parents=True, exist_ok=True)
 
-METRICS = [("accuracy", "Counting accuracy"), ("format", "Answer format")]
-BARS = [("base", "Base (Qwen2.5-VL-3B)", "#9AA7B1"), ("adapter", "After GRPO", "#2E7D32")]
+METRICS = [("accuracy", "数数准确率"), ("format", "答案格式合规率")]
+BARS = [("base", "基座 Qwen2.5-VL-3B", "#9AA7B1"), ("adapter", "GRPO 后训练", "#2E7D32")]
 WIDTH = 0.35
 
 fig, ax = plt.subplots(figsize=(6.4, 4.4))
@@ -35,14 +38,19 @@ for offset, (stage, label, color) in zip((-WIDTH / 2, WIDTH / 2), BARS):
     positions = [i + offset for i in range(len(METRICS))]
     ax.bar(positions, values, WIDTH, color=color, label=label)
     for x, v in zip(positions, values):
-        ax.text(x, v + 0.02, f"{v:.2f}", ha="center", fontsize=11)
+        # `:g` 印有效数字：0.095 就是 0.095，0.44 不会被撑成 0.440。
+        ax.text(x, v + 0.02, f"{v:g}", ha="center", fontsize=11)
 
 ax.set_xticks(range(len(METRICS)))
 ax.set_xticklabels([name for _, name in METRICS])
-ax.set_ylabel(f"Rate on SuperCLEVR-{summary['sample_count']}")
+ax.set_ylabel(f"SuperCLEVR {summary['sample_count']} 题上的比率")
 ax.set_ylim(0, 1.0)
-ax.set_title("GRPO post-training: VLM learns to count")
 ax.legend(loc="upper left")
 fig.tight_layout()
+
+figstyle.assert_covered(
+    "".join(name for _, name in METRICS) + "".join(label for _, label, _ in BARS)
+    + f"SuperCLEVR {summary['sample_count']} 题上的比率",
+    where="fig154-vlm-counting-before-after")
 fig.savefig(out_path, dpi=150, metadata={"Font": FONT_NAME})
 print(f"图已保存到 {out_path}")

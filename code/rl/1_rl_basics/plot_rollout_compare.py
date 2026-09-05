@@ -1,15 +1,23 @@
-"""把三个版本的 rollout 视频抽成关键帧对照图：每行一个版本，标题印该版本的评测数字。
+"""把 rollout 视频抽成关键帧对照图：每行一个版本，标题条印该版本的评测数字。
 
-两张图共用一套排版：3 行 × 5 帧，每行上面一条深色标题条，写「版本名 + 评测奖励 + 摔倒率」。
+所有图共用一套排版：N 行 × 5 帧，每行上面一条深色标题条，写「版本名 + 评测奖励 + 摔倒率」。
 奖励与摔倒率不是手抄的，是从同目录的评测 json 里读出来的 —— 数字和图永远对得上。
 
-  · 行走对照   → assets/figures/lecture14/ref/fig144-walk-compare.png
-  · 动作跟随对照 → assets/figures/lecture14/ref/fig144-track-compare.png
+  · 行走三算法对照 → assets/figures/lecture14/ref/fig144-walk-compare.png
+  · 动作跟随对照   → assets/figures/lecture14/ref/fig144-track-compare.png
+  · v1 单版本      → assets/figures/lecture14/ref/fig146-walk-v1.png
+  · v2 单版本      → assets/figures/lecture14/ref/fig155-walk-v2.png
 
 素材是留存的 rollout mp4，不重跑实验。帧靠 ffmpeg 从视频里按时间点取，走管道不落临时文件。
 
-原来这两张图是有的，但出图脚本没跟着进仓（图上没有任何元数据、全仓也查不到脚本）。
+原来这些图是有的，但出图脚本没跟着进仓（图上没有任何元数据、全仓也查不到脚本）。
 本文件按留存素材把它们补回来，同时接上全书统一字体。
+
+后两张单版本图早先是脱离本脚本单独产出的：尺寸恰是三行版的三分之一（1632×282 对 1632×846）、
+标题条数字与评测 json 一致，但 PNG 里一个文本块都没有 —— 说明它们出自同一套排版代码的更早一版，
+那一版还没接 figstyle，字体默默回落到了 DejaVu，而 matplotlib 对此只发 warning、退出码照样是 0。
+病根不在这两张图本身，在「同一种图有两个出处」：把它们并回本脚本的 PANELS 之后，
+字体、元数据、数字来源就只有一条路径，不会再各走各的。
 """
 
 import io
@@ -49,7 +57,19 @@ PANELS = {
                  ("track-v2-a2c", "v2  A2C  (+critic +GAE)"),
                  ("track-v3-ppo-original", "v3  PPO  (original, 10000 it)")],
     },
+    # 讲 14 在讲到 v1、v2 各自那一节时，单独放这一版的关键帧；到了三版对照那一节才用上面的合图。
+    "fig146-walk-v1.png": {
+        "result_dir": "result/1_1_g1_walk_rl",
+        "rows": [("g1-walk-reinforce", "v1  REINFORCE")],
+    },
+    "fig155-walk-v2.png": {
+        "result_dir": "result/1_1_g1_walk_rl",
+        "rows": [("g1-walk-a2c", "v2  A2C  (+critic +GAE)")],
+    },
 }
+
+# 每行占的高度（英寸）：三行版是 8.46，单行版按同样的行高缩，帧的长宽比才不会变。
+ROW_HEIGHT = 8.46 / 3
 
 
 def video_duration(path):
@@ -85,8 +105,9 @@ def build(filename, spec):
 
     # 每行 = 一条窄标题条 + 一排帧；高度比按现有图的观感取。
     fig, axes = plt.subplots(
-        len(rows) * 2, N_FRAMES, figsize=(16.32, 8.46),
-        gridspec_kw={"height_ratios": [1, 9] * len(rows), "wspace": 0.008, "hspace": 0.0})
+        len(rows) * 2, N_FRAMES, figsize=(16.32, ROW_HEIGHT * len(rows)),
+        gridspec_kw={"height_ratios": [1, 9] * len(rows), "wspace": 0.008, "hspace": 0.0},
+        squeeze=False)
 
     for r, (stem, label) in enumerate(rows):
         video = result_dir / f"{stem}.mp4"

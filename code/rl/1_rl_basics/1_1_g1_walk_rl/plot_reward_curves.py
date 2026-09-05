@@ -61,7 +61,7 @@ for name in ORDER:
 
 ax.set_xlabel("训练迭代")
 ax.set_ylabel("训练回合平均奖励")
-ax.set_title(f"G1 行走：三个算法的训练奖励曲线（细线为原始值，粗线为 {WINDOW} 次迭代滑动平均）")
+# 图内不写标题：标题由讲义正文的图注给出，图里再写一遍 Quarto 会渲成「图 N: 图：…」。
 ax.legend(loc="lower right")
 ax.grid(alpha=0.3)
 fig.tight_layout()
