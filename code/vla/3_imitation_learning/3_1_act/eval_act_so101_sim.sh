@@ -55,7 +55,9 @@ doc = json.loads(f.read_text())
 if "overall" not in doc:
     sys.exit(f"★ {f} 里没有 `overall`，实际顶层键是 {list(doc)}")
 agg = doc["overall"]
-n = len(doc.get("per_episode", []))
-print(f"  pc_success = {agg['pc_success']:.1f}%   avg_max_reward = {agg['avg_max_reward']:.3f}   （{n} 局）")
+# 局数在 overall 里，不在顶层的 per_episode —— 那个键根本不存在，
+# 于是 len([]) 打出「0 局」。空取值当成结论，就是这么来的。
+print(f"  pc_success = {agg['pc_success']:.1f}%   avg_max_reward = {agg['avg_max_reward']:.3f}"
+      f"   （{agg['n_episodes']} 局）")
 print("EVAL_ACT_END")
 PY

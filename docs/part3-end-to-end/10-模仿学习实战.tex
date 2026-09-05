@@ -1327,7 +1327,39 @@ ACT}\label{ux5b9eux9a8cux4effux771f-498-ux96c6-ux771fux673a-300-ux96c6ux4e00ux4e
 ACT 从随机初始化开始训，52M 参数。和 3.1 节 LIBERO
 那轮相比，算法、网络、超参一个没动 ------
 动作维度、状态维度、相机路数都由数据集自己的 \texttt{features}
-描述决定，这正是本节要说明的事。
+描述决定，这正是本节要说明的事。 训 50000 步、batch 64，约 11.7 个
+epoch。
+
+\subsubsection{3.2.5 结果}\label{ux7ed3ux679c}
+
+先看它究竟在做什么：
+
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture10/fig10-3-act-rollout.png}
+
+}
+
+\caption{两行八帧，走完一整个回合：机械臂从起始位姿降向方块、两指合拢夹住、抬起、
+端着方块移到料箱上方、松手让方块落进箱、退回、回到起始位姿}
+
+\end{figure}%
+
+最终 checkpoint 在同一个场景上跑 50 局：\textbf{成功率 76.0\%}。
+
+\textbf{这个数字比训练途中看到的低。} 途中每 10000 步评一次、每次 10
+局，五个点是 40\% → 70\% → 80\% → 80\% → 90\%；照最后那个点读，会以为是
+90\%。差在哪里：\textbf{10 局的分辨率 只有 10 个百分点}，9/10 与 7/10
+之间隔着两格，而 50 局里 76\% 与 90\% 只差七局。
+途中那些点是用来看趋势的 ------
+判断还在不在涨、要不要继续训；\textbf{出结论必须另跑一轮足量的}。
+这一条在第8讲 3.1 节说过一次（loss
+下降不等于任务成功），这里是它的另一半：
+\textbf{成功率涨了也不等于成功率就是那个数}，要看那个数是几局量出来的。
+
+配套代码在
+\texttt{code/vla/3\_imitation\_learning/3\_1\_act/}：\texttt{train\_act\_so101\_sim.sh}
+合并数据并训练， \texttt{eval\_act\_so101\_sim.sh} 跑足量验收。
 
 \subsection{3.3 代码解析：LeRobot
 源码逐层拆解}\label{ux4ee3ux7801ux89e3ux6790lerobot-ux6e90ux7801ux9010ux5c42ux62c6ux89e3}
