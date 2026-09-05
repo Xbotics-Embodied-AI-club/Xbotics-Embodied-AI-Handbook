@@ -14,8 +14,11 @@
 ★ 录像必须是 `record_full_rollout.py` 产的：`lerobot-eval` 的录像在判成功那一刻
   就断了，拍不到第五段回家。
 
-用法：`python plot_rollout_strip.py <录像目录>`
-      目录里要有 SO101PickPlace{Cube40,Cube20,Cylinder40}-v1.mp4 与同名 .tsv
+用法：`python plot_rollout_strip.py <录像目录> <输出 png 路径> [<场景 id> ...]`
+      不给场景就用三个仿真场景。目录里要有 `<场景 id>.mp4` 与同名 `.tsv`。
+
+★ 任务与落点由**调用方声明**，不写死在脚本里：第12讲要三个任务、第10讲那轮 ACT 只训了
+  方块一个任务，写死就得复制一份脚本，改一处忘一处只是时间问题。
 """
 
 import os
@@ -27,14 +30,14 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 HERE = Path(__file__).parent
-OUT = HERE.resolve().parents[3] / "assets" / "figures" / "lecture12" / "ref"
 
-# 每行一个任务：(录像文件名主干, 行首标签)
-ROWS = [
-    ("SO101PickPlaceCube40-v1", "Pick up a cube"),
-    ("SO101PickPlaceCube20-v1", "Pick up a small cube"),
-    ("SO101PickPlaceCylinder40-v1", "Pick up a can"),
-]
+# 场景 id → 行首标签。没登记的 id 用它自己当标签。
+LABELS = {
+    "SO101PickPlaceCube40-v1": "Pick up a cube",
+    "SO101PickPlaceCube20-v1": "Pick up a small cube",
+    "SO101PickPlaceCylinder40-v1": "Pick up a can",
+}
+DEFAULT_SCENES = tuple(LABELS)
 N_FRAMES = 8
 N_COLS = 4          # 每行四格 ⇒ 每个任务占两行，三个任务共六行
 CROP_PAD = 12
@@ -133,17 +136,19 @@ def moments(grip: np.ndarray, n_steps: int) -> list[int]:
 
 
 def main(argv) -> int:
-    if len(argv) != 1:
+    if len(argv) < 2:
         sys.exit(__doc__)
-    src = Path(argv[0])
-    OUT.mkdir(parents=True, exist_ok=True)
+    src, out_path = Path(argv[0]), Path(argv[1])
+    scenes = argv[2:] or list(DEFAULT_SCENES)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     font_path = os.environ.get("XBOTICS_FIG_FONT", "").strip()
     if not font_path or not Path(font_path).is_file():
         sys.exit("★ XBOTICS_FIG_FONT 没配好，行标签画不出中文。见 assets/figures/figstyle.py")
 
     tiles, labels = [], []
-    for stem, label in ROWS:
+    for stem in scenes:
+        label = LABELS.get(stem, stem)
         video, table = src / f"{stem}.mp4", src / f"{stem}.tsv"
         for f in (video, table):
             if not f.is_file():
@@ -170,7 +175,7 @@ def main(argv) -> int:
     # 这八格是**同一条轨迹**而不是两个任务。任务之间留一个标签高度的间隔。
     band_h = fh + gap
     task_h = lab_h + band_h * n_bands + gap * 2
-    canvas = Image.new("RGB", (width, task_h * len(ROWS)), "white")
+    canvas = Image.new("RGB", (width, task_h * len(scenes)), "white")
     draw = ImageDraw.Draw(canvas)
     for r, (row, lab) in enumerate(zip(tiles, labels)):
         y0 = r * task_h
@@ -178,8 +183,8 @@ def main(argv) -> int:
         for i, im in enumerate(row):
             band, col = divmod(i, N_COLS)
             canvas.paste(im, (col * (fw + gap), y0 + lab_h + band * band_h))
-    path = OUT / "fig12-2-rollout-strip.png"
-    canvas.save(path)
+    canvas.save(out_path)
+    path = out_path
     print(f"  {path.name}  {canvas.size[0]}x{canvas.size[1]}")
     return 0
 
