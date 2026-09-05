@@ -1090,7 +1090,18 @@ VLA（Vision-Language-Action）模型的微调场景天然适合 LoRA，原因�
 
 $\pi_0$ 体量大、全量微调成本高，正是 LoRA 的典型场景。好消息是不用自己写注入代码：LeRobot v0.5.1 已经把 PEFT 接进了训练入口，2.3 节那条 `lerobot-train` 命令加几个 `--peft.*` 参数就切换成 LoRA 微调。
 
-命令面上只多三样东西：`--policy.use_peft=true` 打开适配器路径，`--peft.method_type=LORA` 选方法，`--peft.r` 给秩（默认 16，正好落在 3.5.1 节说的那个常用区间）。**注意 `use_peft=true` 必须配 `--policy.path` 一起用**：LeRobot 明确拒绝“从零初始化 + 挂适配器”这种组合，因为 LoRA 的前提就是有一个值得冻结的基座。
+命令面上只多两样东西：`--peft.method_type=LORA` 选方法，`--peft.r` 给秩（默认 16，正好落在 3.5.1 节说的那个常用区间）。触发适配器包装的判据是 `cfg.peft is not None`（`lerobot_train.py:246`），所以**给了 `--peft.*` 就已经挂上了**，日志里会打印一行 `Using PEFT! Wrapping model.`。
+
+> ⚠️ **别把 `--policy.use_peft=true` 加进训练命令。** 它和 `--peft.*` 不是一回事，名字像而已：
+>
+> | 参数 | 含义 | 什么时候用 |
+> |---|---|---|
+> | `--peft.method_type` / `--peft.r` … | 给一个干净基座**挂上新的适配器** | **开始 LoRA 训练** |
+> | `--policy.use_peft=true` | `--policy.path` 指向的是一份**已经训好的适配器目录**，先读适配器 config、再据此加载它的基座 | 推理、续训 |
+>
+> 判据在 `policies/factory.py:550-567`：`use_peft=true` 时 LeRobot 会把 `pretrained_path` 当成**适配器**去解析。训练时若写成 `--policy.use_peft=true --policy.path=lerobot/smolvla_base`，它会去把 `smolvla_base` 当适配器目录读——那是基座，不是适配器。
+>
+> `use_peft` 在训练流程里唯一的作用点是收尾推送（`lerobot_train.py:548`，`push_to_hub` 那一支）。
 
 真正值得读一眼的是 LoRA 挂在哪。LeRobot 给每个策略预置了默认的注入位置，`lerobot/policies/pi0/modeling_pi0.py` 里 $\pi_0$ 那份写成一个正则：
 
