@@ -46,6 +46,7 @@ OUT="$BASE/outputs/lora-$MODEL"
 case "$MODEL" in
   smolvla)
     PRETRAINED=lerobot/smolvla_base
+    EXTRA_POLICY=""
     # 动作专家 32 · 文本塔 32 · 视觉塔 48，共 112 个 q/v
     TARGETS='(model\.vlm_with_expert\.(lm_expert|vlm\.model\.text_model|vlm\.model\.vision_model\.encoder)\..*\.(q|v)_proj)'
     RANK="${RANK:-64}"      # ⇒ 可训练 9,851,728 / 460M = 2.1%
@@ -66,6 +67,12 @@ case "$MODEL" in
     #   0.58% 这个量级在换本体这件事上已经被证明不够（SmolVLA 的 0.16% 版三个评测点全 0）。
     #   取 256 ⇒ 约 94M / 4.05B ≈ 2.3%，与 SmolVLA 那轮同档，两条线才对得起来。
     RANK="${RANK:-256}"
+    # ★ 开梯度重算，否则 batch 提不上去。pi0 冻着的基座就占 8 GB，batch 4 时每卡已到 38 GB，
+    #   加不动 batch；而 batch 必须加 —— **两轮要对齐的是过多少遍数据，不是跑多少步**。
+    #   batch 4 × 6 卡 = effective 24，30000 步只有 0.56 个 epoch，而 SmolVLA 那轮是 2.25 个。
+    #   实测：那样第一个评测点 0.0%，但同步数下 loss 反而比 SmolVLA 低（0.109 对 0.150）——
+    #   **不是学不动，是还没喂够**。重算换来的显存让 batch 回到 16 ⇒ effective 96，与那轮同。
+    EXTRA_POLICY="--policy.gradient_checkpointing=true"
     ;;
   *) echo "★ 只支持 smolvla / pi0，收到 $MODEL"; exit 1 ;;
 esac
@@ -121,6 +128,7 @@ rm -rf "$OUT"
   --env.episode_length=500 \
   --env.fps=30 \
   --batch_size=16 \
+  $EXTRA_POLICY \
   --policy.optimizer_lr=3e-4 \
   --policy.scheduler_warmup_steps=2000 \
   --policy.scheduler_decay_steps=30000 \
