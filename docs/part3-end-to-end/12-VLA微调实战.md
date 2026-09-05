@@ -540,7 +540,7 @@ num_learnable_params=402737376 (403M)
 
 微调后的策略在仿真里执行任务：
 
-![三行连拍，每行一个任务（自上而下：方块、小方块、易拉罐），每行八帧走完一整个回合：初始位姿、夹爪降向物体、合拢夹住、抬起进入搬运、停在料箱上方、松手让物体落进箱、手臂退回、回到起始位姿](../../assets/figures/lecture12/ref/fig12-2-rollout-strip.png){width=100%}
+![三个任务各占两行（自上而下：方块、小方块、易拉罐），每个任务八帧走完一整个回合：初始位姿、夹爪降向物体、合拢夹住、抬起进入搬运、停在料箱上方、松手让物体落进箱、手臂退回、回到起始位姿](../../assets/figures/lecture12/ref/fig12-2-rollout-strip.png){width=92%}
 
 最后两帧值得单看：成功判据只问“物体在不在箱内”，松手那一刻就已经满足了，回家那一段一分不给。策略照样把它走完了——模仿学习照单全收示教里的一切，包括与判据无关的部分。这也意味着**想看完整回合得自己录**：评测程序一判成功就结束这一集，录出来的像永远停在松手那一帧。
 
@@ -558,19 +558,37 @@ num_learnable_params=402737376 (403M)
 | `Pick up a small cube and place in the bin` | 90.0%（45/50） |
 | `Pick up a can and place in the bin` | 96.0%（48/50） |
 
-三个任务分别报，不合成一个平均数：平均可以由 100/70/40 拼出来，会把某一项的失败藏起来。
 
 数据集与权重都公开了，配套代码在 `code/vla/5_vla_finetune/5_2_smolvla_full_sft/`：
 
 - 仿真数据集与产线源码：<https://huggingface.co/datasets/Harrysunshine/so101-sim-pickplace-v2>
 - 微调后的权重：<https://huggingface.co/Harrysunshine/so101-smolvla-sim-real-10task>
 
-- 真机 9 个任务的数据（Apache-2.0，按原出处取用，我们不转发）：
-  <https://modelscope.cn/datasets/zhuzhuangtian/so101-pick-place-tasks>
+- 真机 9 个任务的数据：<https://modelscope.cn/datasets/zhuzhuangtian/so101-pick-place-tasks>
 
 ## 2.5 实物实验：把 SmolVLA 全量微调到 SO-101 真机
 
-真机这条线还没开展，本节先只立题。仿真那条线上的流程在真机上原样适用：数据集格式、相机键映射、`pc_success` 的读法都不变，真机额外多出来的只有两件事：数据来路，以及闭环里误差会一步步累积、开环逐帧比对读不出来的那部分风险。
+真机走的是同一套流程：同一个 `lerobot-train` 入口，同样把 `freeze_vision_encoder` 与 `train_expert_only` 关掉，同样拿 `num_learnable_params` 核对。换到真机之后有三件事不一样。
+
+**一是数据来路。** 训练用的是公开的 SO-101 遥操数据，九个任务。它出自别人的机位，光照与白平衡跟自己这条臂必然不同，所以图像增强里的光度扰动要开得比官方默认宽——亮度与对比度从 0.8–1.2 放到 0.7–1.3，白平衡靠 hue 与 saturation 模拟色温漂移（torchvision 没有独立的白平衡算子，这是标准做法）。
+
+**二是验收判据不能用相关系数。** 这批数据里 `action` 是主臂的目标位姿、`observation.state` 是从臂的实测位姿，两者天然贴在一起。实测过：什么都不学、把 `state` 原样抄成预测，逐关节 `corr(pred, action)` 就有 0.936–0.995，全部能过 0.9——这条门槛没有任何区分力。换成三个相对量，基线由数据自己定义，不用外部拍阈值：
+
+| 指标 | 定义 | 它抓什么 |
+|---|---|---|
+| `ratio` | `MAE(pred, action) / MAE(state, action)` | 照抄基线恒为 1，模型要明显低于 1 |
+| `delta_corr` | `corr(pred − state, action − state)` | “下一步往哪挪”学到没有 |
+| `delta_std` | `std(pred − state) / std(action − state)` | 抓“输出≈state”这种坍缩 |
+
+这三个量算的都是**开环逐帧比对**：每帧独立预测，不接上一帧的结果。真机上动作是连续下发的，误差会一步步累积，所以它们过了只说明模型学到了非平凡的东西，闭环还得真跑。
+
+**三是推理与执行分家。** 大多数边缘端设备都没有足够的算力和内存把一个 VLA 跑起来——$\pi_0$ 权重就有 3 GB 多、SmolVLA 也有 900 MB，板上加载完再推理，内存和延迟都撑不住。所以让板子只干必须在现场干的事，模型推理放 x86 GPU 机上，中间过 gRPC：
+
+![左边是边缘端部署板，负责读舵机、开相机、把观测打包发出去、收到动作块下发舵机；右边是 x86 GPU 机，负责加载 checkpoint、跑策略推理、回一个动作块；两者之间一条蓝色箭头向右标注观测（gRPC），一条红色箭头向左标注动作块](../../assets/figures/lecture12/ref/fig12-2-real-deploy-split.png){width=100%}
+
+服务端起的时候**不指定模型**：加载哪个 checkpoint 是客户端握手时告诉它的，所以同一个服务端可以先后接 $\pi_0$ / ACT / SmolVLA 三种客户端，换模型不用重启。相机与舵机的设备名由 udev 规则固定，不靠 `/dev/video0` 这种会随插拔重排的号。
+
+真机九任务的权重也公开了：<https://huggingface.co/Harrysunshine/so101-smolvla-9task>
 
 ## 2.6 本节小结
 

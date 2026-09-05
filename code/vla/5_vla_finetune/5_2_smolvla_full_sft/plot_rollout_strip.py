@@ -3,8 +3,9 @@
 在讲12 2.4 节被引用。曲线只说明"数对不对"，读者还要看见**它究竟在做什么** ——
 一条 94% 的柱子不告诉人机械臂是怎么把方块放进料箱的。
 
-每行一个任务，八帧走完示教定义的五个阶段（`0_dataset_gen/expert.py:19`）：
-取物 → 合拢 → 搬运 → 松手 → 回家。
+每个任务两行、每行四格，八帧走完示教定义的五个阶段（`0_dataset_gen/expert.py:19`）：
+取物 → 合拢 → 搬运 → 松手 → 回家。**八格不排成一行** —— 排一行时每格只有版心的
+八分之一宽（约 0.75 英寸），机械臂和物体都糊成一团；折成两行后每格翻倍。
 
 ★ 关键时刻按**夹爪动作**定位，不按帧号硬编 —— 硬编的帧号换一集就指向别处
   （本项目在"取错时刻"上栽过四次）。合拢帧与松手帧从录像同名的 `.tsv`
@@ -35,6 +36,7 @@ ROWS = [
     ("SO101PickPlaceCylinder40-v1", "Pick up a can"),
 ]
 N_FRAMES = 8
+N_COLS = 4          # 每行四格 ⇒ 每个任务占两行，三个任务共六行
 CROP_PAD = 12
 
 
@@ -157,19 +159,25 @@ def main(argv) -> int:
 
     fw, fh = tiles[0][0].size
     gap = 6
+    n_bands = N_FRAMES // N_COLS                 # 每个任务占几行
+    width = fw * N_COLS + gap * (N_COLS - 1)
     # 字号按**成品在页面上的物理尺寸**定，不写死像素：像素宽 W 放到 6 英寸上是 W/6 dpi，
     # 要印出来约 9pt，像素高就得是 9/72 × (W/6)。写死 22px 时印出来只有 4.6pt，看不清。
-    px_per_pt = (fw * N_FRAMES + gap * (N_FRAMES - 1)) / 6 / 72
+    px_per_pt = width / 6 / 72
     font = ImageFont.truetype(font_path, max(12, round(9 * px_per_pt)))
     lab_h = font.size + 8
-    canvas = Image.new("RGB", (fw * N_FRAMES + gap * (N_FRAMES - 1),
-                               (fh + lab_h + gap) * len(ROWS)), "white")
+    # 任务名只写在该任务的第一行上；第二行紧跟着，中间不再插标签，读者才看得出
+    # 这八格是**同一条轨迹**而不是两个任务。任务之间留一个标签高度的间隔。
+    band_h = fh + gap
+    task_h = lab_h + band_h * n_bands + gap * 2
+    canvas = Image.new("RGB", (width, task_h * len(ROWS)), "white")
     draw = ImageDraw.Draw(canvas)
     for r, (row, lab) in enumerate(zip(tiles, labels)):
-        y = r * (fh + lab_h + gap)
-        draw.text((2, y + 4), lab, fill="black", font=font)
-        for c, im in enumerate(row):
-            canvas.paste(im, (c * (fw + gap), y + lab_h))
+        y0 = r * task_h
+        draw.text((2, y0 + 4), lab, fill="black", font=font)
+        for i, im in enumerate(row):
+            band, col = divmod(i, N_COLS)
+            canvas.paste(im, (col * (fw + gap), y0 + lab_h + band * band_h))
     path = OUT / "fig12-2-rollout-strip.png"
     canvas.save(path)
     print(f"  {path.name}  {canvas.size[0]}x{canvas.size[1]}")
