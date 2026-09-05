@@ -23,15 +23,17 @@ import sys
 from pathlib import Path
 
 import numpy as np
+
 import recipe
-from grasp_ik import jaw_midpoint, jaw_yaw_error
+from grasp_ik import aim_point, jaw_midpoint, jaw_yaw_error
 from servo import ArmKinematics, BaseFrame
 
 
-def _gripper_limits():
-    """夹爪关节的上下限（弧度），从 URDF 现读。"""
-    from so101_sim.robots.so101_base.so101 import gripper_limit_rad
-    return gripper_limit_rad()
+def _grip_rad(pct):
+    """夹爪行程百分比 → 关节角（弧度），走产线那个唯一入口。"""
+    from so101_sim.robots.so101_base.so101 import grip_rad_from_pct
+
+    return grip_rad_from_pct(pct)
 
 
 def base_and_urdf(env_id):
@@ -73,13 +75,13 @@ def main(argv) -> int:
 
     frame, urdf = base_and_urdf(spec["env_id"])
     kin = ArmKinematics(urdf)
-    # 与 `expert.plan` 同一个瞄点 —— 各写一套就会量到另一个东西。
-    pocket = np.asarray(recipe.pocket(scene), float)
+    # 与 `expert.plan` 同一个瞄点，走 `grasp_ik.aim_point` 那个唯一定义处。
+    # 曾经写的是 `recipe.pocket(scene)`，那是被污染的实测握持点，量的不是被规划的那个点。
+    pocket = aim_point(kin, scene)
 
     # 下降那一段的指尖间距：两指要跨的宽度超过它就夹不住。
     open_pct = spec["open_descent_pct"]
-    low, high = _gripper_limits()
-    descent_rad = low + open_pct / 100.0 * (high - low)
+    descent_rad = _grip_rad(open_pct)
     tips = kin.tips_local(np.r_[np.zeros(5), descent_rad])
     span = float(np.linalg.norm(tips["finger2_tip"] - tips["finger1_tip"])) * 1000.0
 
@@ -95,13 +97,19 @@ def main(argv) -> int:
         ep = int(path.stem.removeprefix("ep"))
         meta = json.loads((prep / "meta" / f"{path.stem}.json").read_text())
         actions = np.load(path)
-        grasp = recipe.close_frame(actions)
+        grasp = recipe.close_frame(actions, recipe.CLOSE_PCT[spec["real_task"]])
         if grasp is None:
             sys.exit(f"★ {path.stem} 里找不到「张开后首次合到底」的帧")
         qpos = np.radians(actions[grasp, :5])
-        # 夹爪那一维要给**规划里那一帧的实际开度** —— 指尖位置随它变，给 0 会量到另一个
-        # 两指连线，于是这里的偏角与 `expert.plan` 判的不是同一个数。
-        grip_rad = low + actions[grasp, 5] / 100.0 * (high - low)
+        # 夹爪那一维要给**下降段的开度** —— 两指是在那个宽度上围住物体的，"对没对齐物体
+        # 的面"问的就是那一刻的两指连线。
+        #
+        # ★ 早先这里给的是"抓取帧的实际开度"，而抓取帧按定义是**首次合到底**那一帧，
+        #   开度是 0：两指尖此时几乎重合，它们的连线方向没有物理含义。于是这一列报出
+        #   32~41° 的假偏角（真值 ≤2°），一度把"对齐没做对"当成失败集的病因去追。
+        #   注释当时写的是"要给规划里那一帧的实际开度"，读起来完全合理 —— 错的是
+        #   "那一帧"选得不对，不是取值取错。
+        grip_rad = descent_rad
         p_local, rot_local = kin.ee_pose_local(qpos)
         aim = frame.to_world(p_local + rot_local @ pocket)
         want = np.array([*meta["item_xy"], spec["item_half"]])

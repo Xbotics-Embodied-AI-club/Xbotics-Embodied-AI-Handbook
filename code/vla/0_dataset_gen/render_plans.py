@@ -24,8 +24,9 @@ from pathlib import Path
 
 import av
 import numpy as np
-import recipe
 from PIL import Image, ImageDraw
+
+import recipe
 
 FPS = 30
 # 每集之间插几帧黑场，读的人才分得清集与集的边界。

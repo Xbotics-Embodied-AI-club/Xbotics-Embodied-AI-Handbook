@@ -18,8 +18,9 @@ import sys
 from pathlib import Path
 
 import numpy as np
+
 import recipe
-from grasp_ik import PREFERRED_WROLL, jaw_yaw_error, solve_approach_and_grasp
+from grasp_ik import PREFERRED_WROLL, aim_point, jaw_yaw_error, solve_approach_and_grasp
 from servo import ArmKinematics, BaseFrame
 
 APPROACH_H = 0.06
@@ -33,7 +34,7 @@ def main(argv) -> int:
     meta = json.loads((prep / "meta" / f"ep{ep}.json").read_text())
     state = json.loads((prep / "states" / f"ep{ep}.json").read_text())
     actions = np.load(prep / "plans" / f"ep{ep}.npy")
-    grasp = recipe.close_frame(actions)
+    grasp = recipe.close_frame(actions, recipe.CLOSE_PCT[spec["real_task"]])
 
     import gymnasium as gym
     import so101_sim  # noqa: F401
@@ -46,12 +47,15 @@ def main(argv) -> int:
     kin = ArmKinematics(inner.agent.urdf_path)
     env.close()
 
-    from so101_sim.robots.so101_base.so101 import gripper_limit_rad
+    from so101_sim.robots.so101_base.so101 import (
+        grip_rad_from_pct,
+        gripper_limit_rad,
+    )
     low, high = gripper_limit_rad()
     lo = np.array([-1.9199, -1.9199, -1.69, -1.6581, -1.1731, low])
     hi = np.array([1.9199, 1.7453, 1.69, 1.8326, 4.4120, high])
-    grip = low + spec["open_approach_pct"] / 100.0 * (high - low)
-    pocket = recipe.pocket(scene)
+    grip = grip_rad_from_pct(spec["open_approach_pct"])
+    pocket = aim_point(kin, scene)
     item_xy = np.asarray(meta["item_xy"], float)
     item_yaw = np.radians(meta["item_yaw_deg"])
     seed_q = np.asarray(state["articulations"]["so101"], float)[:6] \

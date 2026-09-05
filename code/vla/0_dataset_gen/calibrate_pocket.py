@@ -31,20 +31,22 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from transforms3d.quaternions import quat2mat
+
 import recipe
 from expert import CLOSE_FRAMES
-from transforms3d.quaternions import quat2mat
 
 EE_LINK = "gripper_frame_link"
 
 
-def held_pocket(env_id, state_path, actions):
+def held_pocket(env_id, state_path, actions, close_pct):
     """捏住那一刻，物体在夹爪局部系里的坐标。
 
     Args:
         env_id: 已注册的环境 id。
         state_path: 强制初始状态 json。
         actions: `(帧数, 6)` 该集的规划动作。
+        close_pct: 该场景的合拢指令值，取 `recipe.CLOSE_PCT[SCENES[场景]["real_task"]]`。
 
     Returns:
         `(3,)` 口袋坐标（m）；这一集的规划里没有"捏到底"段时给 `None`。
@@ -52,7 +54,7 @@ def held_pocket(env_id, state_path, actions):
     from so101_sim.config_lerobot_robot import SO101SimRobotConfig
     from so101_sim.lerobot_robot import JOINT_NAMES, SO101SimRobot
 
-    closing = recipe.close_frame(actions)
+    closing = recipe.close_frame(actions, close_pct)
     if closing is None:
         return None
     stop = min(closing + CLOSE_FRAMES, len(actions))
@@ -87,7 +89,8 @@ def main(argv) -> int:
     for path in plans:
         ep = path.stem
         actions = np.load(path)
-        pocket = held_pocket(spec["env_id"], prep / "states" / f"{ep}.json", actions)
+        pocket = held_pocket(spec["env_id"], prep / "states" / f"{ep}.json", actions,
+                             recipe.CLOSE_PCT[spec["real_task"]])
         if pocket is None:
             print(f"    {ep}: 规划里没有捏到底段，跳过")
             continue

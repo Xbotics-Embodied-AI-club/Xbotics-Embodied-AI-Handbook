@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+
 import recipe
 from servo import ArmKinematics, BaseFrame
 
@@ -61,7 +62,7 @@ def main(argv) -> int:
     spec = recipe.SCENES[scene]
     meta = json.loads((prep / "meta" / f"ep{ep}.json").read_text())
     actions = np.load(prep / "plans" / f"ep{ep}.npy")
-    grasp = recipe.close_frame(actions)
+    grasp = recipe.close_frame(actions, recipe.CLOSE_PCT[spec["real_task"]])
     if grasp is None:
         sys.exit(f"★ ep{ep} 里找不到「张开后首次合到底」的帧")
 

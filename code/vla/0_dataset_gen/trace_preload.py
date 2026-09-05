@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+
 import recipe
 
 # 判"被推动"的位移门槛（m）。复位后物体从半空落定会有毫米级沉降，取 3mm 避开它。
@@ -28,7 +29,7 @@ def main(argv) -> int:
     scene, prep, ep = argv[0], Path(argv[1]), int(argv[2])
     spec = recipe.SCENES[scene]
     actions = np.load(prep / "plans" / f"ep{ep}.npy")
-    grasp = recipe.close_frame(actions)
+    grasp = recipe.close_frame(actions, recipe.CLOSE_PCT[spec["real_task"]])
     if grasp is None:
         sys.exit(f"★ ep{ep} 里找不到「张开后首次合到底」的帧")
 

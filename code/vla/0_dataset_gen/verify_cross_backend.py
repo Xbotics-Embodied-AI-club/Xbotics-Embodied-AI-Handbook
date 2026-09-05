@@ -41,8 +41,9 @@ from pathlib import Path
 
 import numpy as np
 import pyarrow.parquet as pq
+
 import recipe
-from check_regen import read_order
+from check_recorded import read_order
 
 # 判"抬起来过"的余量（m）：高于静置高度这么多才算真离台。
 LIFT_MARGIN = 0.01
@@ -176,9 +177,27 @@ def main(argv) -> int:
             continue
         state_path = states_dir / f"ep{source_ep}.json"
         verdicts = {}
-        # ★顺序不能反：sapien 的 `physx.enable_gpu()` 要求在任何其它 PhysX 代码之前调用，
-        #   先建 CPU 场景再建 GPU 环境会直接抛
+        # ★顺序不能反：sapien 的 `physx.enable_gpu()` 要求在任何其它 PhysX 代码之前
+        #   调用，先建 CPU 场景再建 GPU 环境会直接抛
         #   `GPU PhysX can only be enabled once before any other code involving PhysX`。
+        #
+        # ★这道门的成本几乎全在 GPU 那一遍，而且**加并行也压不下去**
+        #   （w1 实测，cube40 第 0 集 379 帧；端到端吞吐，含解释器与 import 启动）：
+        #
+        #     后端        N=1     N=8     N=16
+        #     physx_cpu   5.0    25.3    34.3   集/分钟（一直在涨）
+        #     gpu         2.5     4.8     4.2   集/分钟（8 就到顶，16 反而更慢）
+        #
+        #   纯回放耗时（不含启动）是 CPU 6.0s/集、GPU 22.3s/集 —— 慢 3.7 倍。
+        #
+        #   原因写在 `config_lerobot_robot.py` 的 `sim_backend` 条目里：单环境下 GPU 每
+        #   控制步 47.96ms、CPU 3.24ms —— GPU PhysX 是为**批量环境**设计的，一次核函数
+        #   发射摊给成百个环境才划算，我们这里每进程只有一个环境，发射开销就是全部开销。
+        #   要真正提速得让一个进程带 `num_envs` 个环境，而 `SO101SimRobot` 是单环境包装，
+        #   那是另一件事，不在这道门的价值范围内。
+        #
+        #   ⇒ 并行度取 8（N=16 比 N=8 还慢，过了 8 就是纯排队），三场景约 1500 集、GPU 侧约 5 小时。
+        #   这道门不挡别的活，让它在后台跑完即可 —— 只有合并要等它。
         for backend in ("gpu", "physx_cpu"):
             verdicts[backend] = judge(spec, *replay_on(backend, spec, state_path, actions))
         if all(v[0] for v in verdicts.values()):

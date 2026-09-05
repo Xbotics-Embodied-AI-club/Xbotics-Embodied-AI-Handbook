@@ -31,8 +31,9 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import recipe
 from transforms3d.quaternions import quat2mat
+
+import recipe
 
 EE_LINK = "gripper_frame_link"
 
@@ -69,22 +70,6 @@ def load_actions(source):
         from check_success import episode_actions
         return episode_actions(source)
     sys.exit(f"★ {source} 既没有 plans/ 也没有 data/ —— 认不出这是什么来源")
-
-
-def held_window(actions):
-    """夹住那一段的帧区间 `[起, 止)`。
-
-    Args:
-        actions: `(帧数, 6)` 真机口径动作，第 6 列是夹爪行程百分比。
-
-    Returns:
-        `(起, 止)`；这一集没有"合到底"就给 `None`。
-    """
-    start = recipe.close_frame(actions)
-    if start is None:
-        return None
-    after = np.flatnonzero(actions[start:, 5] > recipe.CLOSE_PCT + 1e-6)
-    return start, (start + int(after[0]) if len(after) else len(actions))
 
 
 def trace(env_id, state_path, actions):
@@ -140,9 +125,11 @@ def main(argv) -> int:
     if only is not None:
         actions = {only: actions[only]}
     print("  集   夹住帧数  夹爪逐帧|Δ|中位/p95(%)  峰峰(%)   方块在爪里逐帧|Δ|p95(mm)  转动p95(°/帧)")
+    close_pct = recipe.CLOSE_PCT[spec["real_task"]]
+    grip_step = recipe.grip_step_pct()
     rows = []
     for ep in sorted(actions):
-        window = held_window(actions[ep])
+        window = recipe.held_window(actions[ep], close_pct, grip_step)
         if window is None:
             print(f"  ep{ep}: 没有合到底的段，跳过")
             continue

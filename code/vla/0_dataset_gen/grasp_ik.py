@@ -31,6 +31,7 @@ lift/elbow 的**行程/净位移 = 12–144 倍**（来回摸索），方向翻�
 """
 
 import numpy as np
+
 from recipe import PITCH_CANDIDATES_DEG, SUM_GRASP_DEG, WROLL_GRASP_DEG
 from servo import dls_delta
 
@@ -51,6 +52,8 @@ WROLL_GRASP = np.radians(WROLL_GRASP_DEG)
 PITCH_CANDIDATES = np.radians(PITCH_CANDIDATES_DEG)
 # 伺服每步的关节增量上限（弧度）。限步是为了让解出来的轨迹是连续小步，而不是一跳到位。
 MAX_STEP = np.radians(2.0)
+# 夹持口袋的 y 分量（m）：三个场景共用，实测自捏住那一刻物体在夹爪局部系的 y 中位。
+POCKET_Y_M = 0.00075
 
 
 def grasp_point(kin, q, pocket):
@@ -123,17 +126,33 @@ def jaw_yaw_error(kin, q, item_yaw=0.0):
     return np.radians(((a + 45.0) % 90.0) - 45.0)
 
 
-# 腕滚的偏好值（弧度）。等价解里离它最近的那个胜出。
+# 腕滚的偏好值（弧度）。方块 90° 对称 ⇒ 腕滚 ±90° 抓的是同一组面，等价解里离它最近的胜出。
 #
-# 取 −20°：实测稳定簇覆盖 −40~+24°、打滑簇 +26~+30°，−20° 是稳定簇负半区的中点。
+# 取 0°：**判据是"落进真机的腕滚分布"**。对 `pick_up_a_cube` 299 集取抓取那一刻的
+# `wrist_roll`：中位 **+1.4°**，p10 −19.4 / p90 +34.5，最小 −59.1 / 最大 +96.2。
+# 同一批 16 个种子上扫偏好值（腕滚中位 / p10 / p90 ｜ 可规划 ｜ 成功）：
+#     −20° → −25.4 / −59.9 / +14.0 ｜ 14/16 ｜ 14/14
+#       0° → −11.8 / −30.0 / +17.9 ｜ 11/16 ｜ 11/11
+#     +10° → −10.9 / −28.2 / +18.5 ｜ 10/16 ｜ 10/10
+# −20° 那档的**中位落在真机 p10 以下**、p10 顶到真机的最小值 —— 整批挤在真机分布的尾巴上。
+# 0° 之后落进真机的 p10~p90。成功率各档都是 100%，代价只是可规划 14→11（超采 1.35 倍吸收）。
 #
-# ★ 取 0 是**无效**的：腕滚限位 −67.2~+252.8°，+29.3° 的 90° 等价解是
-#   −60.7 / +119.3 / +209.3°，而 +29.3 本身离 0 最近 ⇒ 原解恒胜，那个实验从构造上
-#   不可能改变任何东西（实测三集数字逐位不变）。这是同义反复判据，本仓反复抓过。
-#   取 −20° 后逐集验算：只有打滑的 ep0/ep2/ep7（+29.3/+29.8/+26.1 → −60.7/−60.2/−63.9）
-#   与空抓的 ep1（+45.9 → −44.1）改用等价解，6 集稳定的全部保留原解
-#   （ep9 在 +24.4 与 −65.6 之间以 1.2° 之差保留）⇒ 这个实验能证伪。
-PREFERRED_WROLL = np.radians(-20.0)
+# ★ 旧值 −20° 的理由**已经失效，别照抄**：它取自"打滑集腕滚在 +26~+30°、稳定集在
+#   −40~+24°"，那是**旧夹爪口径**（力矩上限 100 / 2.0 + 合拢阶梯）下的观察。
+#   机制是两指尖沿插入方向错开形成力偶、腕滚决定它相对重力的朝向；力矩上限降到 0.20
+#   之后这个力偶弱了一个量级（堵转段物体在爪内逐帧位移 0.565 → 0.041mm），
+#   "躲开正腕滚"这条约束不再成立。
+#
+# ★ 取 0 曾被记为"无效实验"（理由：+29.3° 的 90° 等价解是 −60.7/+119.3/+209.3，
+#   +29.3 本身离 0 最近 ⇒ 原解恒胜）。那条只说明**在那一集上**它不改变结果，
+#   不等于在整批上不改变分布 —— 实测中位从 −25.4 变到 −11.8，是能证伪的。
+PREFERRED_WROLL = np.radians(0.0)
+
+# 夹持面与方块的面允许差多少（度，三维夹角）。俯仰候选要过了它才录取。
+#
+# 取 5：实测同一批十集里九集是 1.3~3.8°（俯仰 85.0~86.5°），落到俯仰 73.2° 的那一集
+# 是 10.7°，腕部画面上方块角对着镜头。5 在两群之间，离两边都不近。
+MAX_JAW_FACE_DEG = 5.0
 
 # 两指跨过物体所需的富余（m）。判据是**物理的**：偏 θ 角时两指要跨 `宽度/cos θ`，
 # 它必须落在该开度下的指尖间距之内、再留这么多余量。
@@ -175,13 +194,16 @@ def jaw_midpoint(kin, grip_rad):
     Returns:
         `(3,)` 中点在 `gripper_frame_link` 局部系的坐标。
 
-    这就是抓取该瞄的点：物体中心要落在张开后的两指中点上。结果只与夹爪开度有关、
-    与手臂位形无关（从腕到指是一条固定链），所以手臂那五维给零即可。
+    结果只与夹爪开度有关、与手臂位形无关（从腕到指是一条固定链），所以手臂那五维给零即可。
 
-    ★ 早先瞄的是 `recipe` 里 `pocket_x` / `pocket_z` 那对**实测**值 —— 它们量的是
-      「堵转之后物体实际停在哪」，而那个位置正是被要修的缺陷（楔形指把刚体方块挤偏）
-      决定的。拿被污染的结果当瞄点，等于把偏差固化进产线：目审逐帧看到方块整个偏在
-      画面一侧、左边缘压在指面上，而不是被两指居中围住。
+    ★ **这是诊断量，不是产线的瞄点。** 产线瞄 `recipe.pocket(scene)` 那对实测值；
+      `check_aim.py` 用本函数报「实测口袋离几何中点差多少」，好让人看出瞄点偏在哪一侧。
+
+    ★ 「拿两指中点当瞄点」曾经上过产线，**被实测否掉**：成功率 8/10 → 5/10，解不出来的
+      槽位 3 → 8。理由是动指绕轴摆动，张开时的中点不是物体最终待的地方 —— 合拢过程
+      本身会把物体推走。当时支持它的论证是「实测口袋量的是『堵转之后物体实际停在哪』，
+      那个位置被楔形指挤偏的缺陷污染了」；论证听起来成立，但换上去成功率就掉，
+      ⇒ 以实测为准。本轮 405 集上实测口袋给出 93.3% 的成功率，这条结论继续成立。
     """
     q = np.zeros(6)
     q[5] = grip_rad
@@ -189,6 +211,71 @@ def jaw_midpoint(kin, grip_rad):
     mid = 0.5 * (tips["finger1_tip"] + tips["finger2_tip"])
     p_ee, rot = kin.ee_pose_local(q)
     return rot.T @ (mid - p_ee)
+
+
+def aim_point(kin, scene):
+    """这条产线抓取时瞄的那个点（`gripper_frame_link` 局部系，米）——**唯一定义处**。
+
+    Args:
+        kin: `ArmKinematics`。
+        scene: `recipe.SCENES` 的键。
+
+    Returns:
+        `(3,)` 该场景下降开度下的两指尖中点。
+
+    ★ 产线与所有诊断工具都必须调这一个函数。瞄点是"规划把物体送到爪里的哪儿"，
+      而观感指标（末端速度 / 加速度 / 逐帧转角）量的必须是**同一个点** ——
+      两边取不同的点时，报出来的曲线不是被规划的那一条，而且看不出来。
+
+    「居中」= 物体中心落在**两个夹持面的正中间**，于是两侧各留同样的缝，然后合拢夹住。
+    夹持面从两块指头的**碰撞网格**现算，只取物体所占的那一小段 y/z 邻域里的顶点：
+    固定指取它最靠内（x 最小）的顶点，动指取它最靠内（x 最大）的顶点。
+
+    实测（cube40，40mm，`gripper_frame_link` 局部系，mm）：
+
+        开度 26.6%  固定指面 0.00  动指面 −41.21  中线 −20.60  两侧各空  0.60
+        开度 36.4%  固定指面 0.00  动指面 −54.44  中线 −27.22  两侧各空  7.22
+        开度 46.4%  固定指面 0.00  动指面 −65.83  中线 −32.91  两侧各空 12.91
+
+    ★ **这个量前后错过三次，三次都因为拿错了"指头在哪"：**
+      · `jaw_midpoint`（两指尖中点）—— `finger1_tip` / `finger2_tip` 是**纯 frame、
+        没有碰撞体**，随开度越张越往爪外跑（60% 开度下已到 −46mm）。拿它当瞄点时
+        物体落在动指外侧 17.8mm，画面上整个挂在爪外。
+      · `recipe.pocket` 那组实测值（−18.63）—— 它量的是"堵转之后物体停在哪"，
+        偏向固定指 8.6mm，画面上物体贴着左指。
+      · link **原点**（固定指 −7.9 / 动指 −28.1）—— 原点不是面。固定指的面其实在 0.00。
+      ⇒ 只有碰撞网格上朝内的那两个面才定义得了"居中"。
+
+    ★ 它是**推导量**：跟着该场景的 `open_descent_pct` 走，换场景、换开度都自动对。
+    """
+    from so101_sim.robots.so101_base.so101 import grip_rad_from_pct
+    from transforms3d.quaternions import quat2mat
+
+    import recipe
+    from measure_descent_clearance import link_local_points
+
+    spec = recipe.SCENES[scene]
+    q = np.zeros(6)
+    q[5] = grip_rad_from_pct(spec["open_descent_pct"])
+    names = [link.name for link in kin._art.get_links()]
+    kin._pm.compute_forward_kinematics(np.r_[q, np.zeros(max(0, kin.n - 6))][:kin.n])
+    ee = kin._pm.get_link_pose(names.index("gripper_frame_link"))
+    origin, rot = np.asarray(ee.p, float), quat2mat(np.asarray(ee.q, float))
+
+    points = link_local_points(kin)
+    half = spec["item_half"]
+    faces = []
+    for link, inner in (("gripper_link", "min"), ("moving_jaw_so101_v1_link", "max")):
+        pose = kin._pm.get_link_pose(names.index(link))
+        world = np.asarray(pose.p, float) + points[link] @ quat2mat(np.asarray(pose.q, float)).T
+        local = (world - origin) @ rot
+        # 只看物体真正占住的那一小段：更远处的机身不参与"夹持面"这件事。
+        band = local[(np.abs(local[:, 1] - POCKET_Y_M) < half)
+                     & (np.abs(local[:, 2] - spec["pocket_z"]) < half)]
+        if not len(band):
+            raise RuntimeError(f"{link} 在物体高度带里没有碰撞顶点 —— 夹持面无从算起")
+        faces.append(band[:, 0].min() if inner == "min" else band[:, 0].max())
+    return np.array([0.5 * (faces[0] + faces[1]), POCKET_Y_M, spec["pocket_z"]])
 
 
 def solve_grasp_pose(kin, base, q_seed, target_world, grip, lo, hi,
@@ -215,15 +302,59 @@ def solve_grasp_pose(kin, base, q_seed, target_world, grip, lo, hi,
     return q, err, False
 
 
+def jaw_face_angle_deg(kin, base, q, item_yaw, symmetry="square"):
+    """「抓得正不正」的三维残差（度）—— 判据随物体的对称性变。
+
+    Args:
+        kin: `ArmKinematics`。
+        base: `BaseFrame`。
+        q: 抓取位形（前五个是手臂关节，弧度）。
+        item_yaw: 物体绕 z 的自旋角（弧度）；`round` 时不参与。
+        symmetry: `recipe.SCENES[场景]["item_symmetry"]`。
+
+    Returns:
+        残差（度），0 最好。
+
+    · `square`（方块）：夹持轴与最近那个面法向的夹角。两个夹持面要与方块的一对面平行。
+    · `round`（圆柱）：**圆柱没有面**，绕自身轴连续对称 ⇒ 任何水平朝向都等价，
+      唯一的要求是夹持轴垂直于柱轴。所以判的是「夹持轴离水平面差多少」。
+      拿 `square` 那套去卡圆柱是错的：它会按一个**虚构的自旋角**算出 0~45° 的残差，
+      于是同样好的抓取有的被放行、有的被否，而且否得毫无规律。
+
+    ★ **和 `jaw_yaw_error` 不是一回事，两个都要判。** 那一个把夹持轴投影到水平面再比，
+      于是"轴本身翘起来了"它一律看不见 —— 俯仰 90° 时两者等价，俯仰越浅差得越多。
+      实账：某一集俯仰落到 73.2°（其余九集 85.0~86.5°），水平投影残余 1.97° 全绿，
+      而三维夹角是 10.7°（其余九集 1.3~3.8°）；腕部画面里方块是**角对着镜头**的，
+      两个面都看得见，目审一眼就读出来了。
+    """
+    _, rot = kin.ee_pose_local(np.asarray(q, float)[:5])
+    axis = base.R @ rot @ np.array([1.0, 0.0, 0.0])
+    if symmetry == "round":
+        # 夹持轴与柱轴（世界 z）的夹角该是 90°，差多少就是残差。
+        return abs(90.0 - float(np.degrees(np.arccos(
+            np.clip(abs(axis @ np.array([0.0, 0.0, 1.0])), -1.0, 1.0)))))
+    c, s = np.cos(item_yaw), np.sin(item_yaw)
+    normals = (np.array([c, s, 0.0]), np.array([-s, c, 0.0]), np.array([0.0, 0.0, 1.0]))
+    return float(min(np.degrees(np.arccos(np.clip(abs(axis @ n), -1.0, 1.0)))
+                     for n in normals))
+
+
 def solve_approach_and_grasp(kin, base, q_seed, item_xy, item_half, approach_h,
-                             grip, lo, hi, *, pocket, wroll=None):
+                             grip, lo, hi, *, pocket, wroll=None, pitch=None):
     """一次解出「预抓取（正上方）」与「抓取」两个位姿，**共用同一个俯仰**。
 
     两个位姿必须同俯仰，否则下降段还要一边平移一边转腕，既不好看也容易把方块推走。
-    俯仰按 `PITCH_CANDIDATES` 依次试，取第一个两处都收敛的。
+    俯仰按 `PITCH_CANDIDATES` 依次试，取第一个两处都收敛的；`pitch` 给了就只试它
+    （由 `solve_aligned_grasp` 在外层逐档试，好让平行度也参与选俯仰）。
+
+    ★ **不要在这里判夹持面平行度。** 本函数是腕滚对齐迭代的内层：第一轮进来时腕滚还是
+      初值，两指连线离方块的面可以差到 45°，平行度当然不合格 —— 于是每一档俯仰都被否，
+      整个场景被弃。实测那样做 127 个种子里弃掉 117 个（不加时弃 0 个）。
+      平行度是**收敛之后**才有意义的量，判它的地方在 `expert.plan` 的落盘门那一排。
+
     返回 (q_above, q_grasp, 俯仰, 是否成功)。
     """
-    for sp in PITCH_CANDIDATES:
+    for sp in (PITCH_CANDIDATES if pitch is None else (pitch,)):
         tgt_g = np.array([item_xy[0], item_xy[1], item_half])
         tgt_a = tgt_g + np.array([0.0, 0.0, approach_h])
         q_a, _, ok_a = solve_grasp_pose(kin, base, q_seed, tgt_a, grip, lo, hi, sp,
@@ -237,22 +368,26 @@ def solve_approach_and_grasp(kin, base, q_seed, item_xy, item_half, approach_h,
     return None, None, None, False
 
 
-def solve_aligned_grasp(kin, base, q_seed, item_xy, item_half, approach_h, grip, lo, hi,
-                        *, pocket, item_yaw=0.0, iters=4):
-    """解预抓取/抓取位姿，并用 wrist_roll 把两指连线**对齐到方块的面**。
+def _align_roll(kin, base, q_seed, item_xy, item_half, approach_h, grip, lo, hi,
+                *, pocket, item_yaw, wr0, pitch=None, iters=4):
+    """从 `wr0` 起迭代 wrist_roll，把两指连线对齐到方块的面。
 
-    不对齐的代价是硬的：偏 θ 角时两指要跨 `40/cos θ` mm，撒点区远端（pan≈−35°）
-    偏到 31.9° ⇒ 要跨 47.1mm，而张 26° 只有 47mm。迭代把偏角打到 0 之后，
-    整个撒点区都只需要跨 40mm。返回 (q_above, q_grasp, pitch, wroll, ok)。
+    ★ 这个迭代对**主解和 ±90° 等价解一样都要跑**。早先只有主解跑、等价解直接照抄
+      `wr ± 90°` 单解一次，于是等价解带着 6~15° 的对齐残余出场，被 `span_fits` 全数否掉
+      （实测 ep0/ep4/ep9：主解残余 0.15/0.03/0.45°，+90° 候选 6.08/5.95/6.33°，
+      +180° 候选 15.20/11.14/8.93° —— 每转 90° 长约 6° 且单调累加）。
+      成因是抓取姿态下腕滚轴并非铅垂（俯仰 85~90°，不是正 90°），绕它转 90°
+      在水平投影里就不是正好 90°；差的这一点只要再迭代一轮就归零。
 
-    `item_yaw` 是方块绕 z 的自旋角（弧度）；对齐的目标是**方块的面**，不是世界轴。
+    Returns:
+        `(q_above, q_grasp, pitch, wroll, ok)`。
     """
-    wr = 0.0
+    wr = float(wr0)
     out = None
     for _ in range(iters):
         qa, qg, sp, c = solve_approach_and_grasp(kin, base, q_seed, item_xy, item_half,
                                                  approach_h, grip, lo, hi,
-                                                 pocket=pocket, wroll=wr)
+                                                 pocket=pocket, wroll=wr, pitch=pitch)
         if not c:
             return None, None, None, None, False
         out = (qa, qg, sp)
@@ -260,28 +395,53 @@ def solve_aligned_grasp(kin, base, q_seed, item_xy, item_half, approach_h, grip,
         if abs(e) < np.radians(1.0):
             break
         wr = float(np.clip(wr - e, lo[4] + 0.02, hi[4] - 0.02))
-    qa, qg, sp = out
+    return out[0], out[1], out[2], wr, True
 
-    # 方块 90° 对称 ⇒ 腕滚加减 90° 仍然对齐同一组面，但**夹持稳定性不同**：实测打滑的 3 集
-    # 腕滚都在 +26~+30°，稳定的 6 集在 −40~+24°（bd 记录：滑与腕滚强相关）。机制是两指尖
-    # 沿插入方向错开 7.6mm、合拢形成力偶，腕滚决定这个力偶相对重力的朝向。
-    # 所以在等价解里挑离 `PREFERRED_WROLL` 最近、且在限位内、且逆解仍收敛的那一个。
-    best = (abs(wr - PREFERRED_WROLL), wr, qa, qg, sp)
-    for k in (-2, -1, 1, 2):
-        cand = wr + k * np.pi / 2.0
-        if not (lo[4] + 0.02 <= cand <= hi[4] - 0.02):
+
+def solve_aligned_grasp(kin, base, q_seed, item_xy, item_half, approach_h, grip, lo, hi,
+                        *, pocket, item_yaw=0.0, symmetry="square", iters=4):
+    """解预抓取/抓取位姿，并用 wrist_roll 把两指连线**对齐到方块的面**。
+
+    不对齐的代价是硬的：偏 θ 角时两指要跨 `40/cos θ` mm，撒点区远端（pan≈−35°）
+    偏到 31.9° ⇒ 要跨 47.1mm，而张 26° 只有 47mm。迭代把偏角打到 0 之后，
+    整个撒点区都只需要跨 40mm。返回 (q_above, q_grasp, pitch, wroll, ok)。
+
+    `item_yaw` 是方块绕 z 的自旋角（弧度）；对齐的目标是**方块的面**，不是世界轴。
+
+    方块 90° 对称 ⇒ 腕滚加减 90° 抓的是同一组面，是**真正的等价解**。在它们里挑离
+    `PREFERRED_WROLL` 最近的那个（见该常量处：判据是落进真机的腕滚分布），
+    等价于挑腕部最不别扭的那个方向。
+
+    ★ **俯仰在外层逐档试，平行度参与选档。** 每一档俯仰都跑完整的腕滚对齐（主解 ＋
+      ±90° 等价解），收敛之后再判 `jaw_face_angle_deg`，不合格就换下一档俯仰。
+      两种更省事的写法都试过、都不对：
+        · 把平行度放进 `solve_approach_and_grasp` 的内层 —— 那里腕滚还没对齐，
+          离方块的面能差到 45°，每一档都被否 ⇒ 127 个种子弃 117 个。
+        · 只在最后当一道弃用门 —— 收敛了但不平行的场景整个丢掉，实测 35 个种子弃 7 个
+          （占全部弃用的 88%）。而且**弃得不随机**：被弃的是只有浅俯仰才解得出来的位姿，
+          集中在工作区边缘 ⇒ 数据集系统性缺那一带，评测时方块照样撒到那里。
+    """
+    kw = {"pocket": pocket, "item_yaw": item_yaw, "iters": iters}
+    args = (kin, base, q_seed, item_xy, item_half, approach_h, grip, lo, hi)
+    for sp_try in PITCH_CANDIDATES:
+        qa, qg, sp, wr, ok = _align_roll(*args, wr0=0.0, pitch=sp_try, **kw)
+        if not ok:
             continue
-        score = abs(cand - PREFERRED_WROLL)
-        if score >= best[0]:
-            continue
-        # ★ 种子换成已收敛的 qa **已被实测否证**：ep12/ep27 的负腕滚候选照样不收敛，
-        #   逐位不变。那两个位姿是真的解不出来 —— 腕滚 −49.6/−43.5° 时锁俯仰的三自由度
-        #   逆解在限位内无法把口袋送到方块中心，是运动学硬限制，不是种子问题。
-        ca, cg, csp, ok2 = solve_approach_and_grasp(
-            kin, base, q_seed, item_xy, item_half, approach_h, grip, lo, hi,
-            pocket=pocket, wroll=cand)
-        if not ok2 or not span_fits(kin, cg, item_yaw, item_half, grip):
-            continue
-        best = (score, cand, ca, cg, csp)
-    _, wr, qa, qg, sp = best
-    return qa, qg, sp, wr, True
+        best = (abs(wr - PREFERRED_WROLL), wr, qa, qg, sp)
+        for k in (-2, -1, 1, 2):
+            seed = wr + k * np.pi / 2.0
+            if not (lo[4] + 0.02 <= seed <= hi[4] - 0.02):
+                continue
+            # ★ 种子换成已收敛的 qa **已被实测否证**：ep12/ep27 的负腕滚候选照样不收敛，
+            #   逐位不变。那两个位姿是真的解不出来 —— 腕滚 −49.6/−43.5° 时锁俯仰的三自由度
+            #   逆解在限位内无法把口袋送到方块中心，是运动学硬限制，不是种子问题。
+            ca, cg, csp, cwr, ok2 = _align_roll(*args, wr0=seed, pitch=sp_try, **kw)
+            if not ok2 or not span_fits(kin, cg, item_yaw, item_half, grip):
+                continue
+            score = abs(cwr - PREFERRED_WROLL)
+            if score < best[0]:
+                best = (score, cwr, ca, cg, csp)
+        _, wr, qa, qg, sp = best
+        if jaw_face_angle_deg(kin, base, qg, item_yaw, symmetry) <= MAX_JAW_FACE_DEG:
+            return qa, qg, sp, wr, True
+    return None, None, None, None, False

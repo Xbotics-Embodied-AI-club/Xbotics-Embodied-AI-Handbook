@@ -2695,7 +2695,7 @@ wheels = [
 [[package]]
 name = "lerobot"
 version = "0.5.1"
-source = { git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=main#432e58a8c0faf7a2968807d22af74d319a511898" }
+source = { git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=main#307b7e4ef0933f0c726c84ce5ad42cb52940d139" }
 dependencies = [
     { name = "accelerate" },
     { name = "av" },
@@ -5766,7 +5766,7 @@ wheels = [
 [[package]]
 name = "so101-sim"
 version = "0.1.0"
-source = { git = "https://github.com/Xbotics-Embodied-AI-club/Xbotics-SO101-Sim.git#6964ead320fa974630da34e454f5acd0e4560288" }
+source = { git = "https://github.com/Xbotics-Embodied-AI-club/Xbotics-SO101-Sim.git#5145236aa1cd89c3b216356b21b46af157c82e5f" }
 dependencies = [
     { name = "dacite", marker = "(platform_machine != 'aarch64' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or (platform_python_implementation != 'CPython' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or (sys_platform != 'linux' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or extra == 'extra-19-xbotics-experiments-gpu-x86' or extra == 'extra-19-xbotics-experiments-rdk-s100'" },
     { name = "gymnasium", marker = "(platform_machine != 'aarch64' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or (platform_python_implementation != 'CPython' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or (sys_platform != 'linux' and extra == 'extra-19-xbotics-experiments-nogpu-x86') or extra == 'extra-19-xbotics-experiments-gpu-x86' or extra == 'extra-19-xbotics-experiments-rdk-s100'" },

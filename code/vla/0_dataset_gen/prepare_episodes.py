@@ -27,6 +27,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+
 import recipe
 from expert import plan
 
@@ -37,11 +38,37 @@ SETTLE_MAX_STEPS = 30
 SETTLE_TOL_M = 1e-5
 
 
-def sample_scene(env_id, seed):
-    """复位一次，取整份状态、物体的 xy 与自旋角、料箱 xy、home 位形、机器人基座位姿。
+def make_env(env_id):
+    """建一次环境，整批种子复用。
 
     Args:
         env_id: 已注册的环境 id。
+
+    Returns:
+        gym 环境。
+
+    ★ 早先每个种子都 `gym.make` 再 `close`，建环境要几秒，300 多个种子光建环境就十几分钟。
+      `reconfiguration_freq=1` 已经保证每次 `reset` 都重新撒点，所以环境本身建一次就够。
+    """
+    import gymnasium as gym
+    import so101_sim  # noqa: F401  导入即注册
+    # ★ `control_mode` 必须显式给 `pd_joint_pos`。ManiSkill 的默认是
+    #   `pd_joint_target_delta_pos`（归一化增量，动作空间 Box(−1,1)），而落定循环喂的是
+    #   **绝对弧度** —— lift 的 −1.79 会被夹到 −1，于是每一步都按满速往下推一格
+    #   （实测 lift −1.266°/步、elbow +1.318、wflex +0.830，20 集的偏移方向四个全对）。
+    #   表现是「home 位形被污染」：首帧 lift 中位 −103.87、最差 −110.20（顶在 URDF 限位
+    #   −110.0 上），而真机首帧 lift 是 −102.68 ± 0.32。**不报错**，只是每集从一个
+    #   越走越偏的起点开始。曾把它误诊成"重力下沉"，那是错的：手臂不是在沉，是被推。
+    return gym.make(env_id, num_envs=1, obs_mode="state", sim_backend="physx_cpu",
+                    control_mode="pd_joint_pos",
+                    domain_randomization=False, reconfiguration_freq=1)
+
+
+def sample_scene(env, seed):
+    """复位一次，取整份状态、物体的 xy 与自旋角、料箱 xy、home 位形、机器人基座位姿。
+
+    Args:
+        env: `make_env` 建好的环境，整批复用。
         seed: 这一集的种子。
 
     Returns:
@@ -54,10 +81,6 @@ def sample_scene(env_id, seed):
     用 CPU PhysX：录制本来也走 CPU，而且专家的运动学副本也是 CPU 的 sapien 场景 ——
     全程不碰 GPU 就绕开了 `physx.enable_gpu()` 那条"必须在任何其它 PhysX 代码之前"的限制。
     """
-    import gymnasium as gym
-    import so101_sim  # noqa: F401  导入即注册
-    env = gym.make(env_id, num_envs=1, obs_mode="state", sim_backend="physx_cpu",
-                   domain_randomization=False, reconfiguration_freq=1)
     env.reset(seed=seed)
     inner = env.unwrapped
 
@@ -71,8 +94,17 @@ def sample_scene(env_id, seed):
     home_action = np.asarray(inner.agent.robot.get_qpos()[0].cpu(), float)
 
     def _poses():
-        return np.stack([np.asarray(inner.item.pose.p[0].cpu(), float),
-                         np.asarray(inner.bin.pose.p[0].cpu(), float)])
+        """物体 xyz、料箱 xyz，再拼上手臂五关节 —— 三样都停稳才算场景静止。
+
+        手臂那一项是**防呆**：控制模式一旦给错（见 `make_env`），手臂会被一步步推走
+        而全程不报错，把它纳入静止判据就会当场卡住而不是悄悄产出污染的 home。
+        手臂那五位是弧度、物体那两组是米，量纲不同但判据都是"逐帧变化小于门槛"，
+        而 `SETTLE_TOL_M` = 1mm 对应 0.057°，对关节反而更严，不会放水。
+        """
+        arm = np.asarray(inner.agent.robot.get_qpos()[0, :5].cpu(), float)
+        return np.concatenate([np.asarray(inner.item.pose.p[0].cpu(), float),
+                               np.asarray(inner.bin.pose.p[0].cpu(), float),
+                               arm])
 
     last, settled = _poses(), False
     for _ in range(SETTLE_MAX_STEPS):
@@ -83,7 +115,6 @@ def sample_scene(env_id, seed):
             break
         last = now
     if not settled:
-        env.close()
         return None
     state = {group: {name: [float(v) for v in tensor[0].cpu()]
                      for name, tensor in items.items()}
@@ -96,7 +127,6 @@ def sample_scene(env_id, seed):
     pose = inner.agent.robot.pose
     base_p = [float(v) for v in pose.p[0].cpu()]
     base_q = [float(v) for v in pose.q[0].cpu()]
-    env.close()
     return state, item_xy, item_yaw, bin_xy, home, base_p, base_q
 
 
@@ -112,10 +142,11 @@ def main(argv) -> int:
     for sub in ("states", "plans", "meta"):
         (out_dir / sub).mkdir(parents=True, exist_ok=True)
 
+    env = make_env(spec["env_id"])
     made, skipped = 0, []
     seed = first_seed
     while made < count:
-        sampled = sample_scene(spec["env_id"], seed)
+        sampled = sample_scene(env, seed)
         if sampled is None:
             skipped.append({"seed": seed, "why": "场景没停稳（物体或料箱仍在动）"})
             print(f"    种子 {seed}：场景没停稳，跳过")
@@ -123,7 +154,7 @@ def main(argv) -> int:
             continue
         state, item_xy, item_yaw, bin_xy, home, base_p, base_q = sampled
         actions, why = plan(scene, item_xy, item_yaw, bin_xy, home, base_p, base_q,
-                            SO101.urdf_path)
+                            SO101.urdf_path, seed=seed)
         if actions is None:
             skipped.append({"seed": seed, "why": why,
                             "item_xy": item_xy.tolist(), "bin_xy": bin_xy.tolist()})
@@ -146,6 +177,7 @@ def main(argv) -> int:
         made += 1
         seed += 1
 
+    env.close()
     (out_dir / "meta" / "skipped.json").write_text(json.dumps(skipped, ensure_ascii=False))
     print(f"\n  {scene}：备好 {made} 集，跳过 {len(skipped)} 个槽位（种子 "
           f"{first_seed}~{seed - 1}）")

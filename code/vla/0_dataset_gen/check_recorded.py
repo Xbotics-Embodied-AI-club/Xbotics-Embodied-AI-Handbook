@@ -1,7 +1,11 @@
-"""重录之后的保真核对：录出来的每一集是不是源集的 1:1 还原。
+"""录制之后的保真核对：录出来的每一集是不是那份规划的 1:1 还原。
 
-★ **判据**：动作逐位等于源集，帧数与源集相差不超过 `recipe.FRAME_TOLERANCE` 帧（双向），
-  且差掉的那几帧必须落在源集自己的静止尾巴里。
+★ **参照物是 `prep/plans/ep<N>.npy`，不是另一份数据集。** 产线的动作由脚本化专家算出来、
+  落成 `.npy` 再播出去，所以"录得对不对"只能拿那份 `.npy` 比。拿别的数据集当参照
+  就是第二个真源，改一处忘一处只是时间问题。
+
+★ **判据**：动作逐位等于规划，帧数与规划相差不超过 `recipe.FRAME_TOLERANCE` 帧（双向），
+  且差掉的那几帧必须落在规划自己的静止尾巴里。
   为什么容许差几帧：`lerobot-record` 按墙钟停表，循环踩过 33.3ms 就少一帧，
   真机采集同样会偶尔差一两帧没跟上。
   为什么只容许**几**帧：多出来的帧全是静止帧，会把末尾静止段撑长 ——
@@ -11,8 +15,8 @@
 ★ **任务成没成不在这里判**，在 `verify_cross_backend.py`：那件事要在两个物理后端
   各跑一遍才算数，而且要按料箱自己的坐标系判"落进箱口"。一个问题一道门。
 
-★ **源集号 ↔ 数据集内集号靠 `logs/shard<N>.order` 对账。**
-  每录一集追加一行 `<源集号> <ok|reject>`，**行号（从 0 起）就是这一集在本分片里的
+★ **规划集号 ↔ 数据集内集号靠 `logs/shard<N>.order` 对账。**
+  每录一集追加一行 `<规划集号> <ok|reject>`，**行号（从 0 起）就是这一集在本分片里的
   `episode_index`**。`--resume` 按录制顺序发号，而分片是隔片取集，两者不相等；
   超差重录时那一集也已经写进数据集了，所以它也占一行、标成 `reject`。
   不查账就会核错集 —— 而且核错了不报错，只是结论错。
@@ -20,7 +24,7 @@
 不合格的集号按**合并后**的编号打印，交给
 `lerobot-edit-dataset --operation.type delete_episodes` 官方删除，不在这里动数据。
 
-用法：`python check_regen.py <场景> <录制输出目录> <源数据集根> <分片数>`
+用法：`python check_recorded.py <场景> <录制输出目录> <准备目录> <分片数>`
 """
 
 import json
@@ -29,6 +33,7 @@ from pathlib import Path
 
 import numpy as np
 import pyarrow.parquet as pq
+
 from recipe import FRAME_TOLERANCE
 
 
@@ -52,6 +57,43 @@ def action_by_episode(root):
             prev = per_ep.get(int(ep))
             per_ep[int(ep)] = hit if prev is None else np.vstack([prev, hit])
     return per_ep, names
+
+
+def bare(names):
+    """去掉 lerobot 特征名上的 `.pos` 后缀，两侧才比得起来。
+
+    Args:
+        names: 特征名列表。
+
+    Returns:
+        同长度的列表。
+
+    数据集里写的是 `shoulder_pan.pos`（lerobot 给每个电机特征加的量纲后缀），
+    而机器人插件的 `JOINT_NAMES` 是裸名。**去后缀之后仍按名字取列，不按列序** ——
+    列序若不同，按序比会把肩转的值和肘弯的值对着比，报出来是"动作与规划不符"，
+    而真正的原因是列没对齐。
+    """
+    return [n.removesuffix(".pos") for n in names]
+
+
+def planned_actions(prep):
+    """准备目录里逐集的规划动作。
+
+    Args:
+        prep: `compact_prep.py` 产出的准备目录。
+
+    Returns:
+        `({集号: (帧数, 6) float32}, 关节名列表)`。
+
+    关节名取产线自己那张表 —— 规划的列序由 `so101_sim.lerobot_robot.JOINT_NAMES` 定，
+    录制时也是按同一个名字表逐个填的，所以两边同名同序。
+    """
+    from so101_sim.lerobot_robot import JOINT_NAMES
+    per_ep = {int(f.stem.removeprefix("ep")): np.load(f).astype(np.float32)
+              for f in sorted(Path(prep).glob("plans/ep*.npy"))}
+    if not per_ep:
+        sys.exit(f"★ {prep}/plans 里没有规划 —— 空结果不是「全合格」")
+    return per_ep, list(JOINT_NAMES)
 
 
 def read_order(path):
@@ -103,20 +145,20 @@ def main(argv) -> int:
     if len(argv) != 4:
         sys.exit(__doc__)
     scene, out_dir = argv[0], Path(argv[1])
-    source_root, shards = Path(argv[2]), int(argv[3])
+    prep, shards = Path(argv[2]), int(argv[3])
 
-    source_acts, source_names = action_by_episode(source_root)
+    source_acts, source_names = planned_actions(prep)
 
     bad, ok = [], []
     merged_base = 0
     for shard in range(shards):
         order = read_order(out_dir / "logs" / f"shard{shard}.order")
         rec_acts, rec_names = action_by_episode(out_dir / f"shard{shard}")
-        if sorted(rec_names) != sorted(source_names):
-            sys.exit(f"★ 关节名对不上：源 {source_names} / 重录 {rec_names}")
+        if sorted(bare(rec_names)) != sorted(source_names):
+            sys.exit(f"★ 关节名对不上：规划 {source_names} / 录出 {rec_names}")
         # 按名字取列，不按列序 —— 列序若不同，按序比会把肩转的值和肘弯的值对着比，
         # 结果是"动作与源集不符"，而真正的原因是列没对齐。
-        take = [rec_names.index(n) for n in source_names]
+        take = [bare(rec_names).index(n) for n in source_names]
         if len(rec_acts) != len(order):
             sys.exit(f"★ 片 {shard} 有 {len(rec_acts)} 集，账上记了 {len(order)} 集 —— "
                      "对不上就无法判断哪一集是哪一集")
@@ -132,23 +174,23 @@ def main(argv) -> int:
                 bad.append((merged_idx, src_ep, why))
         merged_base += len(order)
 
-    # 重录会让账上的行数多于源集数（作废的那几份也占行），所以"覆盖了几集"要按
-    # **合格行覆盖到的源集号**去数，不能拿总行数比。
+    # 超差重录会让账上的行数多于规划集数（作废的那几份也占行），所以"覆盖了几集"要按
+    # **合格行覆盖到的规划集号**去数，不能拿总行数比。
     covered = {src_ep for shard in range(shards)
                for src_ep, verdict in read_order(out_dir / "logs" / f"shard{shard}.order")
                if verdict == "ok"}
     print(f"  {scene}: 合格 {len(ok)} 行 / 共 {len(ok) + len(bad)} 行，"
-          f"覆盖源集 {len(covered)}/{len(source_acts)} 集")
+          f"覆盖规划集 {len(covered)}/{len(source_acts)} 集")
     if len(covered) != len(source_acts):
-        print(f"  ★ 有 {len(source_acts) - len(covered)} 个源集没有合格的录制")
+        print(f"  ★ 有 {len(source_acts) - len(covered)} 个规划集没有合格的录制")
     if bad:
         print("  不合格（编号是**合并后**的集号）：")
         for merged_idx, src_ep, why in bad[:10]:
-            print(f"    合并后 ep{merged_idx}（源集 ep{src_ep}）: {why}")
+            print(f"    合并后 ep{merged_idx}（规划集 ep{src_ep}）: {why}")
         if len(bad) > 10:
             print(f"    …… 共 {len(bad)} 集")
         print(f"  待删集号：[{','.join(str(m) for m, _, _ in bad)}]")
-    print("CHECK_REGEN_END")
+    print("CHECK_RECORDED_END")
     return 0
 
 
