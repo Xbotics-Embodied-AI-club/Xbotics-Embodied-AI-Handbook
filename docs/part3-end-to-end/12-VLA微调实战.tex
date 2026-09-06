@@ -2440,6 +2440,76 @@ LoRA 的损失全程高一截、末点 0.099 对 0.052；深浅两色的方点�
 \url{https://huggingface.co/Harrysunshine/so101-smolvla-lora-sim-real-10task}，
 配套代码在 \texttt{code/vla/5\_vla\_finetune/5\_3\_smolvla\_lora/}。
 
+\subsubsection{\texorpdfstring{3.10.3 同一套配方换到
+\(\pi_0\)：参数占比对齐了，任务没跟上}{3.10.3 同一套配方换到 \textbackslash pi\_0：参数占比对齐了，任务没跟上}}\label{ux540cux4e00ux5957ux914dux65b9ux6362ux5230-pi_0ux53c2ux6570ux5360ux6bd4ux5bf9ux9f50ux4e86ux4efbux52a1ux6ca1ux8ddfux4e0a}
+
+3.10.1 节那个方框说「秩要按基座大小取」。把那句话执行到底：\(\pi_0\) 有
+40 亿参数、 180 个可挂的 \(q/v\)，\(r\) 提到 256 才摊出 84,643,872
+个可训练参数，占 \textbf{2.06\%} ------ 和 SmolVLA 那轮的 2.1\%
+对齐到小数点后一位。训练集、步数、图像增强、评测参数全部照旧。
+
+三场终评每场 50 局，与上一轮并排：
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.5000\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2500\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2500\linewidth - 2\tabcolsep\relax}@{}}
+\toprule\noalign{}
+任务（指令原文见上一节那张表） & SmolVLA LoRA & \(\pi_0\) LoRA \\
+\midrule\noalign{}
+方块 40mm & 94.0\%（47/50） & 92.0\%（46/50） \\
+小方块 20mm & 84.0\%（42/50） & \textbf{32.0\%（16/50）} \\
+易拉罐 & 98.0\%（49/50） & 92.0\%（46/50） \\
+\bottomrule\noalign{}
+\end{tabular}
+\end{center}
+
+把四轮画到一起，塌的是哪一档一眼就看得出来 ------
+两个大任务上四根柱子几乎一样高， 20mm 那一组只剩一半：
+
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/fig12-3-pi0-lora-transfer.png}
+
+}
+
+\caption{四组柱子按任务分成三簇：40mm 方块与易拉罐上四轮都在
+92\textasciitilde98\%，20mm 小方块上 SmolVLA 两轮是 90\% 与
+84\%，\(\pi_0\) 两轮只有 34\% 与 32\%}
+
+\end{figure}%
+
+\textbf{第一件事是排除「没训够」。} 图里 \(\pi_0\)
+那两根柱子是同一次训练的两个断点： 1.53 轮时 34\%，接着又训了 10000
+步、六卡跑满六小时到 2.25 轮，成绩是 32\%。 十个点的抖动都算不上。所以
+32\% 不是欠拟合，是这套配方在这个基座上就学不会这一档。
+
+它也不是完全不动。三个任务的 \texttt{avg\_max\_reward} 分别是 0.955 /
+0.575 / 0.936 ------
+小方块那一场拿到了大半的过程奖励，说明手臂找得到、也伸得过去，只是抓不稳、送不进去。
+\textbf{失败集中在最后那几厘米}，不是策略整个崩掉。
+
+\begin{quote}
+\textbf{参数占比对齐，不等于能力对齐。} 2.06\% 与 2.1\%
+是照着凑的，可它们摊在两套完全不同的 骨架上：SmolVLA 那 10M 摊在 4.5
+亿参数的三族 \(q/v\) 上，\(\pi_0\) 那 85M 摊在 40 亿参数的 180 个
+\(q/v\) 上 ------
+每一层拿到的秩相对它自己的宽度反而更薄。\textbf{占比是个方便的旋钮，
+不是一个可以跨架构比较的量。}换基座就得重新按任务验一遍，不能把上一轮的配方直接搬过来。
+\end{quote}
+
+\textbf{这一节还留下一个关于评测的教训，比上面那条更容易犯。} 训练途中的
+\texttt{-\/-env.task} 只能给一个环境，我们挂的是 40mm
+方块，四个途中评测点一路 50 → 70 → 100 → 90， 看着已经收敛 ------
+于是差点就照这条曲线收工了。三场终评出来才发现 20mm 一直没起来。
+两个数并不矛盾：40mm 终评 92\%
+与途中那条曲线完全对得上，\textbf{途中评测在它量的那件事上是准的，
+它只是看不见没挂上的那两场}。所以途中曲线的用途只有一个，判断「有没有在学」；
+「学到什么程度」一律以全场景终评为准。混合多任务训练时这条尤其要紧
+------ 单场景曲线越好看，越容易掩盖另一个任务从头到尾没起来。
+
+适配器权重在
+\url{https://huggingface.co/Harrysunshine/so101-pi0-lora-sim-real-10task}，
+训练入口是同一个 \texttt{train\_lora.sh}，第一个参数换成 \texttt{pi0}。
+
 \subsection{3.11 实物实验：把适配器部署到 SO-101
 真机}\label{ux5b9eux7269ux5b9eux9a8cux628aux9002ux914dux5668ux90e8ux7f72ux5230-so-101-ux771fux673a}
 

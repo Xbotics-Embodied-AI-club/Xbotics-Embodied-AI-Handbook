@@ -30,7 +30,10 @@ export CUDA_VISIBLE_DEVICES="${GPUS:-2}"
 
 [ -f "$CKPT/config.json" ] || { echo "★ $CKPT 不像是 pretrained_model 目录"; exit 1; }
 
-for ENV_ID in SO101PickPlaceCube40-v1 SO101PickPlaceCube20-v1 SO101PickPlaceCylinder40-v1; do
+# 只评其中某几场：`ENVS="<env-id> …"`。三场互不相干，各占一张卡并行跑完再一起汇总，
+# 墙钟时间是串行的三分之一。汇总那段对缺的那几场只打一行「没跑完」，所以并行实例
+# 各自打出的半张表是预期的 —— 以最后统一跑的那次汇总为准。
+for ENV_ID in ${ENVS:-SO101PickPlaceCube40-v1 SO101PickPlaceCube20-v1 SO101PickPlaceCylinder40-v1}; do
   echo "===== $ENV_ID（$N 局）====="
   "${BIN}lerobot-eval" \
     --policy.path="$CKPT" \
