@@ -34,20 +34,25 @@ ckpt = Path(sys.argv[1])
 if not (ckpt / "config.json").is_file():
     sys.exit("★ 缺 config.json —— 这不是一个 pretrained_model 目录")
 
-from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
+# 按 checkpoint 自报的 type 取策略类，别写死某一个 —— 这个脚本要服务
+# SmolVLA / ACT / pi0 三条线。
+from lerobot.configs.policies import PreTrainedConfig
+from lerobot.policies.factory import get_policy_class
 
 if (ckpt / "adapter_model.safetensors").is_file():
     from peft import PeftConfig, PeftModel
     pc = PeftConfig.from_pretrained(ckpt)
-    base = SmolVLAPolicy.from_pretrained(pc.base_model_name_or_path)
+    base_cfg = PreTrainedConfig.from_pretrained(pc.base_model_name_or_path)
+    base = get_policy_class(base_cfg.type).from_pretrained(pc.base_model_name_or_path)
     p = PeftModel.from_pretrained(base, ckpt)
     tr = sum(x.numel() for x in p.parameters() if x.requires_grad)
     tot = sum(x.numel() for x in p.parameters())
     print(f"  适配器装载成功：基座 {pc.base_model_name_or_path}，"
           f"旁路 {tr/1e6:.1f}M / 总 {tot/1e6:.1f}M")
 elif (ckpt / "model.safetensors").is_file():
-    p = SmolVLAPolicy.from_pretrained(ckpt)
-    print(f"  整套权重装载成功：{p.name}，参数 "
+    cfg = PreTrainedConfig.from_pretrained(ckpt)
+    p = get_policy_class(cfg.type).from_pretrained(ckpt)
+    print(f"  整套权重装载成功：type={cfg.type}，参数 "
           f"{sum(x.numel() for x in p.parameters())/1e6:.1f}M")
 else:
     sys.exit("★ 既没有 model.safetensors 也没有 adapter_model.safetensors")

@@ -98,24 +98,28 @@ def moments(grip: np.ndarray, n_steps: int) -> list[int]:
     Returns:
         长度 8 的帧号列表，按时间递增。
 
-    合拢帧 = 夹爪**张开过之后**首次越回开合中线以下；松手帧 = 此后首次再越上去。
-    两者把轨迹分成取物 / 搬运 / 回家三段，八帧按段插进去，于是换一集、换一个任务
-    都指得准。
-
-    ★ "张开过之后"这个前提不能省：示教的起手那一帧**不许把爪张开**
-      （`expert.py:678`，张开会把物体推走），所以第 0 帧夹爪就是合的。
-      直接找"首次低于中线"会命中第 0 帧，八个时刻全挤在开头 —— 第一版就是这样，
-      而它**不报错**，只是产出一张八格几乎一样的图。
+    合拢帧与松手帧 = **最长那段闭合**的首尾。搬运段是全程最长的闭合区间，
+    两端正是抓住与松手。这样定位与起手时夹爪是开是合无关，也不受抓取前抖动的影响。
     """
     mid = (grip.max() + grip.min()) / 2
-    opened = grip > mid
-    if not opened.any():
-        sys.exit("★ 这段录像里夹爪从没张开过，定位不了合拢/松手")
-    open_at = int(np.argmax(opened))
-    closed_after = ~opened[open_at:]
-    close_at = open_at + int(np.argmax(closed_after)) if closed_after.any() else n_steps // 2
-    open_again = opened[close_at:]
-    release_at = close_at + int(np.argmax(open_again)) if open_again.any() else n_steps - 1
+    closed = grip < mid
+    # ★ 取**最长的那段闭合**，不取「首次越过中线」。搬运段是全程最长的闭合区间，
+    #   而抓取前夹爪常有一次短暂的抖动 —— 按「首次」定位就会落在那次抖动上，
+    #   close_at 与 release_at 只隔两三帧，八个时刻随之乱序。
+    #   实测 small cube 那一集就是这样：取到 [0,64,135,129,130,…]，第 4、5 帧排在第 3 帧前面。
+    runs, i = [], 0
+    while i < len(closed):
+        if closed[i]:
+            j = i
+            while j < len(closed) and closed[j]:
+                j += 1
+            runs.append((i, j))
+            i = j
+        else:
+            i += 1
+    if not runs:
+        sys.exit("★ 这段录像里夹爪始终张着，定位不了合拢/松手")
+    close_at, release_at = max(runs, key=lambda r: r[1] - r[0])
     last = n_steps - 1
     # 搬运段按比例取两帧而不是取中点：夹住之后策略先原地稳一会儿才抬，取中点时物体
     # 还停在原位，与前一格几乎一样。"即将合拢"与"已夹住"也不各占一格 —— 夹爪在整幅
@@ -132,7 +136,11 @@ def moments(grip: np.ndarray, n_steps: int) -> list[int]:
         last,                                    # 回到 home
     ]
     assert len(picks) == N_FRAMES, f"取了 {len(picks)} 帧，画布按 {N_FRAMES} 帧排"
-    return [min(max(p, 0), last) for p in picks]
+    picks = [min(max(p, 0), last) for p in picks]
+    # ★ 断言单调：帧号乱序时画出来的连拍会倒着讲这个故事，而**它本身不报错**。
+    #   之前只断言了帧数、没断言顺序，于是乱序一路画到了 PNG 里。
+    assert picks == sorted(picks), f"★ 取的帧号不是递增的：{picks}"
+    return picks
 
 
 def main(argv) -> int:
@@ -174,7 +182,10 @@ def main(argv) -> int:
     # 任务名只写在该任务的第一行上；第二行紧跟着，中间不再插标签，读者才看得出
     # 这八格是**同一条轨迹**而不是两个任务。任务之间留一个标签高度的间隔。
     band_h = fh + gap
-    task_h = lab_h + band_h * n_bands + gap * 2
+    # 任务之间空出**一整个标签高度**，别只留几像素的 gap —— 下一个任务的标签会压到
+    # 上一个任务最后一行的画面旁边。格子高一点时恰好躲得过去，矮一点就露馅，
+    # 是那种「换一组录像才暴露」的排版 bug，所以按标签高度留，不按固定像素留。
+    task_h = lab_h * 2 + band_h * n_bands
     canvas = Image.new("RGB", (width, task_h * len(scenes)), "white")
     draw = ImageDraw.Draw(canvas)
     for r, (row, lab) in enumerate(zip(tiles, labels)):

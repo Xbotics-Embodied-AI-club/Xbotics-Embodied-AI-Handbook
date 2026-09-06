@@ -32,7 +32,7 @@ RENAME_SMOLVLA = {
     "observation.images.top": "observation.images.camera1",
     "observation.images.wrist": "observation.images.camera2",
 }
-SEED = 0
+SEED = int(__import__("os").environ.get("ROLL_SEED", "0"))
 
 
 def record(policy, ckpt: Path, task: str, steps: int, out_dir: Path) -> None:
@@ -69,6 +69,11 @@ def record(policy, ckpt: Path, task: str, steps: int, out_dir: Path) -> None:
         preprocessor_overrides={"device_processor": {"device": str(policy.config.device)},
                                 "rename_observations_processor": {"rename_map": rename}},
     )
+    # ★ 环境和**策略**都要定住。`env.reset(seed=…)` 只固定物体摆放；而 flow-matching
+    #   采样动作用的是全局 torch 随机数，它的状态取决于此前抽过多少次 ——
+    #   于是同一个种子在不同的场景顺序下给出不同轨迹。实测：cube20 单独跑时成功，
+    #   排在 cube40 之后跑就失败，同一份权重同一个种子。不定住它，这个脚本的输出不可复现。
+    torch.manual_seed(SEED)
     obs, _ = env.reset(seed=SEED)
     policy.reset()
 
@@ -92,7 +97,7 @@ def record(policy, ckpt: Path, task: str, steps: int, out_dir: Path) -> None:
     imageio.mimsave(out_dir / f"{task}.mp4", frames, fps=30, macro_block_size=1)
     (out_dir / f"{task}.tsv").write_text(
         "\n".join(f"{i}\t{g:.4f}" for i, g in enumerate(grips)) + "\n")
-    print(f"  {task}: {len(frames)} 帧，首次判成功在第 {first_success} 步")
+    print(f"  {task}: {len(frames)} 帧，种子 {SEED}，首次判成功在第 {first_success} 步")
 
 
 def main(argv) -> int:
@@ -108,8 +113,21 @@ def main(argv) -> int:
     from lerobot.policies.factory import get_policy_class
 
     cfg = PreTrainedConfig.from_pretrained(ckpt)
-    policy = get_policy_class(cfg.type).from_pretrained(ckpt).to("cuda").eval()
-    print(f"  策略类型 {cfg.type}")
+    cls = get_policy_class(cfg.type)
+    if (ckpt / "adapter_model.safetensors").is_file():
+        # LoRA 产物落的是适配器，不是整套权重：要先读 PeftConfig 找到基座，再把旁路挂上去。
+        # 直接 from_pretrained(适配器目录) 会因为没有 model.safetensors 而失败。
+        from peft import PeftConfig, PeftModel
+        pc = PeftConfig.from_pretrained(str(ckpt))
+        base = cls.from_pretrained(pc.base_model_name_or_path)
+        policy = PeftModel.from_pretrained(base, str(ckpt)).to("cuda").eval()
+        # PeftModel 把策略包了一层，而下面要用 policy.config / .reset / .select_action，
+        # 它们都在被包的那个对象上 —— 取出来直接用，别隔着包装层调。
+        policy = policy.merge_and_unload().to("cuda").eval()
+        print(f"  策略类型 {cfg.type}（适配器已合并进基座）")
+    else:
+        policy = cls.from_pretrained(ckpt).to("cuda").eval()
+        print(f"  策略类型 {cfg.type}")
     for task in tasks:
         record(policy, ckpt, task, steps, out_dir)
     print("RECORD_FULL_DONE")

@@ -2400,6 +2400,19 @@ LoRA 的损失全程高一截、末点 0.099 对 0.052；深浅两色的方点�
 
 \end{figure}%
 
+先看它在仿真里跑成什么样 ------
+三个任务各一集成功回合，每个任务两行八帧：
+
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=0.92\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/fig12-3-lora-rollout.png}
+
+}
+
+\caption{三个任务各占两行（自上而下：方块、小方块、易拉罐），每个任务八帧走完一整个回合：初始位姿、夹爪降向物体、合拢夹住、抬起进入搬运、停在料箱上方、松手让物体落进箱、手臂退回、回到起始位姿}
+
+\end{figure}%
+
 最终 checkpoint 在三个仿真任务上各跑 50 局，与 2.4 节那轮并排：
 
 \begin{center}
