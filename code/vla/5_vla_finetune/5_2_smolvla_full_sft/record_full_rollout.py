@@ -10,7 +10,8 @@
 ★ 每步的夹爪动作一并存进 `<场景>.tsv`。连拍图要按**夹爪开合**定位关键时刻，
   硬编帧号换一集就指向别处 —— 本项目在"取错时刻"上栽过四次。
 
-用法：python record_full_rollout.py <checkpoint 目录> <输出目录> [步数]
+用法：python record_full_rollout.py <checkpoint 目录> <输出目录> [步数] [场景 id ...]
+      不给场景就录全部三个。
 """
 
 import sys
@@ -24,8 +25,10 @@ TASKS = [
     "SO101PickPlaceCube20-v1",
     "SO101PickPlaceCylinder40-v1",
 ]
-# 与训练、评测逐字相同的键名映射（数据集相机名 → 策略输入名）。
-RENAME = {
+# 相机键名映射（数据集相机名 → 策略输入名）。**只有 SmolVLA 需要**：它的预训练权重
+# 认的是 camera1/camera2。ACT 从零训、pi0 用自己的命名，都直接用数据集里的 top/wrist，
+# 传了反而会把键改错。所以按策略类型决定给不给。
+RENAME_SMOLVLA = {
     "observation.images.top": "observation.images.camera1",
     "observation.images.wrist": "observation.images.camera2",
 }
@@ -59,11 +62,12 @@ def record(policy, ckpt: Path, task: str, steps: int, out_dir: Path) -> None:
     )
     # 走与 `lerobot-eval` 逐字相同的 pre/post 管线（lerobot_eval.py:176）。手写一份
     # 会漏掉分词、归一化、设备搬运里的任何一步，而漏了**不报错**，只表现为成功率低。
+    rename = RENAME_SMOLVLA if policy.config.type == "smolvla" else {}
     pre, post = make_pre_post_processors(
         policy_cfg=policy.config,
         pretrained_path=str(ckpt),
         preprocessor_overrides={"device_processor": {"device": str(policy.config.device)},
-                                "rename_observations_processor": {"rename_map": RENAME}},
+                                "rename_observations_processor": {"rename_map": rename}},
     )
     obs, _ = env.reset(seed=SEED)
     policy.reset()
@@ -77,7 +81,7 @@ def record(policy, ckpt: Path, task: str, steps: int, out_dir: Path) -> None:
         with torch.inference_mode():
             action = post(policy.select_action(pre(feed)))
         act = action.squeeze(0).cpu().numpy()
-        obs, _, terminated, _, info = env.step(act)
+        obs, _, terminated, _, _ = env.step(act)
         frames.append(env.render())
         grips.append(float(act[-1]))
         if terminated and first_success is None:
@@ -92,15 +96,21 @@ def record(policy, ckpt: Path, task: str, steps: int, out_dir: Path) -> None:
 
 
 def main(argv) -> int:
-    if len(argv) not in (2, 3):
+    if len(argv) < 2:
         sys.exit(__doc__)
     ckpt, out_dir = Path(argv[0]), Path(argv[1])
-    steps = int(argv[2]) if len(argv) == 3 else 300
+    steps = int(argv[2]) if len(argv) >= 3 else 300
+    tasks = argv[3:] or TASKS
 
-    from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
+    # 按 checkpoint 自报的 type 取策略类，别写死某一个 —— 这个脚本要同时服务
+    # SmolVLA / ACT / pi0 三条线，写死就得复制三份，改一处忘两处只是时间问题。
+    from lerobot.configs.policies import PreTrainedConfig
+    from lerobot.policies.factory import get_policy_class
 
-    policy = SmolVLAPolicy.from_pretrained(ckpt).to("cuda").eval()
-    for task in TASKS:
+    cfg = PreTrainedConfig.from_pretrained(ckpt)
+    policy = get_policy_class(cfg.type).from_pretrained(ckpt).to("cuda").eval()
+    print(f"  策略类型 {cfg.type}")
+    for task in tasks:
         record(policy, ckpt, task, steps, out_dir)
     print("RECORD_FULL_DONE")
     return 0

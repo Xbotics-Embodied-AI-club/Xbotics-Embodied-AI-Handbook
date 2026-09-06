@@ -156,7 +156,24 @@ echo "== ③ $NGPU 卡全量微调（$MODEL，每进程 batch $BATCH ⇒ effecti
 #
 # 不开 `--eval.use_async_envs`：AsyncVectorEnv 默认 fork，而 ManiSkill 的每个 worker
 # 都要自己的 CUDA 上下文，fork 出来的子进程不能再初始化 CUDA，实测直接 RuntimeError。
-"${BIN}accelerate" launch --num_processes="$NGPU" --mixed_precision=bf16 \
+# ★ 两个开关直接决定装不装得下，默认跟着上一次跑通的那轮走：
+#   AMP=      不给 accelerate 传 --mixed_precision。混合精度会为 bf16 权重再存一份
+#             **fp32 主副本**，4B 参数就是多 16 GB/卡。以前那次 use_amp=False 跑通过。
+#   WITH_ENV= 不传 --env.*，训练途中不做仿真评测。传了的话**每个 rank 都会起一个
+#             ManiSkill 渲染环境**，各占若干 GB —— 六个 rank 就是六份。评测放训练后单独跑。
+#   两条都是从以前那次跑通的 train_config.json 里读出来的差异，不是猜的。
+AMP="${AMP-bf16}"
+ENV_ARGS=()
+if [ -n "${WITH_ENV-1}" ]; then
+  ENV_ARGS=(--env.type=so101_sim --env.task=SO101PickPlaceCube40-v1
+            --env.control_mode=pd_joint_pos --env.observation_width=640
+            --env.observation_height=480 --env.episode_length=500 --env.fps=30
+            --eval_freq="${EVAL_FREQ:-5000}" --eval.n_episodes=10 --eval.batch_size=5)
+fi
+LAUNCH=("${BIN}accelerate" launch --num_processes="$NGPU")
+[ -n "$AMP" ] && LAUNCH+=(--mixed_precision="$AMP")
+
+"${LAUNCH[@]}" \
   "${BIN}lerobot-train" \
   --policy.path="$PRETRAINED" \
   --policy.device=cuda \
@@ -173,18 +190,9 @@ echo "== ③ $NGPU 卡全量微调（$MODEL，每进程 batch $BATCH ⇒ effecti
   --dataset.image_transforms.max_num_transforms=5 \
   --dataset.image_transforms.tfs="$TFS" \
   --rename_map='{"observation.images.top": "observation.images.camera1", "observation.images.wrist": "observation.images.camera2"}' \
-  --env.type=so101_sim \
-  --env.task=SO101PickPlaceCube40-v1 \
-  --env.control_mode=pd_joint_pos \
-  --env.observation_width=640 \
-  --env.observation_height=480 \
-  --env.episode_length=500 \
-  --env.fps=30 \
+  "${ENV_ARGS[@]}" \
   --batch_size="$BATCH" \
   --steps="${STEPS:-30000}" \
-  --eval_freq="${EVAL_FREQ:-5000}" \
-  --eval.n_episodes=10 \
-  --eval.batch_size=5 \
   --save_freq=2500 \
   --log_freq=100 \
   --num_workers="${WORKERS:-8}" \
