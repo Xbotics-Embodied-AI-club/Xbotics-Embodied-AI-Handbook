@@ -25,14 +25,21 @@ $$
 ## 环境准备
 
 ```bash
-pip install numpy opencv-python
+cd "code/lecture06/Hand-eye calibration"
+python -m venv .venv
+source .venv/bin/activate
+pip install "numpy" "opencv-python<5"
 ```
 
 如果默认镜像下载较慢或失败，可以临时使用清华 PyPI 镜像：
 
 ```bash
-pip install -i https://pypi.tuna.tsinghua.edu.cn/simple numpy opencv-python
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple "numpy" "opencv-python<5"
 ```
+
+> ⚠️ `opencv-python` 必须用 **4.x**（`<5`）：OpenCV 5.0 重构了 Python API，移除了
+> `cv2.calibrateHandEye`（本讲求解器依赖的接口）。直接 `pip install opencv-python`
+> 会装到 5.x 并报 `AttributeError: module 'cv2' has no attribute 'calibrateHandEye'`。
 
 ## 目录说明
 
