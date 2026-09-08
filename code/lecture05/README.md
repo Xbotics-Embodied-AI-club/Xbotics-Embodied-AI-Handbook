@@ -41,7 +41,10 @@ git clone --filter=blob:none --sparse --no-checkout \
   https://github.com/google-deepmind/mujoco_menagerie.git
 git -C mujoco_menagerie sparse-checkout set robotstudio_so101
 git -C mujoco_menagerie checkout 71f066ad0be9cd271f7ed58c030243ef157af9f4
+cp scenes/scene_box_mass.xml scenes/scene_box_lowfriction.xml mujoco_menagerie/robotstudio_so101/
 ```
+
+最后一行把 `scenes/` 下两个**自建场景**复制进 menagerie：它们是实验二/三（`mass.py`/`friction.py`）依赖、上游 menagerie 没有，随仓库分发。
 
 验证安装：
 
@@ -98,6 +101,7 @@ code/lecture05/
 | `experiments/mass.py` | 实验二：方块质量对比 |
 | `experiments/friction.py` | 实验三：方块—桌面摩擦对比 |
 | `mujoco_menagerie/` | Menagerie 稀疏 clone，只含 `robotstudio_so101` |
+| `scenes/` | 自建场景 `scene_box_mass.xml`、`scene_box_lowfriction.xml`，clone 后复制进 `mujoco_menagerie/robotstudio_so101/` |
 | `results/` | 全部 CSV 输出与录像 |
 | `requirements.txt` | pip 依赖清单 |
 
@@ -110,6 +114,8 @@ code/lecture05/
 | `scene_box.xml` | pick-place 基线场景，方块 `size="0.02 0.02 0.03"`、`friction="1 .03 .003"`、无 `mass` 属性（默认密度 1000 → 约 0.096 kg），含 `pickup` 关键帧 |
 | `scene_box_mass.xml` | 与 `scene_box.xml` **仅差一行**：方块 `mass="0.20"` |
 | `scene_box_lowfriction.xml` | 与 `scene_box.xml` **仅差一行**：sliding friction `1 → 0.1` |
+
+前三个（`so101.xml`/`scene.xml`/`scene_box.xml`）来自上游 menagerie；后两个是自建场景，随仓库放在 `scenes/`，sparse clone 后按上方命令复制进去。
 
 ## 推荐实操流程
 
