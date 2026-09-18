@@ -1236,35 +1236,14 @@ loss 判断``还该不该继续训''会一直得到``该''，得看右边那条�
 真机走的是同一套流程：同一个 \texttt{lerobot-train} 入口，同样把
 \texttt{freeze\_vision\_encoder} 与 \texttt{train\_expert\_only}
 关掉，同样拿 \texttt{num\_learnable\_params}
-核对。换到真机之后有三件事不一样。
+核对。换到真机之后有两件事不一样。
 
 \textbf{一是数据来路。} 训练用的是公开的 SO-101
 遥操数据，九个任务。它出自别人的机位，光照与白平衡跟自己这条臂必然不同，所以图像增强里的光度扰动要开得比官方默认宽------亮度与对比度从
 0.8--1.2 放到 0.7--1.3，白平衡靠 hue 与 saturation
 模拟色温漂移（torchvision 没有独立的白平衡算子，这是标准做法）。
 
-\textbf{二是验收判据不能用相关系数。} 这批数据里 \texttt{action}
-是主臂的目标位姿、\texttt{observation.state}
-是从臂的实测位姿，两者天然贴在一起。实测过：什么都不学、把
-\texttt{state} 原样抄成预测，逐关节 \texttt{corr(pred,\ action)} 就有
-0.936--0.995，全部能过
-0.9------这条门槛没有任何区分力。换成三个相对量，基线由数据自己定义，不用外部拍阈值：
-
-\begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1675\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.6207\linewidth - 2\tabcolsep\relax} >{\raggedright\arraybackslash}p{\dimexpr 0.2118\linewidth - 2\tabcolsep\relax}@{}}
-\toprule\noalign{}
-指标 & 定义 & 它抓什么 \\
-\midrule\noalign{}
-\texttt{ratio} & \texttt{MAE(pred,\ action)\ /\ MAE(state,\ action)} & 照抄基线恒为 1，模型要明显低于 1 \\
-\texttt{delta\_\allowbreak corr} & \texttt{corr(pred\ −\ state,\ action\ −\ state)} & ``下一步往哪挪''学到没有 \\
-\texttt{delta\_\allowbreak std} & \texttt{std(pred\ −\ state)\ /\ std(action\ −\ state)} & 抓``输出≈state''这种坍缩 \\
-\bottomrule\noalign{}
-\end{tabular}
-\end{center}
-
-这三个量算的都是\textbf{开环逐帧比对}：每帧独立预测，不接上一帧的结果。真机上动作是连续下发的，误差会一步步累积，所以它们过了只说明模型学到了非平凡的东西，闭环还得真跑。
-
-\textbf{三是推理与执行分家。}
+\textbf{二是推理与执行分家。}
 大多数边缘端设备都没有足够的算力和内存把一个 VLA 跑起来------\(\pi_0\)
 权重就有 3 GB 多、SmolVLA 也有 900
 MB，板上加载完再推理，内存和延迟都撑不住。所以让板子只干必须在现场干的事，模型推理放
@@ -1286,6 +1265,24 @@ checkpoint、跑策略推理、回一个动作块；两者之间一条蓝色箭�
 是客户端握手时告诉它的，所以同一个服务端可以先后接 \(\pi_0\) / ACT /
 SmolVLA 三种客户端，换模型不用重启。相机与舵机的设备名由 udev
 规则固定，不靠 \texttt{/dev/video0} 这种会随插拔重排的号。
+
+这套链路真跑起来是下面这样。九个任务里取五个，每个任务录一整个闭环回合，指令直接用训练时那句任务描述：
+
+\begin{figure}[htbp]
+
+{\centering \includegraphics[width=0.92\linewidth,height=\textheight,keepaspectratio]{../../assets/figures/lecture12/ref/fig12-2-real-rollout-strip.png}
+
+}
+
+\caption{五个任务各占一行（自上而下：方块、易拉罐、毛绒玩具、橡皮、电池），每行四帧走完一个回合：物体摆在桌上、手臂停在起始位姿；夹爪降到物体上合拢夹住；抬起后朝料箱方向搬运；松手，物体落在料箱里、手臂退开。同一套权重、同一条
+gRPC 链路，只换任务描述这一句话}
+
+\end{figure}%
+
+这五行证明的是链路跑得通、策略在真机上确实会抓会放，\textbf{不是成功率}
+------
+每个任务只录了一个成功回合，没有统计试次，也没有把失败的样子放进来。真机的成功率要照
+2.4 节仿真那套口径逐任务连跑若干局才报得出来。
 
 真机九任务的权重也公开了：\url{https://huggingface.co/Harrysunshine/so101-smolvla-9task}
 
