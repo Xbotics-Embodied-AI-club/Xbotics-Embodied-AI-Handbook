@@ -2692,7 +2692,7 @@ wheels = [
 [[package]]
 name = "lerobot"
 version = "0.5.1"
-source = { git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=main#9381726d2a99f1da8f822ab0917246106d6f8d7c" }
+source = { git = "https://github.com/Xbotics-Embodied-AI-club/lerobot.git?branch=main#889adfb0e43ca85e160df31e754c4604d7c87205" }
 dependencies = [
     { name = "accelerate" },
     { name = "av" },
