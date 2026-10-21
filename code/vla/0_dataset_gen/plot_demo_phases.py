@@ -3,8 +3,8 @@
 在讲10 3.2.2 节被引用：读者要能看见「脚本化专家产出的一集」到底长什么样 ——
 六条曲线怎么走、五个阶段各占多长、夹爪在哪两处动。
 
-阶段边界从**夹爪指令**解出来，不硬编帧号：夹爪张开过之后首次合到底 = 抓住，
-此后首次再张开 = 松手。起手那一帧夹爪本来就是合的（张开会把物体推走），
+阶段边界从**夹爪指令与手臂动静**解出来，不硬编帧号：夹爪张开过之后首次合到底 = 抓住，
+此后首次再张开 = 松手；合拢、松手两段各算到手臂重新动起来为止。起手那一帧夹爪本来就是合的（张开会把物体推走），
 所以必须先等它张开过，否则边界会落在第 0 帧。
 
 ★ 存盘路径就是讲义引用的那个路径，不存别处再拷（xb-q1ut）。
@@ -56,15 +56,21 @@ def load_episode(root: Path, ep: int) -> np.ndarray:
     sys.exit(f"★ 没有第 {ep} 集")
 
 
-def phase_bounds(grip: np.ndarray) -> list[int]:
-    """按夹爪指令解出五个阶段的分界帧。
+def phase_bounds(grip: np.ndarray, arm: np.ndarray) -> list[int]:
+    """按夹爪指令与手臂动静解出五个阶段的分界帧。
+
+    合拢段从夹爪开始合拢算到手臂重新动起来（含「手臂不动、保持若干帧让堵转建立」那一段）；
+    松手段从夹爪开始张开算到手臂开始回家。只按夹爪算的话，合拢、松手各只有夹爪在动的三五帧，
+    色块窄成一条线，和正文说的「保持若干帧」对不上（VLA-wri-001 重画时发现）。
 
     Args:
         grip: `(帧数,)` 夹爪指令，小 = 合拢。
+        arm: `(帧数, 5)` 五个臂关节角（度）。
 
     Returns:
         长度 6 的分界点（含首尾）。
     """
+    moving = np.abs(np.diff(arm, axis=0)).max(axis=1) > 0.05   # 第 i 帧到第 i+1 帧手臂在动
     mid = (grip.max() + grip.min()) / 2
     opened = grip > mid
     if not opened.any():
@@ -75,14 +81,16 @@ def phase_bounds(grip: np.ndarray) -> list[int]:
     open_again = opened[close_at:]
     release_at = close_at + int(np.argmax(open_again))
     last = len(grip) - 1
-    # 合拢段 = 夹爪一直在往小走的那几帧；松手段 = 一直在往大走的那几帧。
+    # 合拢段、松手段的终点 = 夹爪动完之后、手臂第一次重新动起来的那一帧。
     # ★ 别写成「首次到达最小值」：夹爪合到底之后会在底部维持很久，最小值可能出现在
     #   搬运段末尾，于是边界跑到松手之后去 —— 实测得到过 [0,155,359,286,287,376] 这种逆序，
     #   而 matplotlib 画逆序区间**不报错**，只是把色块画反。
     def settle(start: int, sign: int) -> int:
         d = np.diff(grip[start:])
         k = int(np.argmax(sign * d >= 0)) if (sign * d >= 0).any() else len(d)
-        return min(start + max(k, 1), last)
+        done = min(start + max(k, 1), last)          # 夹爪动完
+        rest = np.flatnonzero(moving[done:])
+        return min(done + int(rest[0]), last) if rest.size else last
 
     return [0, close_at, settle(close_at, +1), release_at, settle(release_at, -1), last]
 
@@ -94,7 +102,7 @@ def main(argv) -> int:
     ep = int(argv[1]) if len(argv) == 2 else 0
     act = load_episode(root, ep)
     arm, grip = act[:, :5], act[:, 5]
-    b = phase_bounds(grip)
+    b = phase_bounds(grip, arm)
     t = np.arange(len(act))
 
     figstyle.assert_covered(
