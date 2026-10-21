@@ -170,7 +170,7 @@ python simulation/minimal_reach.py
 
 ![VLA 模型演进时间线](./assets/figures/lecture11/ref/intro/vla_timeline.png)
 
-| 第 10 讲 · 方块 / 小方块 / 易拉罐 | 第 12 讲 · SmolVLA 微调后的仿真 rollout |
+| 第 10 讲 · 方块 / 小方块 / 圆柱体 | 第 12 讲 · SmolVLA 微调后的仿真 rollout |
 |:---:|:---:|
 | ![三个抓放场景](./assets/figures/lecture10/fig10-3-sim-scenes.png) | ![SmolVLA 微调后的抓放 rollout](./assets/figures/lecture12/ref/fig12-2-rollout-strip.png) |
 

@@ -29,7 +29,7 @@ plt.rcParams.update({"font.size": 9, "axes.labelsize": 9, "legend.fontsize": 8,
                      "xtick.labelsize": 9, "ytick.labelsize": 8})
 OUT = HERE.resolve().parents[3] / "assets" / "figures" / "lecture12" / "ref"
 
-TASKS = ("方块 40mm", "小方块 20mm", "易拉罐")
+TASKS = ("方块 40mm", "小方块 20mm", "圆柱体")
 # (图例, 颜色, 三场成功率 %)。顺序 = 图上从左到右。
 RUNS = (
     ("SmolVLA 全参 403M", "#c0392b", (94.0, 90.0, 96.0)),
