@@ -10,7 +10,7 @@ SERVER=127.0.0.1:8080
 # 隧道：`ssh -R 8080:localhost:8080 robot@<板子IP>`，板上就把 SERVER 写 127.0.0.1:8080 走隧道。
 
 # ACT 是单任务模型（只训了方块那一个任务），不是 9 任务混训的。
-PRETRAINED=Harrysunshine/so101-act-cube
+PRETRAINED=Harrysunshine/so101-act-real-cube
 
 # 这个 --task 对 ACT 其实不起作用：lerobot 的 ACT 不接语言输入，它只看图像和关节角。
 # 参数是 client 必填的，所以照实写上，但换成别的字它的行为不会变。

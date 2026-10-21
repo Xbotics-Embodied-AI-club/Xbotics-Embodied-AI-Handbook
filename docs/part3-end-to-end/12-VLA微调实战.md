@@ -588,7 +588,7 @@ num_learnable_params=402737376 (403M)
 
 这五行证明的是链路跑得通、策略在真机上确实会抓会放，**不是成功率** —— 每个任务只录了一个成功回合，没有统计试次，也没有把失败的样子放进来。真机的成功率要照 2.4 节仿真那套口径逐任务连跑若干局才报得出来。
 
-真机九任务的权重也公开了：<https://huggingface.co/Harrysunshine/so101-smolvla-9task>
+真机九任务的权重也公开了：<https://huggingface.co/Harrysunshine/so101-smolvla-real-9task>
 
 ## 2.6 本节小结
 

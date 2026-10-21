@@ -10,7 +10,7 @@ SERVER=127.0.0.1:8080
 # 隧道：`ssh -R 8080:localhost:8080 robot@<板子IP>`，板上就把 SERVER 写 127.0.0.1:8080 走隧道。
 
 # 与 π0 同一批 9 任务数据训出来的，用来做对照。采用点是末点 030000。
-PRETRAINED=Harrysunshine/so101-smolvla-9task
+PRETRAINED=Harrysunshine/so101-smolvla-real-9task
 
 # SmolVLA 看语言，任务文本同样要用训练数据里的说法。
 TASK="Pick up a battery and place in the bin"
